@@ -1,5 +1,47 @@
 # FazAI Changelog
 
+## [3.1.0-beta] - 2025-11-14
+
+### Added
+- **Arquitetura Terminal FazAI** com 5 collections Qdrant especializadas
+- **Importador de conversas** (Claude Desktop + ChatGPT Desktop → Qdrant)
+  - Comando: `fazai import <file> --source=<claude|chatgpt>`
+  - Extração automática de conhecimento técnico para fazai_kb
+  - Extração de padrões de aprendizado para fazai_learning
+  - Suporte a importação recursiva de diretórios
+- **Instalador completo** com instalação do Qdrant (Docker/Podman/Binário)
+- **Manual completo** (MANUAL.md) com 700+ linhas e 8 casos de uso reais
+- **Bash completion** (Bash + Zsh) para todos os comandos e flags
+- **Suite de testes reais** com Vitest (sem mocks)
+  - Integration tests com Qdrant real
+  - Unit tests para sistema de configuração
+  - Coverage support
+- **Collections Qdrant:**
+  - fazai_personality - Expertise e estilo de troubleshooting
+  - fazai_memory - Histórico operacional
+  - fazai_learning - Aprendizado técnico
+  - fazai_kb - Base de conhecimento Linux/Redes (RAG)
+  - fazai_inference - Políticas de segurança e SLAs
+
+### Changed
+- **Sistema de configuração** prioriza `/etc/fazai/fazai.conf` (config do sistema)
+- **Installer** agora cria diretórios de sistema (/etc/fazai, /var/log/fazai)
+- **Collections renomeadas:** jarvis_* → fazai_*
+- **Foco especializado:** Administrador Linux Senior + Redes
+
+### Removed
+- Milvus completamente removido
+- Dependência `@zilliz/milvus2-sdk-node`
+- Todas as referências a "jarvis" (exceto em documentação histórica)
+
+### Technical
+- Dependência adicionada: `@qdrant/js-client-rest` ^1.15.1
+- Dependências de teste: `vitest` ^4.0.9, `@vitest/ui` ^4.0.9
+- Scripts npm: test, test:unit, test:integration, test:watch, test:ui, test:coverage
+- Build size: 656KB
+- TypeScript strict mode
+- Zero placeholders ou mocks
+
 ## [3.0.0-rc] - 2025-10-17
 
 - Reorganizado projeto para suceder a versão anterior (arquivada sob `~/deprecated`).
