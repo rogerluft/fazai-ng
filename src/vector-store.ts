@@ -3,7 +3,7 @@ import { getConfigValue } from "./config";
 import { logger } from "./logger";
 
 type VectorDistance = "Cosine" | "Euclid" | "Dot";
-type VectorProvider = "qdrant" | "milvus";
+type VectorProvider = "qdrant";
 
 interface SchemaField {
   name: string;
@@ -26,13 +26,7 @@ export interface VectorValidationOptions {
   distance?: VectorDistance;
   qdrantUrl?: string;
   qdrantApiKey?: string;
-  milvusAddress?: string;
-  milvusToken?: string;
-  milvusUsername?: string;
-  milvusPassword?: string;
-  milvusSecure?: boolean;
   recreate?: boolean;
-  createIndex?: boolean;
 }
 
 interface ValidationError {
@@ -53,35 +47,90 @@ export interface VectorValidationResult {
 const DEFAULT_VECTOR_DIMENSION = 1536;
 const DEFAULT_DISTANCE: VectorDistance = "Cosine";
 
+/**
+ * Terminal Jarvis + AutoGPT Collections
+ * Arquitetura de memória autônoma para o agente
+ */
 const COLLECTION_SCHEMAS: CollectionSchema[] = [
   {
-    name: "fazai_memory",
-    description: "Memória vetorial das conversas, histórico do usuário e contexto de execução.",
+    name: "jarvis_personality",
+    description: "Personalidade e preferências do agente - traits, valores, estilo de comunicação.",
+    metadataFields: [
+      { name: "trait_name", type: "string", description: "Nome do traço de personalidade", maxLength: 64 },
+      { name: "category", type: "string", description: "Categoria (comunicação, decisão, ética)", maxLength: 32 },
+      { name: "value", type: "text", description: "Descrição detalhada do valor/traço" },
+      { name: "intensity", type: "float", description: "Intensidade do traço (0.0-1.0)" },
+      { name: "context", type: "string", description: "Contexto de aplicação", maxLength: 128, optional: true },
+      { name: "tags", type: "string", description: "Tags auxiliares", array: true, maxLength: 32, optional: true },
+    ],
+  },
+  {
+    name: "jarvis_memory",
+    description: "Memória de longo prazo - conversas, contexto do usuário, histórico de vida.",
     metadataFields: [
       { name: "conversation_id", type: "string", description: "Identificador lógico da conversa", maxLength: 64 },
       { name: "message_id", type: "int", description: "Sequência incremental por conversa" },
-      { name: "role", type: "string", description: "user/assistant/system", maxLength: 16 },
+      { name: "role", type: "string", description: "user/assistant/system/autonomous", maxLength: 16 },
       { name: "timestamp", type: "string", description: "ISO timestamp", maxLength: 64 },
-      { name: "content", type: "text", description: "Conteúdo bruto da mensagem" },
+      { name: "content", type: "text", description: "Conteúdo bruto da mensagem/ação" },
       { name: "summary", type: "text", description: "Resumo curto para buscas", optional: true },
+      { name: "emotional_context", type: "string", description: "Contexto emocional detectado", maxLength: 64, optional: true },
+      { name: "importance", type: "float", description: "Score de importância (0.0-1.0)", optional: true },
       { name: "tags", type: "string", description: "Marcadores auxiliares", array: true, maxLength: 32, optional: true },
     ],
   },
   {
-    name: "fazai_kb",
-    description: "Base de conhecimento com soluções Linux e inferências validadas.",
+    name: "jarvis_learning",
+    description: "Aprendizado contínuo - erros, acertos, padrões descobertos, otimizações.",
+    metadataFields: [
+      { name: "learning_id", type: "string", description: "Identificador único do aprendizado", maxLength: 96 },
+      { name: "type", type: "string", description: "Tipo: erro, acerto, padrão, otimização", maxLength: 32 },
+      { name: "title", type: "string", description: "Título resumido", maxLength: 256 },
+      { name: "description", type: "text", description: "Descrição detalhada do que foi aprendido" },
+      { name: "context", type: "text", description: "Contexto completo da situação" },
+      { name: "action_taken", type: "text", description: "Ação que foi tomada", optional: true },
+      { name: "outcome", type: "string", description: "Resultado: sucesso, falha, parcial", maxLength: 32 },
+      { name: "confidence", type: "float", description: "Confiança na lição aprendida (0.0-1.0)" },
+      { name: "category", type: "string", description: "Categoria (linux, network, security, social)", maxLength: 64 },
+      { name: "timestamp", type: "string", description: "Quando foi aprendido", maxLength: 64 },
+      { name: "applied_count", type: "int", description: "Quantas vezes foi aplicado com sucesso", optional: true },
+      { name: "tags", type: "string", description: "Tags para busca", array: true, maxLength: 32, optional: true },
+    ],
+  },
+  {
+    name: "jarvis_kb",
+    description: "Base de conhecimento - soluções Linux, redes, inferências validadas (RAG).",
     metadataFields: [
       { name: "slug", type: "string", description: "Identificador estável", maxLength: 96 },
       { name: "title", type: "string", description: "Título curto da solução", maxLength: 256 },
       { name: "summary", type: "text", description: "Resumo detalhado da solução" },
-      { name: "category", type: "string", description: "Categoria principal (ex: networking, storage)", maxLength: 64 },
-      { name: "scope", type: "string", description: "Escopo de aplicação (ex: cluster, host)", maxLength: 64, optional: true },
-      { name: "linux_distribution", type: "string", description: "Distribuição alvo (ex: debian, rhel)", maxLength: 48, optional: true },
+      { name: "category", type: "string", description: "Categoria principal (networking, storage, security)", maxLength: 64 },
+      { name: "scope", type: "string", description: "Escopo de aplicação (cluster, host, container)", maxLength: 64, optional: true },
+      { name: "linux_distribution", type: "string", description: "Distribuição alvo (debian, rhel, arch)", maxLength: 48, optional: true },
       { name: "component", type: "string", description: "Componente/serviço relacionado", maxLength: 64, optional: true },
       { name: "commands", type: "text", description: "Sequência de comandos prevista", optional: true },
       { name: "source", type: "string", description: "Fonte da informação", maxLength: 256, optional: true },
       { name: "confidence", type: "float", description: "Score de confiança (0.0-1.0)", optional: true },
+      { name: "validated", type: "bool", description: "Se foi validado na prática", optional: true },
       { name: "tags", type: "string", description: "Marcadores livres", array: true, maxLength: 32, optional: true },
+    ],
+  },
+  {
+    name: "jarvis_inference",
+    description: "Inferências manuais - decisões explícitas, regras personalizadas, políticas do usuário.",
+    metadataFields: [
+      { name: "rule_id", type: "string", description: "Identificador da regra", maxLength: 96 },
+      { name: "title", type: "string", description: "Título da regra/decisão", maxLength: 256 },
+      { name: "description", type: "text", description: "Descrição completa da inferência" },
+      { name: "condition", type: "text", description: "Condição para aplicar a regra" },
+      { name: "action", type: "text", description: "Ação a ser tomada" },
+      { name: "priority", type: "int", description: "Prioridade de execução (maior = mais prioritária)" },
+      { name: "enabled", type: "bool", description: "Se a regra está ativa" },
+      { name: "created_by", type: "string", description: "user ou autonomous", maxLength: 32 },
+      { name: "created_at", type: "string", description: "Timestamp de criação", maxLength: 64 },
+      { name: "last_applied", type: "string", description: "Última vez que foi aplicada", maxLength: 64, optional: true },
+      { name: "apply_count", type: "int", description: "Quantas vezes foi aplicada", optional: true },
+      { name: "tags", type: "string", description: "Tags de categorização", array: true, maxLength: 32, optional: true },
     ],
   },
 ];
@@ -91,29 +140,22 @@ export async function validateVectorCollections(options: VectorValidationOptions
   const dimension = resolveDimension(options.dimension);
   const distance = resolveDistance(options.distance);
 
-  logger.info(chalk.cyan(`\n🗄️  Validando collections vetoriais (${provider})`));
-  logger.info(chalk.gray(`Dimensão padrão: ${dimension} · Métrica: ${distance}`));
+  logger.info(chalk.cyan(`\n🗄️  Validando collections vetoriais Terminal Jarvis (${provider})`));
+  logger.info(chalk.gray(`Dimensão: ${dimension} · Métrica: ${distance}`));
 
-  if (provider === "qdrant") {
-    return validateQdrantCollections({ ...options, dimension, distance });
-  }
-
-  return validateMilvusCollections({ ...options, dimension, distance });
+  return validateQdrantCollections({ ...options, dimension, distance });
 }
 
 function resolveProvider(input?: VectorProvider): VectorProvider {
-  const fromConfig = (getConfigValue("VECTOR_PROVIDER") ?? process.env.VECTOR_PROVIDER ?? "").toLowerCase();
+  const fromConfig = (getConfigValue("VECTOR_PROVIDER") ?? process.env.VECTOR_PROVIDER ?? "qdrant").toLowerCase();
   const resolved = input ?? (fromConfig as VectorProvider);
 
-  if (resolved === "qdrant" || resolved === "milvus") {
+  if (resolved === "qdrant") {
     return resolved;
   }
 
-  if (resolved === "zilliz") {
-    return "milvus";
-  }
-
-  throw new Error("Defina VECTOR_PROVIDER como 'qdrant' ou 'milvus' (ou passe provider explicitamente).");
+  logger.warn(chalk.yellow(`⚠️  Provider '${resolved}' não suportado. Usando Qdrant.`));
+  return "qdrant";
 }
 
 function resolveDimension(dimension?: number): number {
@@ -404,213 +446,5 @@ function safeJsonParse<T>(raw: string): T | null {
     return JSON.parse(raw) as T;
   } catch {
     return null;
-  }
-}
-
-interface MilvusValidationContext extends VectorValidationOptions {
-  dimension: number;
-  distance: VectorDistance;
-}
-
-async function validateMilvusCollections(options: MilvusValidationContext): Promise<VectorValidationResult> {
-  const address = resolveMilvusAddress(options.milvusAddress);
-  const secure = resolveBoolean(options.milvusSecure ?? process.env.MILVUS_SSL ?? getConfigValue("MILVUS_SSL"));
-  const username = options.milvusUsername ?? process.env.MILVUS_USERNAME ?? getConfigValue("MILVUS_USERNAME") ?? "root";
-  const password = options.milvusPassword ?? process.env.MILVUS_PASSWORD ?? getConfigValue("MILVUS_PASSWORD") ?? "Milvus";
-  const token = options.milvusToken ?? process.env.MILVUS_TOKEN ?? getConfigValue("MILVUS_TOKEN");
-
-  const created: string[] = [];
-  const verified: string[] = [];
-  const updated: string[] = [];
-  const errors: ValidationError[] = [];
-
-  let milvusClient: any;
-  let DataType: any;
-  let MetricType: any;
-
-  try {
-    const milvusModule = await import("@zilliz/milvus2-sdk-node");
-    milvusClient = new milvusModule.MilvusClient({
-      address,
-      ssl: secure,
-      username,
-      password,
-      token,
-    });
-    DataType = milvusModule.DataType;
-    MetricType = milvusModule.MetricType;
-  } catch (error) {
-    throw new Error(`Falha ao carregar @zilliz/milvus2-sdk-node: ${error instanceof Error ? error.message : String(error)}`);
-  }
-
-  const metric = distanceToMetric(options.distance, MetricType);
-
-  for (const schema of COLLECTION_SCHEMAS) {
-    try {
-      const has = await milvusClient.hasCollection({ collection_name: schema.name });
-      const exists = has?.value === true;
-
-      if (exists && options.recreate) {
-        logger.info(chalk.yellow(`↻  Recriando collection ${schema.name} em Milvus (remoção solicitada)`));
-        await milvusClient.dropCollection({ collection_name: schema.name });
-      }
-
-      if (!exists || options.recreate) {
-        logger.info(chalk.blue(`➕  Criando collection ${schema.name} em ${address}`));
-        await createMilvusCollection(milvusClient, DataType, schema, options.dimension);
-        created.push(schema.name);
-        if (options.createIndex !== false) {
-          await createMilvusIndex(milvusClient, schema.name, metric);
-        }
-        continue;
-      }
-
-      verified.push(schema.name);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      errors.push({ collection: schema.name, message });
-      logger.error(chalk.red(`❌  Falha ao validar ${schema.name} em Milvus: ${message}`));
-    }
-  }
-
-  return {
-    provider: "milvus",
-    dimension: options.dimension,
-    distance: options.distance,
-    created,
-    verified,
-    updated,
-    errors,
-  };
-}
-
-function resolveMilvusAddress(explicit?: string): string {
-  const candidate = explicit ?? process.env.MILVUS_ADDRESS ?? getConfigValue("MILVUS_ADDRESS");
-  if (candidate && candidate.trim().length > 0) {
-    return candidate.trim();
-  }
-  return "localhost:19530";
-}
-
-function resolveBoolean(value: unknown): boolean {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "string") {
-    const normalized = value.trim().toLowerCase();
-    return normalized === "1" || normalized === "true" || normalized === "yes" || normalized === "y" || normalized === "on";
-  }
-  return false;
-}
-
-async function createMilvusCollection(client: any, DataType: any, schema: CollectionSchema, dimension: number): Promise<void> {
-  const fields = buildMilvusFields(schema, dimension, DataType);
-
-  await client.createCollection({
-    collection_name: schema.name,
-    fields,
-  });
-}
-
-function buildMilvusFields(schema: CollectionSchema, dimension: number, DataType: any) {
-  const fields = [
-    {
-      name: `${schema.name}_id`,
-      data_type: DataType.Int64,
-      autoID: true,
-      is_primary_key: true,
-      description: "Identificador interno autoincremental",
-    },
-    {
-      name: "embedding",
-      data_type: DataType.FloatVector,
-      type_params: {
-        dim: String(dimension),
-      },
-      description: "Embedding vetorial padrão (OpenAI 1536 por padrão)",
-    },
-  ];
-
-  for (const field of schema.metadataFields) {
-    fields.push(mapFieldToMilvus(field, DataType));
-  }
-
-  return fields;
-}
-
-function mapFieldToMilvus(field: SchemaField, DataType: any) {
-  const base: Record<string, unknown> = {
-    name: field.name,
-    description: field.description ?? "",
-  };
-
-  switch (field.type) {
-    case "int":
-      return {
-        ...base,
-        data_type: DataType.Int64,
-      };
-    case "float":
-      return {
-        ...base,
-        data_type: DataType.Float,
-      };
-    case "bool":
-      return {
-        ...base,
-        data_type: DataType.Bool,
-      };
-    case "text":
-    case "string": {
-      const max = field.maxLength ?? (field.type === "text" ? 4096 : 512);
-      if (field.array) {
-        return {
-          ...base,
-          data_type: DataType.Array,
-          element_type: DataType.VarChar,
-          type_params: {
-            max_capacity: "32",
-            max_length: String(Math.min(max, 512)),
-          },
-        };
-      }
-      return {
-        ...base,
-        data_type: DataType.VarChar,
-        type_params: {
-          max_length: String(Math.min(max, 65535)),
-        },
-      };
-    }
-    default:
-      return {
-        ...base,
-        data_type: DataType.VarChar,
-        type_params: {
-          max_length: "1024",
-        },
-      };
-  }
-}
-
-async function createMilvusIndex(client: any, collection: string, metric: any): Promise<void> {
-  await client.createIndex({
-    collection_name: collection,
-    field_name: "embedding",
-    metric_type: metric,
-    index_type: "AUTOINDEX",
-    params: {},
-  });
-}
-
-function distanceToMetric(distance: VectorDistance, MetricType: any) {
-  switch (distance) {
-    case "Euclid":
-      return MetricType.L2;
-    case "Dot":
-      return MetricType.IP;
-    case "Cosine":
-    default:
-      return MetricType.COSINE;
   }
 }

@@ -11,7 +11,6 @@
   "type": "module",
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
-    "@zilliz/milvus2-sdk-node": "^2.3.7",
     "chalk": "4.1.2",
     "inquirer": "^12.10.0",
     "oboe": "^2.1.7",
