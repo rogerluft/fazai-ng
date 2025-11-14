@@ -23,7 +23,13 @@
     "build": "tsup",
     "postbuild": "node scripts/postbuild.js",
     "dev": "tsx src/app.ts",
-    "start": "node dist/app.cjs"
+    "start": "node dist/app.cjs",
+    "test": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:watch": "vitest watch",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage"
   },
   "files": [
     "dist",
@@ -40,8 +46,10 @@
   "devDependencies": {
     "@swc/core": "^1.7.0",
     "@types/node": "^20.14.11",
+    "@vitest/ui": "^4.0.9",
     "tsup": "^8.2.0",
     "tsx": "^4.0.0",
-    "typescript": "^5.5.3"
+    "typescript": "^5.5.3",
+    "vitest": "^4.0.9"
   }
 }
