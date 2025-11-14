@@ -1,0 +1,130 @@
+name: Auto PR Merge
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+
+permissions:
+  contents: write
+  pull-requests: write
+  checks: read
+  statuses: read
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup git user
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine PR and run prechecks
+        id: precheck
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const pr = context.payload.pull_request;
+            if (!pr) {
+              core.setFailed('No pull_request in payload');
+              return;
+            }
+            const prNumber = pr.number;
+            const headRef = pr.head.ref;
+            const baseRef = pr.base.ref;
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            if (pr.merged) {
+              core.info('PR already merged');
+              core.setOutput('action', 'noop');
+              return;
+            }
+            const sha = pr.head.sha;
+            const combined = await github.repos.getCombinedStatusForRef({ owner, repo, ref: sha });
+            const state = combined.data.state;
+            const runs = await github.checks.listForRef({ owner, repo, ref: sha });
+            const checkRuns = runs.data.check_runs || [];
+            const hasFailingChecks = (state === 'failure') || checkRuns.some(r => r.conclusion === 'failure');
+            const hasPendingChecks = (state === 'pending') || checkRuns.some(r => r.status !== 'completed');
+            if (hasFailingChecks) {
+              await github.issues.createComment({ owner, repo, issue_number: prNumber, body: 'Auto-merge aborted: some CI checks failed.' });
+              core.setOutput('action', 'abort');
+              return;
+            }
+            if (hasPendingChecks) {
+              core.info('Checks pending; will re-run on next event.');
+              core.setOutput('action', 'wait');
+              return;
+            }
+            core.setOutput('pr_number', prNumber);
+            core.setOutput('head_ref', headRef);
+            core.setOutput('base_ref', baseRef);
+            core.setOutput('head_sha', sha);
+            core.setOutput('action', 'proceed');
+
+      - name: Try fast merge via GitHub API
+        if: steps.precheck.outputs.action == 'proceed'
+        id: api_merge
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const prNumber = parseInt(core.getInput('pr_number') || steps.precheck.outputs.pr_number);
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            try {
+              const res = await github.pulls.merge({ owner, repo, pull_number: prNumber, merge_method: 'squash' });
+              if (res.data.merged) {
+                await github.issues.createComment({ owner, repo, issue_number: prNumber, body: 'Auto-merge: PR merged via API (squash).' });
+                core.setOutput('merged', 'true');
+                return;
+              }
+            } catch (err) {
+              core.info('API merge failed or conflict: ' + err.message);
+            }
+            core.setOutput('merged', 'false');
+
+      - name: Backup and attempt git-based merge (resolve lockfile conflicts)
+        if: steps.api_merge.outputs.merged == 'false' && steps.precheck.outputs.action == 'proceed'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          PR_NUMBER=${{ steps.precheck.outputs.pr_number }}
+          HEAD_REF=${{ steps.precheck.outputs.head_ref }}
+          BASE_REF=${{ steps.precheck.outputs.base_ref }}
+          TIMESTAMP=$(date +'%Y%m%d%H%M%S')
+          OWNER=${{ github.repository_owner }}
+          REPO=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+
+          echo "PR_NUMBER=$PR_NUMBER, HEAD_REF=$HEAD_REF, BASE_REF=$BASE_REF"
+
+          # Fetch branches
+          git fetch origin ${HEAD_REF}:${HEAD_REF}
+          git fetch origin ${BASE_REF}:${BASE_REF}
+
+          # Create backup of base branch
+          BACKUP_BRANCH=backup/pre-merge-pr-${PR_NUMBER}-${TIMESTAMP}
+          git checkout ${BASE_REF}
+          git checkout -b ${BACKUP_BRANCH}
+          git push origin ${BACKUP_BRANCH}
+
+          # Attempt merge without committing
+          git checkout ${BASE_REF}
+          set +e
+          git merge --no-commit --no-ff ${HEAD_REF}
+          MERGE_EXIT=$?
+          set -e
+
+          if [ $MERGE_EXIT -eq 0 ]; then
+            # No conflicts, commit and push merge commit to base
+            git commit -m "chore: merge PR #${PR_NUMBER} via auto-pr-merge action"
+            git push origin ${BASE_REF}
+
+            # Post success comment
+            curl -s -H "Authorization: token ${GITHUB_TOKEN}" -X POST "https://api.github.com/repos/${OWNER}/${REPO}/issues/${PR_NUMBER}/comments" -d '{"body":"Auto-merge: PR merged by workflow. Backup branch created: '+'backup/pre-merge-pr-${PR_NUMBER}-${TIMESTAMP}+'"}'
+          fi
