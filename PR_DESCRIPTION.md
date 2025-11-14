@@ -1,13 +1,15 @@
-# Terminal Jarvis: Arquitetura autônoma com Genkit + RAG (5 collections Qdrant)
+# Terminal FazAI: Administrador Linux Senior + Redes com Genkit + RAG
 
-## 🤖 Terminal Jarvis - Arquitetura de Agente Autônomo
+## 🖥️ Terminal FazAI - Agente Autônomo para Infraestrutura
 
-Transição completa do FazAI para **Terminal Jarvis**: CLI de administração Linux com capacidades autônomas via AutoGPT + Genkit.
+**FazAI v3.1-beta**: CLI de administração Linux e redes com capacidades autônomas via AutoGPT + Genkit.
+
+**Especialização:** Administrador de Sistemas Linux Senior + Administrador de Redes focado em soluções e monitoramento.
 
 ### 🎯 Arquitetura
 
 ```
-Terminal Jarvis + AutoGPT
+Terminal FazAI + AutoGPT
     ↓
 Genkit Plugins (Anthropic, Mistral, OpenAI)
     ↓
@@ -16,37 +18,36 @@ Qdrant Vector Store (RAG)
 5 Collections Especializadas
 ```
 
-### ✨ Novas Collections Qdrant
+### ✨ Collections Qdrant (Infraestrutura)
 
-**1. `jarvis_personality`** - Personalidade do agente
-- Traits, valores, estilo de comunicação
-- Intensidade e contexto de aplicação
+**1. `fazai_personality`** - Perfil do administrador
+- Expertise técnica, estilo de troubleshooting
+- Preferências operacionais e decisões
 
-**2. `jarvis_memory`** - Memória de longo prazo
-- Conversas e ações autônomas
-- Contexto emocional detectado
-- Score de importância
+**2. `fazai_memory`** - Memória operacional
+- Histórico de troubleshooting
+- Soluções aplicadas e contexto de infra
 
-**3. `jarvis_learning`** - Aprendizado contínuo
-- Erros, acertos e padrões descobertos
-- Contador de aplicações bem-sucedidas
-- Confiança na lição aprendida
+**3. `fazai_learning`** - Aprendizado técnico
+- Erros operacionais e soluções validadas
+- Padrões de falhas descobertos
+- Otimizações aplicadas
 
-**4. `jarvis_kb`** - Base de conhecimento (RAG)
+**4. `fazai_kb`** - Base de conhecimento (RAG)
 - Soluções Linux e redes validadas
-- Comandos e procedures
-- Categorização por distro/componente
+- Procedimentos de monitoramento
+- Comandos e troubleshooting
 
-**5. `jarvis_inference`** - Regras manuais
-- Decisões explícitas do usuário
-- Políticas e condições customizadas
-- Priorização de execução
+**5. `fazai_inference`** - Regras operacionais
+- Políticas de segurança e SLAs
+- Automações customizadas
+- Decisões administrativas
 
 ### 🔄 Breaking Changes
 
 - ❌ **Remove Milvus/Zilliz** completamente
 - ✅ **Qdrant exclusivo** como vector store
-- 🔄 Collections renomeadas: `fazai_*` → `jarvis_*`
+- 🔄 Collections: `fazai_personality`, `fazai_memory`, `fazai_learning`, `fazai_kb`, `fazai_inference`
 
 ### 📝 Documentação
 
@@ -76,6 +77,9 @@ Qdrant Vector Store (RAG)
 
 ---
 
+**Foco:** Administrador Linux Senior + Administrador de Redes
+**Especialização:** Soluções, Monitoramento, Troubleshooting, Automação
+
 **Referências originais mantidas:**
 - Fork de Mandark (Hrishi Olickel) - Apache 2.0
 - Documentação original citada
@@ -89,7 +93,7 @@ Qdrant Vector Store (RAG)
 ## Para criar o PR:
 
 ```bash
-gh pr create --title "Terminal Jarvis: Arquitetura autônoma com Genkit + RAG (5 collections Qdrant)" \
+gh pr create --title "Terminal FazAI v3.1-beta: Admin Linux Senior + Redes com AutoGPT + RAG" \
   --body-file PR_DESCRIPTION.md \
   --head claude/claude-md-mhz9jvk4tyerueu5-016SKNYEgrr5T6KU5XkgNy7F
 ```

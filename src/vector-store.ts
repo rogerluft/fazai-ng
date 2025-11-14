@@ -48,13 +48,13 @@ const DEFAULT_VECTOR_DIMENSION = 1536;
 const DEFAULT_DISTANCE: VectorDistance = "Cosine";
 
 /**
- * Terminal Jarvis + AutoGPT Collections
- * Arquitetura de memória autônoma para o agente
+ * Terminal FazAI - Administrador Linux Senior + Redes
+ * Collections para agente autônomo especializado em infraestrutura
  */
 const COLLECTION_SCHEMAS: CollectionSchema[] = [
   {
-    name: "jarvis_personality",
-    description: "Personalidade e preferências do agente - traits, valores, estilo de comunicação.",
+    name: "fazai_personality",
+    description: "Personalidade do administrador - expertise técnica, estilo de troubleshooting, preferências operacionais.",
     metadataFields: [
       { name: "trait_name", type: "string", description: "Nome do traço de personalidade", maxLength: 64 },
       { name: "category", type: "string", description: "Categoria (comunicação, decisão, ética)", maxLength: 32 },
@@ -65,8 +65,8 @@ const COLLECTION_SCHEMAS: CollectionSchema[] = [
     ],
   },
   {
-    name: "jarvis_memory",
-    description: "Memória de longo prazo - conversas, contexto do usuário, histórico de vida.",
+    name: "fazai_memory",
+    description: "Memória operacional - histórico de troubleshooting, soluções aplicadas, contexto de infraestrutura.",
     metadataFields: [
       { name: "conversation_id", type: "string", description: "Identificador lógico da conversa", maxLength: 64 },
       { name: "message_id", type: "int", description: "Sequência incremental por conversa" },
@@ -80,8 +80,8 @@ const COLLECTION_SCHEMAS: CollectionSchema[] = [
     ],
   },
   {
-    name: "jarvis_learning",
-    description: "Aprendizado contínuo - erros, acertos, padrões descobertos, otimizações.",
+    name: "fazai_learning",
+    description: "Aprendizado técnico - erros operacionais, soluções validadas, padrões de falhas, otimizações de infra.",
     metadataFields: [
       { name: "learning_id", type: "string", description: "Identificador único do aprendizado", maxLength: 96 },
       { name: "type", type: "string", description: "Tipo: erro, acerto, padrão, otimização", maxLength: 32 },
@@ -98,8 +98,8 @@ const COLLECTION_SCHEMAS: CollectionSchema[] = [
     ],
   },
   {
-    name: "jarvis_kb",
-    description: "Base de conhecimento - soluções Linux, redes, inferências validadas (RAG).",
+    name: "fazai_kb",
+    description: "Base de conhecimento - soluções Linux/redes, troubleshooting, monitoramento, procedimentos validados (RAG).",
     metadataFields: [
       { name: "slug", type: "string", description: "Identificador estável", maxLength: 96 },
       { name: "title", type: "string", description: "Título curto da solução", maxLength: 256 },
@@ -116,8 +116,8 @@ const COLLECTION_SCHEMAS: CollectionSchema[] = [
     ],
   },
   {
-    name: "jarvis_inference",
-    description: "Inferências manuais - decisões explícitas, regras personalizadas, políticas do usuário.",
+    name: "fazai_inference",
+    description: "Regras operacionais - políticas de segurança, SLAs, automações customizadas, decisões administrativas.",
     metadataFields: [
       { name: "rule_id", type: "string", description: "Identificador da regra", maxLength: 96 },
       { name: "title", type: "string", description: "Título da regra/decisão", maxLength: 256 },
@@ -140,7 +140,7 @@ export async function validateVectorCollections(options: VectorValidationOptions
   const dimension = resolveDimension(options.dimension);
   const distance = resolveDistance(options.distance);
 
-  logger.info(chalk.cyan(`\n🗄️  Validando collections vetoriais Terminal Jarvis (${provider})`));
+  logger.info(chalk.cyan(`\n🗄️  Validando collections vetoriais Terminal FazAI (${provider})`));
   logger.info(chalk.gray(`Dimensão: ${dimension} · Métrica: ${distance}`));
 
   return validateQdrantCollections({ ...options, dimension, distance });
