@@ -7,6 +7,8 @@ const CONFIG_ENV_PATH = "FAZAI_CONFIG_PATH";
 
 const HOME_DIR = os.homedir() || "";
 const DEFAULT_HOME_CONFIG_DIR = HOME_DIR ? path.join(HOME_DIR, ".config", "fazai") : "";
+const SYSTEM_CONFIG_DIR = "/etc/fazai";
+const SYSTEM_CONFIG_PATH = path.join(SYSTEM_CONFIG_DIR, CONFIG_FILE_NAME);
 
 const DEFAULT_WRITE_PATH = DEFAULT_HOME_CONFIG_DIR
   ? path.join(DEFAULT_HOME_CONFIG_DIR, CONFIG_FILE_NAME)
@@ -23,9 +25,14 @@ function getExplicitPath(): string | undefined {
 function getSearchPaths(): string[] {
   const paths: string[] = [];
 
+  // Prioridade 1: System-wide config (administrador pode definir padrões globais)
+  paths.push(SYSTEM_CONFIG_PATH);
+
+  // Prioridade 2: Current working directory (override local)
   const cwdPath = path.resolve(process.cwd(), CONFIG_FILE_NAME);
   paths.push(cwdPath);
 
+  // Prioridade 3: Script directory (desenvolvimento)
   if (process.argv[1]) {
     const scriptPath = path.resolve(process.argv[1]);
     const scriptDir = path.dirname(scriptPath);
@@ -33,10 +40,12 @@ function getSearchPaths(): string[] {
     paths.push(path.join(path.resolve(scriptDir, ".."), CONFIG_FILE_NAME));
   }
 
+  // Prioridade 4: User config directory (preferido para usuário)
   if (DEFAULT_HOME_CONFIG_DIR) {
     paths.push(path.join(DEFAULT_HOME_CONFIG_DIR, CONFIG_FILE_NAME));
   }
 
+  // Prioridade 5: Home directory (fallback legacy)
   if (HOME_DIR) {
     paths.push(path.join(HOME_DIR, CONFIG_FILE_NAME));
   }
@@ -147,4 +156,16 @@ export function getConfigFilePath(): string {
 
 export function configFileExists(): boolean {
   return findExistingConfigPath() !== undefined;
+}
+
+export function getConfigSearchPaths(): string[] {
+  return getSearchPaths();
+}
+
+export function getSystemConfigDir(): string {
+  return SYSTEM_CONFIG_DIR;
+}
+
+export function getSystemConfigPath(): string {
+  return SYSTEM_CONFIG_PATH;
 }
