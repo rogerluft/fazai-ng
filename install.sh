@@ -618,15 +618,16 @@ install_qdrant_docker() {
   info "Instalando Qdrant via Docker..."
 
   # Parar container existente se houver
-  docker stop fazai-qdrant 2>/dev/null || true
-  docker rm fazai-qdrant 2>/dev/null || true
+  docker stop qdrant 2>/dev/null || true
+  docker rm qdrant 2>/dev/null || true
 
   # Criar volume para persistência
   mkdir -p "$HOME/.fazai/qdrant_storage"
 
-  # Iniciar Qdrant
+  # Iniciar Qdrant com restart automático
   docker run -d \
-    --name fazai-qdrant \
+    --name qdrant \
+    --restart unless-stopped \
     -p 6333:6333 \
     -p 6334:6334 \
     -v "$HOME/.fazai/qdrant_storage:/qdrant/storage:z" \
@@ -642,7 +643,7 @@ install_qdrant_docker() {
     sleep 1
   done
 
-  error "Qdrant não iniciou corretamente. Verifique: docker logs fazai-qdrant"
+  error "Qdrant não iniciou corretamente. Verifique: docker logs qdrant"
 }
 
 # Instalar Qdrant via Podman
@@ -677,15 +678,16 @@ install_qdrant_podman() {
   info "Instalando Qdrant via Podman..."
 
   # Parar container existente se houver
-  podman stop fazai-qdrant 2>/dev/null || true
-  podman rm fazai-qdrant 2>/dev/null || true
+  podman stop qdrant 2>/dev/null || true
+  podman rm qdrant 2>/dev/null || true
 
   # Criar volume para persistência
   mkdir -p "$HOME/.fazai/qdrant_storage"
 
-  # Iniciar Qdrant
+  # Iniciar Qdrant com restart automático
   podman run -d \
-    --name fazai-qdrant \
+    --name qdrant \
+    --restart unless-stopped \
     -p 6333:6333 \
     -p 6334:6334 \
     -v "$HOME/.fazai/qdrant_storage:/qdrant/storage:z" \
@@ -701,7 +703,7 @@ install_qdrant_podman() {
     sleep 1
   done
 
-  error "Qdrant não iniciou corretamente. Verifique: podman logs fazai-qdrant"
+  error "Qdrant não iniciou corretamente. Verifique: podman logs qdrant"
 }
 
 # Instalar Qdrant via binário

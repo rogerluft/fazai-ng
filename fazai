@@ -15,6 +15,46 @@ done
 DIR="$(cd -P "$(dirname "$SOURCE")" >/dev/null 2>&1 && pwd)"
 NODE_PATH="$DIR/node_modules/.bin:$PATH"
 
+# Verificar se Qdrant está rodando
+check_qdrant() {
+    if ! curl -sf http://localhost:6333/health >/dev/null 2>&1; then
+        echo "⚠️  Qdrant não está rodando. Tentando iniciar..."
+        
+        # Tentar iniciar com Docker
+        if command -v docker &> /dev/null; then
+            if docker ps -a --format '{{.Names}}' | grep -q '^qdrant$'; then
+                docker start qdrant >/dev/null 2>&1
+            else
+                docker run -d --name qdrant -p 6333:6333 -p 6334:6334 \
+                    -v "$HOME/.fazai/qdrant_storage:/qdrant/storage" \
+                    qdrant/qdrant >/dev/null 2>&1
+            fi
+            sleep 2
+        # Tentar iniciar com Podman
+        elif command -v podman &> /dev/null; then
+            if podman ps -a --format '{{.Names}}' | grep -q '^qdrant$'; then
+                podman start qdrant >/dev/null 2>&1
+            else
+                podman run -d --name qdrant -p 6333:6333 -p 6334:6334 \
+                    -v "$HOME/.fazai/qdrant_storage:/qdrant/storage" \
+                    qdrant/qdrant >/dev/null 2>&1
+            fi
+            sleep 2
+        # Tentar iniciar serviço systemd
+        elif systemctl is-active --quiet qdrant; then
+            sudo systemctl start qdrant
+            sleep 2
+        else
+            echo "❌ Qdrant não encontrado. Instale com: ./install.sh"
+        fi
+    fi
+}
+
+# Verificar Qdrant antes de iniciar (apenas se comando não for help/version)
+if [[ "$1" != "--help" && "$1" != "-h" && "$1" != "--version" && "$1" != "-v" ]]; then
+    check_qdrant
+fi
+
 # Verificar se o arquivo compilado existe no repositório real
 if [ ! -f "$DIR/dist/app.cjs" ]; then
     echo "❌ Arquivo compilado não encontrado. Execute o script de instalação novamente."
