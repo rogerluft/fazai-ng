@@ -25,8 +25,14 @@ NC='\033[0m' # No Color
 
 # Configurações
 FAZAI_VERSION="3.1.0-beta"
-INSTALL_DIR="${FAZAI_INSTALL_DIR:-$HOME/.fazai}"
-BIN_DIR="${FAZAI_BIN_DIR:-$HOME/.local/bin}"
+# Instala global se root, senão user local
+if [[ $EUID -eq 0 ]]; then
+  INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
+  BIN_DIR="${FAZAI_BIN_DIR:-/usr/local/bin}"
+else
+  INSTALL_DIR="${FAZAI_INSTALL_DIR:-$HOME/.fazai}"
+  BIN_DIR="${FAZAI_BIN_DIR:-$HOME/.local/bin}"
+fi
 REPO_URL="https://github.com/rogerluft/fazai-ng"
 QDRANT_DEFAULT_URL="http://localhost:6333"
 

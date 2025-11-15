@@ -48,9 +48,14 @@ PREFER_LOCAL=false
 
 # Ollama Base URL (for local LLM)
 # Default: http://localhost:11434
+# Remote: http://192.168.0.101:11434
 # Remote server example: http://192.168.0.101:11434
 # OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_BASE_URL=http://192.168.0.101:11434
+
+# Available Ollama Models (comma-separated)
+# These are the models you have running on your Ollama instance
+OLLAMA_MODELS=gptoss-20b,llama3.2
 
 # MCP Context7 integration (optional)
 # Provide either an HTTP endpoint or a CLI command
