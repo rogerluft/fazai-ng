@@ -69,29 +69,63 @@ error() {
 # Verificar dependências
 check_dependencies() {
   info "Verificando dependências..."
-
+  
+  local missing_deps=()
+  
   # Node.js
   if ! command -v node &> /dev/null; then
-    error "Node.js não encontrado. Instale Node.js 18+ primeiro: https://nodejs.org"
+    missing_deps+=("Node.js 18+")
+    warning "Node.js não encontrado"
+  else
+    local node_version=$(node --version | sed 's/v//' | cut -d. -f1)
+    if [ "$node_version" -lt 18 ]; then
+      missing_deps+=("Node.js 18+ (atual: $(node --version))")
+      warning "Node.js 18+ requerido. Versão atual: $(node --version)"
+    else
+      success "Node.js $(node --version) ✓"
+    fi
   fi
-
-  local node_version=$(node --version | sed 's/v//' | cut -d. -f1)
-  if [ "$node_version" -lt 18 ]; then
-    error "Node.js 18+ requerido. Versão atual: $(node --version)"
-  fi
-  success "Node.js $(node --version) ✓"
-
+  
   # npm
   if ! command -v npm &> /dev/null; then
-    error "npm não encontrado"
+    missing_deps+=("npm")
+    warning "npm não encontrado"
+  else
+    success "npm $(npm --version) ✓"
   fi
-  success "npm $(npm --version) ✓"
-
+  
   # git
   if ! command -v git &> /dev/null; then
-    error "git não encontrado. Instale git primeiro."
+    missing_deps+=("git")
+    warning "git não encontrado"
+  else
+    success "git $(git --version | cut -d' ' -f3) ✓"
   fi
-  success "git $(git --version | cut -d' ' -f3) ✓"
+  
+  # curl ou wget
+  if ! command -v curl &> /dev/null && ! command -v wget &> /dev/null; then
+    missing_deps+=("curl ou wget")
+    warning "curl ou wget não encontrado"
+  else
+    if command -v curl &> /dev/null; then
+      success "curl $(curl --version | head -n1 | cut -d' ' -f2) ✓"
+    else
+      success "wget $(wget --version | head -n1 | cut -d' ' -f3) ✓"
+    fi
+  fi
+  
+  # Verificar se há dependências faltando
+  if [ ${#missing_deps[@]} -gt 0 ]; then
+    error "Dependências faltando:\n  - ${missing_deps[*]}\n\nInstale as dependências e tente novamente."
+  fi
+  
+  # Verificar espaço em disco
+  local available_space=$(df -BG "$HOME" | awk 'NR==2 {print $4}' | sed 's/G//')
+  if [ "$available_space" -lt 1 ]; then
+    warning "Espaço em disco baixo: ${available_space}GB disponível"
+  else
+    success "Espaço em disco: ${available_space}GB disponível ✓"
+  fi
 }
 
 # Criar diretórios
@@ -149,16 +183,57 @@ clone_repo() {
 install_deps() {
   info "Instalando dependências Node.js..."
   cd "$INSTALL_DIR"
-  npm install --production
-  success "Dependências instaladas"
+  
+  # Verificar se package.json existe
+  if [ ! -f "package.json" ]; then
+    error "package.json não encontrado em $INSTALL_DIR"
+  fi
+  
+  # Limpar instalações anteriores problemáticas
+  if [ -d "node_modules" ]; then
+    warning "Removendo node_modules antigo..."
+    rm -rf node_modules
+  fi
+  
+  if [ -f "package-lock.json" ]; then
+    rm -f package-lock.json
+  fi
+  
+  # Instalar com output limpo
+  if npm install --production --silent 2>&1 | tee /tmp/fazai-npm-install.log | grep -i "error" > /dev/null; then
+    error "Falha ao instalar dependências. Verifique /tmp/fazai-npm-install.log"
+  fi
+  
+  success "Dependências instaladas ($(ls node_modules | wc -l) pacotes)"
 }
 
 # Build do projeto
 build_project() {
   info "Compilando FazAI..."
   cd "$INSTALL_DIR"
-  npm run build
-  success "Build concluído"
+  
+  # Verificar tsconfig.json
+  if [ ! -f "tsconfig.json" ]; then
+    warning "tsconfig.json não encontrado"
+  fi
+  
+  # Limpar build anterior
+  if [ -d "dist" ]; then
+    rm -rf dist
+  fi
+  
+  # Build com output
+  if ! npm run build 2>&1 | tee /tmp/fazai-build.log; then
+    error "Falha no build. Verifique /tmp/fazai-build.log"
+  fi
+  
+  # Verificar se dist/app.cjs foi criado
+  if [ ! -f "dist/app.cjs" ]; then
+    error "Build falhou: dist/app.cjs não foi criado"
+  fi
+  
+  local dist_size=$(du -h dist/app.cjs | cut -f1)
+  success "Build concluído (dist/app.cjs: $dist_size)"
 }
 
 # Criar symlink
@@ -203,10 +278,17 @@ setup_config() {
   # Configuração do usuário
   if [ -f "$user_config" ]; then
     warning "Configuração do usuário já existe: $user_config"
+    echo ""
+    read -p "Deseja reconfigurar API keys? [s/N]: " reconfig
+    if [[ "$reconfig" =~ ^[Ss]$ ]]; then
+      configure_api_keys "$user_config"
+    fi
   else
     info "Criando configuração do usuário..."
     create_config_file "$user_config"
     success "Config do usuário criada: $user_config"
+    echo ""
+    configure_api_keys "$user_config"
   fi
 
   # Configuração do sistema (global - requer sudo)
@@ -225,6 +307,77 @@ setup_config() {
       fi
     fi
   fi
+}
+
+# Configurar API keys interativamente
+configure_api_keys() {
+  local config_file="$1"
+  
+  echo -e "\n${CYAN}═══════════════════════════════════════════════════════${NC}"
+  echo -e "${CYAN}║  Configuração de API Keys                           ║${NC}"
+  echo -e "${CYAN}═══════════════════════════════════════════════════════${NC}\n"
+  
+  echo -e "${YELLOW}Escolha qual provider de IA deseja configurar:${NC}"
+  echo -e "  ${BLUE}1.${NC} Claude (Anthropic) - Recomendado para Linux/Redes"
+  echo -e "  ${BLUE}2.${NC} OpenAI (GPT) - Alternativa robusta"
+  echo -e "  ${BLUE}3.${NC} Ollama (Local) - Gratuito e privado"
+  echo -e "  ${BLUE}4.${NC} Pular (configurar manualmente depois)"
+  echo ""
+  
+  read -p "Opção [1-4]: " provider_choice
+  
+  case "$provider_choice" in
+    1)
+      echo ""
+      echo -e "${CYAN}Claude (Anthropic):${NC}"
+      echo -e "→ Acesse: ${BLUE}https://console.anthropic.com${NC}"
+      echo -e "→ Ganhe \$5 grátis ao criar conta"
+      echo -e "→ Vá em 'API Keys' e crie uma nova key"
+      echo ""
+      read -p "Cole sua API key (sk-ant-api03-...): " anthropic_key
+      if [ -n "$anthropic_key" ]; then
+        sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$anthropic_key|" "$config_file"
+        success "Claude API key configurada!"
+      fi
+      ;;
+    2)
+      echo ""
+      echo -e "${CYAN}OpenAI (GPT):${NC}"
+      echo -e "→ Acesse: ${BLUE}https://platform.openai.com/api-keys${NC}"
+      echo -e "→ Crie ou use uma key existente"
+      echo ""
+      read -p "Cole sua API key (sk-...): " openai_key
+      if [ -n "$openai_key" ]; then
+        sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$openai_key|" "$config_file"
+        success "OpenAI API key configurada!"
+      fi
+      ;;
+    3)
+      echo ""
+      echo -e "${CYAN}Ollama (Local):${NC}"
+      if command -v ollama &> /dev/null; then
+        success "Ollama já instalado!"
+        local ollama_url="http://localhost:11434"
+        read -p "URL do Ollama [$ollama_url]: " custom_ollama_url
+        ollama_url="${custom_ollama_url:-$ollama_url}"
+        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
+        success "Ollama configurado: $ollama_url"
+      else
+        echo -e "→ Ollama não instalado"
+        echo -e "→ Instale com: ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
+        echo -e "→ Depois rode: ${CYAN}ollama pull llama3.2${NC}"
+        warning "Pule Ollama por enquanto"
+      fi
+      ;;
+    4)
+      info "Configuração manual: edite $config_file"
+      ;;
+    *)
+      warning "Opção inválida. Configure manualmente depois."
+      ;;
+  esac
+  
+  echo ""
 }
 
 # Criar arquivo de configuração
