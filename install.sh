@@ -261,13 +261,12 @@ build_project() {
   fi
   
   # Build com output
-  if ! npm run build 2>&1 | tee /tmp/fazai-build.log; then
-    error "Falha no build. Verifique /tmp/fazai-build.log"
-  fi
+  npm run build > /tmp/fazai-build.log 2>&1
+  local build_status=$?
   
   # Verificar se dist/app.cjs foi criado
-  if [ ! -f "dist/app.cjs" ]; then
-    error "Build falhou: dist/app.cjs não foi criado"
+  if [ ! -f "dist/app.cjs" ] || [ $build_status -ne 0 ]; then
+    error "Build falhou. Verifique /tmp/fazai-build.log"
   fi
   
   local dist_size=$(du -h dist/app.cjs | cut -f1)
