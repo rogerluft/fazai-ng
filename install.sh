@@ -897,7 +897,7 @@ WEBENV
       create_web_service
     else
       info "Para criar serviço manualmente:"
-      info "  sudo cp $INSTALL_DIR/etc/fazai/fazai-web.service /etc/systemd/system/"
+      info "  sudo cp $INSTALL_DIR/etc/fazai/fazai-web@.service /etc/systemd/system/"
       info "  sudo systemctl daemon-reload"
       info "  sudo systemctl enable fazai-web@\$(whoami)"
       info "  sudo systemctl start fazai-web@\$(whoami)"
@@ -916,9 +916,9 @@ create_web_service() {
   
   info "Criando serviço systemd fazai-web@$web_user..."
   
-  # Copiar arquivo de serviço
-  sudo cp "$INSTALL_DIR/etc/fazai/fazai-web.service" /etc/systemd/system/ || {
-    warning "Falha ao copiar fazai-web.service"
+  # Copiar arquivo de serviço template
+  sudo cp "$INSTALL_DIR/etc/fazai/fazai-web@.service" /etc/systemd/system/ || {
+    warning "Falha ao copiar fazai-web@.service"
     return 1
   }
   
