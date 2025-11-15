@@ -481,14 +481,27 @@ async function main() {
 
   // Ask mode (general questions)
   if (inputs[0] === "ask") {
-    const question = inputs.slice(1).join(" ");
+    // Check if last arg is a model nickname
+    const lastArg = inputs[inputs.length - 1];
+    let selectedModel = models.find((model) => model.nickName === lastArg);
+    
+    let questionParts: string[];
+    if (selectedModel) {
+      // Model specified, question is everything except first (ask) and last (model)
+      questionParts = inputs.slice(1, -1);
+    } else {
+      // No model, use default and question is everything except first (ask)
+      selectedModel = models[0];
+      questionParts = inputs.slice(1);
+    }
+
+    const question = questionParts.join(" ");
 
     if (!question) {
-      logger.error('Usage: fazai ask "Your question here"');
+      logger.error('Usage: fazai ask "Your question here" [model]');
       process.exit(1);
     }
 
-    const selectedModel = models[0]; // Default model for ask
     await checkAndSetAPIKey(selectedModel);
 
     logger.info(chalk.blue("🤔 Fazendo pergunta..."));
