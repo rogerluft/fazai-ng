@@ -34,6 +34,7 @@ Options:
   --verbose                Alias para --debug
   --log-file <path>        Define caminho explícito para o arquivo de log
   --auto-research          Reativar pesquisa automática após falhas
+  --yolo, -y               Execute all commands without confirmation (DANGEROUS!)
   --help, -h               Show this help message
 
 Examples:

@@ -8,7 +8,7 @@
 _fazai_completion() {
     local cur prev opts commands models
     COMPREPLY=()
-    cur="${COMP_WORDS[COMP_COUR]}"
+    cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
