@@ -40,6 +40,15 @@ export async function getAndSetAPIKey(provider: string): Promise<string> {
 
   if (!apiKey) {
     logger.warn(chalk.yellow(`\nAPI key para ${provider} não encontrada no ${configFileLabel()}.`));
+    
+    // Mostrar instruções específicas por provider
+    if (provider === "openrouter") {
+      logger.info(chalk.cyan(`\n💡 Como obter sua chave OpenRouter:`));
+      logger.info(chalk.cyan(`   1. Acesse: https://openrouter.ai/keys`));
+      logger.info(chalk.cyan(`   2. Faça login e crie uma nova chave`));
+      logger.info(chalk.cyan(`   3. Adicione créditos em https://openrouter.ai/credits\n`));
+    }
+    
     const key = await password({
       message: `Digite sua chave API do ${provider.charAt(0).toUpperCase() + provider.slice(1)}:`,
       mask: "*",
