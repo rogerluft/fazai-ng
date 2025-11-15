@@ -397,13 +397,21 @@ fazai
 
 ## 🤝 Contribuindo
 
-Contribuições são muito bem-vindas!
+Contribuições são muito bem-vindas! Para informações detalhadas sobre como contribuir, obter acesso ao repositório, resolver problemas de permissão e seguir os padrões do projeto, consulte nosso [Guia de Contribuição](CONTRIBUTING.md).
 
-1. Fork o projeto
-2. Crie uma branch (`git checkout -b feature/MinhaFeature`)
-3. Commit suas mudanças (`git commit -m 'Add: MinhaFeature'`)
-4. Push para a branch (`git push origin feature/MinhaFeature`)
-5. Abra um Pull Request
+### Início Rápido
+
+1. **Se você não tem acesso de escrita**: Fork o projeto primeiro
+2. Clone seu fork ou o repositório original
+3. Crie uma branch (`git checkout -b feature/MinhaFeature`)
+4. Faça suas mudanças seguindo os [padrões de código](CONTRIBUTING.md#padrões-de-código)
+5. Commit suas mudanças (`git commit -m 'Add: MinhaFeature'`)
+6. Push para a branch (`git push origin feature/MinhaFeature`)
+7. Abra um Pull Request
+
+### Problemas de Permissão?
+
+Se você receber um erro `Permission denied` ao fazer push, consulte a seção [Como Obter Acesso ao Repositório](CONTRIBUTING.md#como-obter-acesso-ao-repositório) no guia de contribuição para soluções detalhadas.
 
 ## 📄 Licença
 
