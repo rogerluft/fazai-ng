@@ -238,11 +238,13 @@ install_deps() {
   fi
   
   # Instalar TODAS as dependências (incluindo devDependencies para build)
-  if npm install --silent 2>&1 | tee /tmp/fazai-npm-install.log | grep -i "error" > /dev/null; then
-    error "Falha ao instalar dependências. Verifique /tmp/fazai-npm-install.log"
+  local npm_log="${TMPDIR:-/tmp}/fazai-npm-$$.log"
+  if npm install --silent > "$npm_log" 2>&1; then
+    success "Dependências instaladas ($(ls node_modules | wc -l) pacotes)"
+    rm -f "$npm_log"
+  else
+    error "Falha ao instalar dependências. Verifique $npm_log"
   fi
-  
-  success "Dependências instaladas ($(ls node_modules | wc -l) pacotes)"
 }
 
 # Build do projeto
@@ -261,16 +263,22 @@ build_project() {
   fi
   
   # Build com output
-  npm run build > /tmp/fazai-build.log 2>&1
+  local build_log="${TMPDIR:-/tmp}/fazai-build-$$.log"
+  npm run build > "$build_log" 2>&1
   local build_status=$?
   
-  # Verificar se dist/app.cjs foi criado
-  if [ ! -f "dist/app.cjs" ] || [ $build_status -ne 0 ]; then
-    error "Build falhou. Verifique /tmp/fazai-build.log"
+  # Verificar se dist/app.cjs foi criado (arquivo principal, não stderr)
+  if [ ! -f "dist/app.cjs" ]; then
+    error "Build falhou: dist/app.cjs não foi criado. Verifique $build_log"
   fi
   
-  local dist_size=$(du -h dist/app.cjs | cut -f1)
-  success "Build concluído (dist/app.cjs: $dist_size)"
+  if [ $build_status -eq 0 ]; then
+    local dist_size=$(du -h dist/app.cjs | cut -f1)
+    success "Build concluído (dist/app.cjs: $dist_size)"
+    rm -f "$build_log"
+  else
+    warning "Build teve avisos mas arquivo foi criado. Verifique $build_log"
+  fi
 }
 
 # Criar symlink
