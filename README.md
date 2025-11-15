@@ -1,136 +1,297 @@
-# 🖥️ FazAI 3.0-RC - Administrador Linux Inteligente com IA
+# 🖥️ FazAI v3.1-beta - Terminal Admin Linux com IA Autônoma
 
-<h3 align="center">FazAI converte linguagem natural em comandos Linux seguros, com validação de risco e rollback automático.</h3>
+<div align="center">
+
+**Administrador de Sistemas Linux Senior + Redes**  
+*AutoGPT · Genkit · RAG · Vector Store Qdrant*
+
+</div>
+
+<h3 align="center">Terminal inteligente que converte linguagem natural em comandos Linux seguros, com memória operacional, aprendizado contínuo e pesquisa assistida.</h3>
+
+---
 
 ## 🌟 Features
 
-- **Linguagem Natural para Linux**: Descreva o que quer fazer, FazAI gera os comandos
-- **Segurança em Camadas**: Detecção automática de comandos perigosos
-- **Confirmação Inteligente**: Pedidos de confirmação baseados no nível de risco
-- **Rollback Automático**: Comandos reversíveis incluem rollback
-- **Modo Dry-Run**: Simule comandos sem executar nada
-- **Context-Aware**: Analisa seu sistema (OS, serviços, pacotes) para gerar comandos corretos
-- **IA Poderosa**: Claude 3.5 Sonnet e Haiku da Anthropic
-- **Chat Interativo**: Modo `--cli` com memória contextual persistente, comandos especiais e histórico navegável
-- **Fallback Inteligente**: Pesquisa via MCP Context7 com fallback para busca web quando precisa de mais contexto
+### 🧠 Inteligência e Memória
+- **5 Collections Qdrant Especializadas** para RAG e memória operacional
+  - `fazai_personality` - Expertise técnica e estilo de troubleshooting
+  - `fazai_memory` - Histórico operacional e contexto de infraestrutura
+  - `fazai_learning` - Aprendizado técnico (erros, soluções, padrões)
+  - `fazai_kb` - Base de conhecimento Linux/Redes validada
+  - `fazai_inference` - Políticas de segurança, SLAs e regras operacionais
+
+### 🤖 IA Multi-Modelo
+- **Claude** (Anthropic): Sonnet 3.5, Haiku - Tarefas complexas e rápidas
+- **GPT** (OpenAI): GPT-4o, GPT-4 Turbo, GPT-4 Mini
+- **Ollama** (Local): Llama 3.2, Qwen 2.5, Mistral - 100% privado e gratuito
+
+### 🛡️ Segurança em 5 Camadas
+- **Pattern Matching**: Bloqueia comandos destrutivos conhecidos
+- **Avaliação de Risco**: Análise automática (CRITICAL, HIGH, MEDIUM, LOW)
+- **Safety Checks**: Validações pré-execução geradas pela IA
+- **Rollback Automático**: Comandos reversíveis com undo integrado
+- **Modo Dry-Run**: Simule sem executar nada
+
+### 🔍 Pesquisa Assistida
+- **MCP Context7**: Integração com servidor de contexto local
+- **Fallback Web**: DuckDuckGo automático quando precisa de mais informação
+- **Importação de Conversas**: Claude/ChatGPT Desktop → Vector Store
+
+### 💬 Modo CLI Interativo
+- **Chat persistente** com memória contextual entre sessões
+- **Comandos especiais**: `/exec`, `/history`, `/memory`, `/help`
+- **Histórico navegável**: Setas ↑/↓ e auto-complete
+- **Bash completion**: Instalação automática para Bash e Zsh
 
 ## 🚀 Instalação
 
-### Script (recomendado)
+### Método 1: Instalador Automático (Recomendado)
+
 ```bash
-curl -fsSL https://github.com/RLuf/FazAI/raw/master/scripts/install.sh | bash
-start-codex
+curl -fsSL https://raw.githubusercontent.com/rogerluft/fazai-ng/master/install.sh | bash
 ```
 
-### Via NPX (sem instalação)
+O instalador irá:
+- ✅ Verificar dependências (Node.js 18+, npm, git)
+- ✅ Clonar e compilar o projeto
+- ✅ Criar symlinks em `~/.local/bin/fazai`
+- ✅ Oferecer instalação do Qdrant (Docker/Podman/Binário)
+- ✅ Criar arquivo de configuração interativo
+- ✅ Instalar Bash/Zsh completion automaticamente
+- ✅ Configurar diretórios de sistema (`/etc/fazai`, `/var/log/fazai`)
+
+### Método 2: Via NPX (Teste Rápido)
 ```bash
 npx fazai
 ```
+*Nota: Vector Store e recursos avançados requerem instalação completa.*
 
-### Instalação Global (npm)
-```bash
-npm install -g fazai
-fazai
-```
+### Método 3: Build Local
 
-### Build Local
 ```bash
-git clone https://github.com/seu-usuario/fazai.git
-cd fazai
+git clone https://github.com/rogerluft/fazai-ng
+cd fazai-ng
 npm install
 npm run build
 npm link
-fazai
+fazai --help
 ```
 
-#### Auto-build para desenvolvimento
-- O launcher (`bin/fazai.js`) detecta alterações em `src/` e executa `npm run build` automaticamente antes de iniciar o CLI.
-- Para forçar um rebuild manual, basta apagar `dist/` ou rodar `npm run build`.
-- Se quiser desativar o comportamento (por exemplo em CI), exporte `FAZAI_AUTO_BUILD=0` antes de executar `fazai`.
+#### Auto-build para Desenvolvimento
+O launcher detecta alterações em `src/` e executa `npm run build` automaticamente.
+- Desabilitar: `export FAZAI_AUTO_BUILD=0`
+- Forçar rebuild: `rm -rf dist && npm run build`
 
-### Instalador Local
+### Instalação do Qdrant (Vector Store)
+
+**Docker (Recomendado):**
 ```bash
-git clone https://github.com/seu-usuario/fazai.git
-cd fazai
-./scripts/install.sh --prefix ~/.local/bin --pack
+docker run -d -p 6333:6333 -p 6334:6334 \
+  -v $(pwd)/qdrant_storage:/qdrant/storage:z \
+  qdrant/qdrant
 ```
-O script compila o projeto, instala o executável `fazai` no diretório escolhido e, com `--pack`, gera um pacote `.tgz` pronto para distribuição.
+
+**Podman:**
+```bash
+podman run -d -p 6333:6333 -p 6334:6334 \
+  -v ./qdrant_storage:/qdrant/storage:z \
+  qdrant/qdrant
+```
+
+**Binário Standalone:**
+```bash
+curl -O https://github.com/qdrant/qdrant/releases/download/v1.8.0/qdrant-x86_64-unknown-linux-gnu.tar.gz
+tar -xzf qdrant-*.tar.gz && cd qdrant
+./qdrant
+```
 
 ## 📖 Uso
 
-### Modo Admin (Default)
+### Modo Admin Linux (Default)
 
 ```bash
 # Iniciar FazAI
 fazai
 
 # Com modelo específico
-fazai haiku          # Claude Haiku (rápido e barato)
+fazai haiku          # Claude Haiku (rápido e econômico)
 fazai sonnet35       # Claude 3.5 Sonnet (default, mais inteligente)
+fazai gpt4o          # GPT-4o (OpenAI)
+fazai llama32        # Llama 3.2 local (Ollama)
 
-# Modo simulação (nada é executado)
+# Modo simulação (visualizar sem executar)
 fazai --dry-run
 
 # Modo CLI interativo com chat e memória persistente
 fazai --cli
 ```
 
-**Exemplos de tarefas:**
+### Modo CLI Interativo
+
+O modo `fazai --cli` oferece um ambiente de chat completo:
+
+```bash
+fazai --cli
+
+# Comandos disponíveis:
+/help                    # Lista todos os comandos
+/exec instalar nginx     # Executa fluxo administrativo
+/history                 # Mostra histórico de comandos
+/history clear           # Limpa histórico
+/memory clear            # Limpa memória contextual
+/quit ou /exit          # Encerra o CLI
+
+# Suporta texto multi-linha:
+/exec '''
+  configurar nginx como proxy reverso
+  para porta 3000 com SSL
+'''
+```
+
+**Features do modo CLI:**
+- ✅ Memória contextual persistente entre sessões
+- ✅ Histórico navegável com setas ↑/↓
+- ✅ Auto-complete para comandos iniciados com `/`
+- ✅ Suporte a texto multi-linha com `'''`
+
+### Exemplos de Tarefas Administrativas
+
 ```bash
 > O que você precisa fazer?
 
+# Instalação e Configuração
 "instalar e configurar nginx como proxy reverso para porta 3000"
-"verificar uso de disco e limpar arquivos temporários antigos"
-"reiniciar serviço apache e verificar se está funcionando"
-"criar usuário admin com permissões sudo"
 "configurar firewall ufw para permitir apenas portas 22, 80, 443"
-"fazer backup do diretório /var/www em /backup"
+"criar usuário admin com permissões sudo e chaves SSH"
+
+# Monitoramento e Diagnóstico
+"verificar uso de disco e limpar arquivos temporários antigos"
+"analisar logs do sistema em busca de erros críticos"
+"verificar status de todos os serviços e reiniciar os que falharam"
+
+# Backup e Manutenção
+"fazer backup do diretório /var/www em /backup com timestamp"
 "atualizar sistema e reiniciar se necessário"
+"verificar integridade do raid e enviar relatório"
+
+# Redes e Segurança
+"configurar fail2ban para proteger SSH"
+"analisar conexões de rede ativas e identificar anomalias"
+"configurar iptables para bloquear tráfego suspeito"
 ```
 
-### Modo Ask (Perguntas Gerais)
+### Modo Ask (Consultas e Dúvidas)
 
 ```bash
 fazai ask "Como configurar nginx como proxy reverso?"
 fazai ask "Diferença entre systemctl e service?"
-fazai ask "Explicar como funciona iptables"
+fazai ask "Explicar como funciona iptables com exemplos"
+fazai ask "Melhores práticas para hardening SSH"
 ```
 
-### Configuração
+### Gerenciamento e Vector Store
 
 ```bash
-# Listar API keys configuradas
+# Listar configurações e API keys
 fazai config
 
-# Ver ajuda
+# Ver ajuda completa
 fazai --help
 
-# Listar sugestões para auto-complete
-fazai completion
+# Comandos do Vector Store
+fazai vector validate              # Validar collections
+fazai vector recreate --provider qdrant  # Recriar collections
+fazai vector import --file conversas.json  # Importar conversas
 
-# Validar/alinhar collections no vetor store
-fazai vector validate
-fazai vector recreate --provider qdrant
+# Importar conversas Claude/ChatGPT Desktop
+fazai import --source ~/Library/Application\ Support/Claude/claude_desktop_config.sqlite
+fazai import --source ~/Library/Application\ Support/ChatGPT/conversations.db
+
+# Auto-complete Bash/Zsh
+fazai completion
 ```
 
-- Durante a instalação/build o FazAI tenta preparar `/var/log/fazai/fazai.log`; se falhar (permissão), execute `sudo mkdir -p /var/log/fazai && sudo chmod 775 /var/log/fazai`.
+### Importação de Conversas
 
-### Vetor Store (Qdrant / Milvus)
+O FazAI pode importar conversas históricas do Claude Desktop e ChatGPT Desktop para o Vector Store:
 
-- Defina `VECTOR_PROVIDER=qdrant` ou `VECTOR_PROVIDER=milvus` no `fazai.conf`.
-- Ajuste `QDRANT_URL` e `QDRANT_API_KEY` quando usar Qdrant (docker/local ou cloud).
-- Para Milvus/Zilliz, configure `MILVUS_ADDRESS`, `MILVUS_USERNAME`, `MILVUS_PASSWORD` (ou `MILVUS_TOKEN`).
-- `VECTOR_DIMENSION` e `VECTOR_DISTANCE` (cosine, euclid, dot) controlam o espaço vetorial esperado pelos embeddings.
-- Rode `fazai vector validate` após atualizar configurações para garantir que as collections `fazai_memory` e `fazai_kb` existam com o schema correto.
+```bash
+# Claude Desktop (SQLite)
+fazai import --source ~/Library/Application\ Support/Claude/claude_desktop_config.sqlite
 
-### Fallback Automático (MCP Context7 + Busca Web)
+# ChatGPT Desktop (JSON/DB)
+fazai import --source ~/Library/Application\ Support/ChatGPT/conversations.db
 
-- Quando o modelo identifica que precisa de mais contexto, ele pode definir `researchNeeded=true` e sugerir uma `researchQuery` no JSON retornado.
-- Se um comando falhar, FazAI dispara automaticamente uma pesquisa:
-  1. Consulta o provider configurado via MCP Context7 (HTTP ou comando externo).
-  2. Faz fallback para uma busca na internet (DuckDuckGo por padrão).
-- Os resultados são exibidos diretamente no terminal, com título, resumo e URL, ajudando você a decidir a próxima ação.
-- Defina `FAZAI_DISABLE_RESEARCH=true` caso prefira operar offline ou em ambientes sem acesso à internet.
+# Arquivo JSON customizado
+fazai import --source conversas.json --format json
+
+# Com filtros
+fazai import --source claude.db --min-messages 5 --before 2024-01-01
+```
+
+**Benefícios:**
+- ✅ Reutiliza conhecimento de conversas anteriores
+- ✅ Alimenta collections `fazai_memory` e `fazai_kb`
+- ✅ Melhora respostas contextuais futuras
+- ✅ Preserva histórico operacional
+
+### Configuração do Vector Store (Qdrant)
+
+**Arquivo de configuração** (`~/.config/fazai/fazai.conf` ou `/etc/fazai/fazai.conf`):
+
+```bash
+# Vector Store (Qdrant)
+VECTOR_PROVIDER=qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=                    # Opcional para instância local
+
+# Configurações de Embedding
+VECTOR_DIMENSION=1536              # Dimensão dos embeddings
+VECTOR_DISTANCE=cosine             # cosine, euclid, dot
+
+# Collections (criadas automaticamente)
+# fazai_personality, fazai_memory, fazai_learning, fazai_kb, fazai_inference
+```
+
+**Validar e recriar collections:**
+```bash
+fazai vector validate              # Verifica se collections existem
+fazai vector recreate --provider qdrant  # Recria com schema correto
+```
+
+### Pesquisa Assistida (MCP Context7 + Web)
+
+O FazAI pode buscar informações automaticamente quando precisa de mais contexto:
+
+**Configuração** (`fazai.conf`):
+```bash
+# MCP Context7 (Servidor HTTP)
+MCP_CONTEXT7_URL=http://localhost:7700/context7/search
+MCP_CONTEXT7_API_KEY=seu_token_opcional
+
+# OU Comando Local
+MCP_CONTEXT7_COMMAND=context7 --json --query "{query}"
+
+# Fallback Web (DuckDuckGo)
+WEB_SEARCH_PROVIDER=duckduckgo
+
+# Desabilitar pesquisas (modo offline)
+FAZAI_DISABLE_RESEARCH=true
+```
+
+**Funcionamento:**
+1. IA detecta necessidade de mais informação (`researchNeeded=true`)
+2. Tenta MCP Context7 primeiro (se configurado)
+3. Fallback para busca web se Context7 falhar
+4. Exibe resultados com título, resumo e URL
+5. Usa informações para gerar resposta mais precisa
+
+**Casos de uso:**
+- ✅ Comandos falharam e precisa de troubleshooting
+- ✅ Configuração específica de distribuição Linux
+- ✅ Versões atualizadas de pacotes
+- ✅ Documentação de ferramentas recentes
 
 ## 🛡️ Sistema de Segurança
 
@@ -253,77 +414,96 @@ Executar? [Y/n] y
 
 **Nota**: Ollama requer servidor Ollama rodando (local ou remoto).
 
-## 🔑 Configuração
+## 🔑 Configuração de API Keys
 
-### Método 1: Arquivo fazai.conf (Recomendado)
+### Método 1: Instalador Interativo (Recomendado)
 
-Copie o arquivo de exemplo e edite com suas credenciais:
+Durante a instalação, o FazAI pedirá suas API keys e criará o arquivo de configuração automaticamente.
+
+### Método 2: Arquivo fazai.conf
+
+Copie e edite o arquivo de exemplo:
 
 ```bash
-cp fazai.conf.example fazai.conf
-nano fazai.conf
+cp fazai.conf.example ~/.config/fazai/fazai.conf
+nano ~/.config/fazai/fazai.conf
 ```
 
-Exemplo de configuração:
+**Exemplo de configuração completa:**
 ```bash
-# Anthropic Claude (opcional - se você tiver)
+# ============================================
+# FAZAI v3.1-beta - Configuração
+# ============================================
+
+# --- APIs de IA ---
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-
-# OpenAI (cole sua chave aqui)
 OPENAI_API_KEY=sk-xxxxx
+OLLAMA_BASE_URL=http://localhost:11434
 
-# Ollama (se estiver rodando em outro servidor)
-OLLAMA_BASE_URL=http://192.168.1.100:11434
+# --- Vector Store (Qdrant) ---
+VECTOR_PROVIDER=qdrant
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+VECTOR_DIMENSION=1536
+VECTOR_DISTANCE=cosine
+
+# --- Pesquisa MCP Context7 ---
+MCP_CONTEXT7_URL=http://localhost:7700/context7/search
+MCP_CONTEXT7_API_KEY=
+# MCP_CONTEXT7_COMMAND=context7 --json --query "{query}"
+
+# --- Fallback Web ---
+WEB_SEARCH_PROVIDER=duckduckgo
+FAZAI_DISABLE_RESEARCH=false
+
+# --- Logs e Configuração ---
+FAZAI_CONFIG_PATH=/etc/fazai/fazai.conf
+LOG_LEVEL=info
 ```
 
-### Método 2: Interativo
+### Método 3: Variáveis de Ambiente
 
-Na primeira execução, FazAI pedirá a API key necessária e salvará automaticamente em `fazai.conf`.
+```bash
+export ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+export OPENAI_API_KEY=sk-xxxxx
+export VECTOR_PROVIDER=qdrant
+export QDRANT_URL=http://localhost:6333
+fazai
+```
 
 ### Obter API Keys
 
-**OpenAI** (você já tem!):
-- Use sua chave existente da OpenAI
-- Cole no arquivo `fazai.conf` na linha `OPENAI_API_KEY=`
-
-**Anthropic** (opcional):
+#### Anthropic Claude (Recomendado)
 1. Acesse [console.anthropic.com](https://console.anthropic.com)
-2. Crie conta (ganha $5 grátis)
-3. Gere uma API key
-4. Cole no `fazai.conf`
+2. Crie conta (ganha $5 grátis para testar)
+3. Gere uma API key em "API Keys"
+4. Cole no `fazai.conf`: `ANTHROPIC_API_KEY=sk-ant-api03-xxxxx`
 
-**Ollama** (local/gratuito):
-1. Instale Ollama: https://ollama.com
-2. Baixe um modelo: `ollama pull llama3.2`
-3. Configure `OLLAMA_BASE_URL` no `fazai.conf` (se não for localhost)
+**Modelos:** Claude 3.5 Sonnet (inteligente), Claude Haiku (rápido e econômico)
 
-### Configurações adicionais (MCP, pesquisa e caminho do config)
+#### OpenAI GPT
+1. Acesse [platform.openai.com](https://platform.openai.com)
+2. Vá em "API Keys" e crie uma nova key
+3. Cole no `fazai.conf`: `OPENAI_API_KEY=sk-xxxxx`
 
-Adicione as chaves abaixo ao `fazai.conf` (ou exporte como variáveis de ambiente) para habilitar a pesquisa assistida:
+**Modelos:** GPT-4o, GPT-4 Turbo, GPT-4 Mini
 
-```ini
-# Endpoint HTTP que atenda POST /context7/search
-MCP_CONTEXT7_URL=http://localhost:7700/context7/search
+#### Ollama (Local/Gratuito)
+1. Instale Ollama: [ollama.com](https://ollama.com)
+2. Baixe um modelo:
+   ```bash
+   ollama pull llama3.2    # Llama 3.2 (Meta)
+   ollama pull qwen2.5:7b  # Qwen 2.5 (Alibaba)
+   ollama pull mistral     # Mistral 7B
+   ```
+3. Configure URL se não for localhost:
+   ```bash
+   OLLAMA_BASE_URL=http://192.168.1.100:11434
+   ```
 
-# OU um comando local que aceite a consulta (substitui {query})
-MCP_CONTEXT7_COMMAND=context7 --json --query "{query}"
+**Vantagens:** 100% local, gratuito, privado, sem limites
 
-# Chave opcional para autenticação do endpoint HTTP
-MCP_CONTEXT7_API_KEY=seu_token
-
-# Provedor de fallback web (suporta: duckduckgo)
-WEB_SEARCH_PROVIDER=duckduckgo
-
-# Desative pesquisas automáticas quando estiver offline
-FAZAI_DISABLE_RESEARCH=true
-
-# Defina um caminho alternativo para o arquivo de configuração
-FAZAI_CONFIG_PATH=/etc/fazai/fazai.conf
-```
-
-Se `FAZAI_CONFIG_PATH` for informado, o CLI usará esse caminho para ler e gravar configurações.
-
-## 🛰️ Servidor MCP embutido (opcional)
+## 🛰️ Servidor MCP Embutido (Opcional)
 
 Deseja compartilhar a camada de pesquisa do FazAI com outras ferramentas que falam MCP? Você pode subir um microservidor HTTP:
 
