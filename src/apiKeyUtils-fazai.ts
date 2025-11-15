@@ -78,6 +78,8 @@ function getEnvVarName(provider: string): string {
       return "ANTHROPIC_API_KEY";
     case "openai":
       return "OPENAI_API_KEY";
+    case "openrouter":
+      return "OPENROUTER_API_KEY";
     case "fireworks":
       return "FIREWORKS_API_KEY";
     case "ollama":
@@ -102,7 +104,7 @@ export function listConfiguredKeys(): void {
     const entries = listConfigEntries();
     logger.info(chalk.cyan(`\n🔑 Configurações em ${configFileLabel()}:`));
 
-    const providers = ["anthropic", "openai", "ollama"];
+    const providers = ["openrouter", "anthropic", "openai", "ollama"];
     let found = false;
 
     for (const provider of providers) {

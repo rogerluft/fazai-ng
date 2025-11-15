@@ -53,6 +53,32 @@ export async function* askAI(
     for await (const chunk of stream) {
       yield chunk.choices[0]?.delta?.content || "";
     }
+  } else if (provider === "openrouter") {
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      defaultHeaders: {
+        "HTTP-Referer": "https://github.com/rogerluft/fazai-ng",
+        "X-Title": "FazAI Terminal Assistant",
+      },
+    });
+
+    const systemMessage = isGeneralQuestion
+      ? "Você é um assistente inteligente e bem-informado. Responda perguntas de forma clara e útil."
+      : `CODE:\n${fileContent}\n`;
+
+    const stream = await openai.chat.completions.create({
+      model: model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      yield chunk.choices[0]?.delta?.content || "";
+    }
   } else if (provider === "ollama") {
     const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
     const openai = new OpenAI({

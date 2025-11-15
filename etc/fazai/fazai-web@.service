@@ -7,9 +7,9 @@ Wants=qdrant.service
 [Service]
 Type=simple
 User=%i
-WorkingDirectory=/home/%i/.fazai/web
+WorkingDirectory=%h/.fazai/web
 Environment=NODE_ENV=production
-Environment=PORT=3000
+Environment=PORT=3456
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=10
@@ -22,7 +22,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/%i/.fazai/web/.next
+ReadWritePaths=%h/.fazai/web/.next
 
 [Install]
 WantedBy=multi-user.target
