@@ -29,9 +29,9 @@ cd /home/rluft/fazai-ng
 npm install @genkit-ai/core @genkit-ai/ai @genkit-ai/flow
 
 # LLM Plugins
-npm install genkitx-anthropic genkitx-openai genkitx-ollama
+npm install genkitx-openai genkitx-openrouter genkitx-ollama
 
-# Vector Store Plugin
+# Vector Store Plugin (apenas Qdrant)
 npm install genkitx-qdrant
 
 # Save
@@ -402,9 +402,10 @@ ragQuery('nginx configuration', 'fazai_kb').then(console.log);
 - **Genkit Docs:** https://firebase.google.com/docs/genkit
 - **Genkit Plugins:** https://bloomlabsinc.github.io/genkit-plugins/
 - **genkitx-qdrant:** https://www.npmjs.com/package/genkitx-qdrant
-- **genkitx-anthropic:** https://www.npmjs.com/package/genkitx-anthropic
 - **genkitx-openai:** https://www.npmjs.com/package/genkitx-openai
+- **genkitx-openrouter:** https://www.npmjs.com/package/genkitx-openrouter
 - **genkitx-ollama:** https://www.npmjs.com/package/genkitx-ollama
+- **OpenRouter Models:** https://openrouter.ai/models (200+ disponíveis)
 
 ---
 

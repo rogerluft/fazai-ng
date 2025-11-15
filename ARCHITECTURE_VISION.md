@@ -58,16 +58,13 @@ User/AutoGPT Agent
 Terminal Jarvis (CLI Robusta)
         ↓
 Genkit Orchestrator (Plugin-based)
-        ├─→ genkitx-anthropic (Claude Sonnet/Haiku)
         ├─→ genkitx-openai (GPT-4o/Mini/Turbo)
-        ├─→ genkitx-ollama (Llama/Qwen/Mistral)
-        ├─→ genkitx-mistral (Mistral Cloud)
-        └─→ genkitx-groq (Groq LPU)
+        ├─→ genkitx-openrouter (200+ models: Claude, Mistral, Gemini, Llama...)
+        ├─→ genkitx-ollama (Local models: Llama/Qwen/Mistral)
+        └─→ genkitx-groq (Groq LPU - opcional)
         ↓
 Genkit RAG (Vector Plugin)
-        ├─→ genkitx-qdrant (Primary - 5 collections)
-        ├─→ genkitx-milvus (Alternative)
-        └─→ genkitx-hnsw (Fallback local)
+        └─→ genkitx-qdrant (5 collections ativas)
         ↓
 GPTCache (Performance Layer)
         ↓
@@ -125,18 +122,15 @@ interface JarvisAgent {
 
 #### LLM Providers:
 ```bash
-npm install genkitx-anthropic    # Claude Sonnet/Haiku
 npm install genkitx-openai       # GPT-4o/Mini/Turbo
+npm install genkitx-openrouter   # Unified API (200+ models)
 npm install genkitx-ollama       # Llama/Qwen/Mistral local
-npm install genkitx-mistral      # Mistral Cloud (opcional)
 npm install genkitx-groq         # Groq LPU (opcional)
 ```
 
 #### Vector Stores (RAG):
 ```bash
-npm install genkitx-qdrant       # Primary (já temos Qdrant)
-npm install genkitx-milvus       # Alternative
-npm install genkitx-hnsw         # Fallback local
+npm install genkitx-qdrant       # Primary (já temos Qdrant rodando)
 ```
 
 #### Observability:
@@ -148,21 +142,23 @@ npm install @genkit-ai/google-cloud  # Logging/tracing
 ```typescript
 // src/genkit-orchestrator.ts (NOVO)
 import { configureGenkit } from '@genkit-ai/core';
-import { anthropic } from 'genkitx-anthropic';
 import { openai } from 'genkitx-openai';
+import { openrouter } from 'genkitx-openrouter';
 import { ollama } from 'genkitx-ollama';
 import { qdrant } from 'genkitx-qdrant';
+import { getConfigValue } from './config';
 
 const ai = configureGenkit({
   plugins: [
     // LLM providers
-    anthropic({ apiKey: process.env.ANTHROPIC_API_KEY }),
-    openai({ apiKey: process.env.OPENAI_API_KEY }),
-    ollama({ baseUrl: process.env.OLLAMA_BASE_URL }),
+    openai({ apiKey: getConfigValue("OPENAI_API_KEY") }),
+    openrouter({ apiKey: getConfigValue("OPENROUTER_API_KEY") }), // 200+ models
+    ollama({ baseUrl: getConfigValue("OLLAMA_BASE_URL") }),
     
     // Vector store
     qdrant({ 
-      url: process.env.QDRANT_URL,
+      url: getConfigValue("QDRANT_URL"),
+      apiKey: getConfigValue("QDRANT_API_KEY"),
       collections: [
         'fazai_personality',
         'fazai_memory',
@@ -173,12 +169,17 @@ const ai = configureGenkit({
     }),
   ],
   
-  // Model routing strategy
+  // Dynamic model routing from config
   modelRouter: (task) => {
-    if (task.complexity === 'high') return 'claude-3-5-sonnet';
-    if (task.speed === 'critical') return 'claude-haiku';
-    if (task.cost === 'minimal') return 'llama3.2';
-    return 'gpt-4o-mini'; // default
+    const defaultModel = getConfigValue("DEFAULT_MODEL") || 'gpt-4o-mini';
+    const complexModel = getConfigValue("COMPLEX_MODEL") || 'openrouter/anthropic/claude-3.5-sonnet';
+    const fastModel = getConfigValue("FAST_MODEL") || 'openrouter/anthropic/claude-3-haiku';
+    const localModel = getConfigValue("LOCAL_MODEL") || 'ollama/llama3.2';
+    
+    if (task.complexity === 'high') return complexModel;
+    if (task.speed === 'critical') return fastModel;
+    if (task.cost === 'minimal') return localModel;
+    return defaultModel;
   },
 });
 ```
@@ -438,10 +439,9 @@ class ZeroTrustExecutor {
 ### Genkit Plugins (LLM):
 ```json
 {
-  "genkitx-anthropic": "^1.0.0",
   "genkitx-openai": "^1.0.0",
+  "genkitx-openrouter": "^1.0.0",
   "genkitx-ollama": "^1.0.0",
-  "genkitx-mistral": "^1.0.0",
   "genkitx-groq": "^1.0.0"
 }
 ```
@@ -449,9 +449,7 @@ class ZeroTrustExecutor {
 ### Genkit Plugins (Vector):
 ```json
 {
-  "genkitx-qdrant": "^1.0.0",
-  "genkitx-milvus": "^1.0.0",
-  "genkitx-hnsw": "^1.0.0"
+  "genkitx-qdrant": "^1.0.0"
 }
 ```
 
