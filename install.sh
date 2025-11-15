@@ -163,20 +163,54 @@ setup_directories() {
 
 # Clonar repositório
 clone_repo() {
+
   info "Clonando Terminal FazAI $FAZAI_VERSION..."
 
-  if [ -d "$INSTALL_DIR/.git" ]; then
-    warning "FazAI já instalado. Atualizando..."
-    cd "$INSTALL_DIR"
-    git fetch origin
-    git checkout master
-    git pull origin master
+  # Se diretório existe e não é vazio
+  if [ -d "$INSTALL_DIR" ] && [ "$(ls -A "$INSTALL_DIR" 2>/dev/null)" ]; then
+    # Se é um repositório git válido
+    if [ -d "$INSTALL_DIR/.git" ]; then
+      info "Repositório já existe. Atualizando..."
+      cd "$INSTALL_DIR"
+
+      # Salvar mudanças locais se houver
+      if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        warning "Detectadas mudanças locais. Fazendo stash..."
+        git stash push -m "Install script auto-stash $(date +%Y-%m-%d_%H:%M:%S)" || true
+      fi
+
+      # Atualizar repositório
+      git fetch origin || warning "Falha ao fazer fetch"
+      git reset --hard origin/master || warning "Falha ao resetar"
+      git pull origin master || warning "Falha ao atualizar"
+
+      success "Repositório atualizado"
+    else
+      # Backup e clonar
+      warning "Diretório existe mas não é git"
+      local backup_dir="${INSTALL_DIR}.backup.$(date +%Y%m%d_%H%M%S)"
+      info "Criando backup em $backup_dir..."
+      mv "$INSTALL_DIR" "$backup_dir"
+      git clone "$REPO_URL" "$INSTALL_DIR" || error "Falha ao clonar"
+      success "Repositório clonado (backup criado)"
+    fi
   else
-    git clone "$REPO_URL" "$INSTALL_DIR"
-    cd "$INSTALL_DIR"
+    git clone "$REPO_URL" "$INSTALL_DIR" || error "Falha ao clonar"
+    success "Repositório clonado"
   fi
 
-  success "Repositório clonado/atualizado"
+
+
+
+
+
+
+
+
+
+
+
+
 }
 
 # Instalar dependências
