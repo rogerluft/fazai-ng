@@ -388,19 +388,23 @@ configure_api_keys() {
       ;;
     3)
       echo ""
-      echo -e "${CYAN}Ollama (Local):${NC}"
-      if command -v ollama &> /dev/null; then
-        success "Ollama já instalado!"
-        local ollama_url="http://localhost:11434"
-        read -p "URL do Ollama [$ollama_url]: " custom_ollama_url
-        ollama_url="${custom_ollama_url:-$ollama_url}"
+      echo -e "${CYAN}Ollama (Local ou Remoto):${NC}"
+      echo -e "→ Local: http://localhost:11434"
+      echo -e "→ Remoto: http://192.168.0.101:11434"
+      local ollama_url="http://192.168.0.101:11434"
+      read -p "URL do Ollama [$ollama_url]: " custom_ollama_url
+      ollama_url="${custom_ollama_url:-$ollama_url}"
+      
+      # Testa conexão
+      if curl -s --max-time 3 "$ollama_url/api/tags" &> /dev/null; then
         sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
-        success "Ollama configurado: $ollama_url"
+        sed -i "s|^# OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
+        success "Ollama configurado e acessível: $ollama_url"
       else
-        echo -e "→ Ollama não instalado"
-        echo -e "→ Instale com: ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
+        warning "Ollama não acessível em $ollama_url"
+        echo -e "→ Se local, instale: ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
         echo -e "→ Depois rode: ${CYAN}ollama pull llama3.2${NC}"
-        warning "Pule Ollama por enquanto"
+        echo -e "→ Se remoto, verifique firewall/rede"
       fi
       ;;
     4)

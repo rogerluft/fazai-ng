@@ -8,17 +8,17 @@
 # OpenRouter API Key (access 200+ models via single API)
 # Get yours at: https://openrouter.ai/keys
 # Recommended: Use OpenRouter for unified access to Claude, GPT, Gemini, etc.
-# OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # Default model for general tasks
 # Examples:
-#   DEFAULT_MODEL=openai/gpt-4o-mini           # Fast & cheap (recommended)
+#   DEFAULT_MODEL=openai/gpt-4o-mini           # Fast & cheap (via OpenRouter)
 #   DEFAULT_MODEL=anthropic/claude-3-haiku     # Via OpenRouter
 #   DEFAULT_MODEL=ollama/llama3.2              # Local & private
-# DEFAULT_MODEL=openai/gpt-4o-mini
+DEFAULT_MODEL=openai/gpt-4o-mini
 
 # Complex reasoning tasks (optional - falls back to DEFAULT_MODEL)
-# COMPLEX_MODEL=anthropic/claude-3.5-sonnet    # Best reasoning
+COMPLEX_MODEL=anthropic/claude-3.5-sonnet    # Best reasoning
 # COMPLEX_MODEL=openai/gpt-4o                  # Latest GPT
 
 # Fast/cheap tasks (optional - falls back to DEFAULT_MODEL)
@@ -26,7 +26,7 @@
 # FAST_MODEL=openai/gpt-4o-mini                # Cheap
 
 # Local model via Ollama (optional - for privacy)
-# LOCAL_MODEL=ollama/llama3.2
+LOCAL_MODEL=ollama/llama3.2
 # LOCAL_MODEL=ollama/qwen2.5:7b
 
 # Prefer local models when available (privacy mode)
@@ -49,10 +49,11 @@
 # LOCAL MODELS
 # =============================================================================
 
-# Ollama Base URL (for local LLM - default: http://localhost:11434)
-# Configure this if you have Ollama running on another server
-# OLLAMA_BASE_URL=http://192.168.1.100:11434
+# Ollama Base URL (for local LLM)
+# Default: http://localhost:11434
+# Remote server example: http://192.168.0.101:11434
 # OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_BASE_URL=http://192.168.0.101:11434
 
 # MCP Context7 integration (optional)
 # Provide either an HTTP endpoint or a CLI command
