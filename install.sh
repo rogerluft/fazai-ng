@@ -233,8 +233,8 @@ install_deps() {
     rm -f package-lock.json
   fi
   
-  # Instalar com output limpo
-  if npm install --production --silent 2>&1 | tee /tmp/fazai-npm-install.log | grep -i "error" > /dev/null; then
+  # Instalar TODAS as dependências (incluindo devDependencies para build)
+  if npm install --silent 2>&1 | tee /tmp/fazai-npm-install.log | grep -i "error" > /dev/null; then
     error "Falha ao instalar dependências. Verifique /tmp/fazai-npm-install.log"
   fi
   
