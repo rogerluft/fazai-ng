@@ -352,9 +352,9 @@ configure_api_keys() {
   echo -e "${CYAN}═══════════════════════════════════════════════════════${NC}\n"
   
   echo -e "${YELLOW}Escolha qual provider de IA deseja configurar:${NC}"
-  echo -e "  ${BLUE}1.${NC} Claude (Anthropic) - Recomendado para Linux/Redes"
-  echo -e "  ${BLUE}2.${NC} OpenAI (GPT) - Alternativa robusta"
-  echo -e "  ${BLUE}3.${NC} Ollama (Local) - Gratuito e privado"
+  echo -e "  ${BLUE}1.${NC} OpenRouter (GRÁTIS: Qwen3 Coder 480B) - Recomendado"
+  echo -e "  ${BLUE}2.${NC} Ollama Remoto (192.168.0.101) - gptoss-20b"
+  echo -e "  ${BLUE}3.${NC} Ambos (OpenRouter + Ollama)"
   echo -e "  ${BLUE}4.${NC} Pular (configurar manualmente depois)"
   echo ""
   
@@ -363,59 +363,77 @@ configure_api_keys() {
   case "$provider_choice" in
     1)
       echo ""
-      echo -e "${CYAN}Claude (Anthropic):${NC}"
-      echo -e "→ Acesse: ${BLUE}https://console.anthropic.com${NC}"
-      echo -e "→ Ganhe \$5 grátis ao criar conta"
-      echo -e "→ Vá em 'API Keys' e crie uma nova key"
+      echo -e "${CYAN}OpenRouter:${NC}"
+      echo -e "→ Acesse: ${BLUE}https://openrouter.ai/keys${NC}"
+      echo -e "→ ${GREEN}FREE tier:${NC} qwen/qwen3-coder:free (Qwen3 Coder 480B A35B)"
+      echo -e "→ Crie uma conta e gere sua API key"
       echo ""
-      read -p "Cole sua API key (sk-ant-api03-...): " anthropic_key
-      if [ -n "$anthropic_key" ]; then
-        sed -i "s|^ANTHROPIC_API_KEY=.*|ANTHROPIC_API_KEY=$anthropic_key|" "$config_file"
-        success "Claude API key configurada!"
+      read -p "Cole sua API key (sk-or-v1-...): " openrouter_key
+      if [ -n "$openrouter_key" ]; then
+        sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$openrouter_key|" "$config_file"
+        sed -i "s|^# OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$openrouter_key|" "$config_file"
+        sed -i "s|^DEFAULT_MODEL=.*|DEFAULT_MODEL=qwen/qwen3-coder:free|" "$config_file"
+        sed -i "s|^# DEFAULT_MODEL=.*|DEFAULT_MODEL=qwen/qwen3-coder:free|" "$config_file"
+        success "OpenRouter configurado! Modelo: qwen/qwen3-coder:free"
       fi
       ;;
     2)
       echo ""
-      echo -e "${CYAN}OpenAI (GPT):${NC}"
-      echo -e "→ Acesse: ${BLUE}https://platform.openai.com/api-keys${NC}"
-      echo -e "→ Crie ou use uma key existente"
-      echo ""
-      read -p "Cole sua API key (sk-...): " openai_key
-      if [ -n "$openai_key" ]; then
-        sed -i "s|^OPENAI_API_KEY=.*|OPENAI_API_KEY=$openai_key|" "$config_file"
-        success "OpenAI API key configurada!"
-      fi
+      echo -e "${CYAN}Ollama (Remoto):${NC}"
+      configure_ollama
       ;;
     3)
       echo ""
-      echo -e "${CYAN}Ollama (Local ou Remoto):${NC}"
-      echo -e "→ Local: http://localhost:11434"
-      echo -e "→ Remoto: http://192.168.0.101:11434"
-      local ollama_url="http://192.168.0.101:11434"
-      read -p "URL do Ollama [$ollama_url]: " custom_ollama_url
-      ollama_url="${custom_ollama_url:-$ollama_url}"
-      
-      # Testa conexão
-      if curl -s --max-time 3 "$ollama_url/api/tags" &> /dev/null; then
-        sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
-        sed -i "s|^# OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
-        success "Ollama configurado e acessível: $ollama_url"
-      else
-        warning "Ollama não acessível em $ollama_url"
-        echo -e "→ Se local, instale: ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
-        echo -e "→ Depois rode: ${CYAN}ollama pull llama3.2${NC}"
-        echo -e "→ Se remoto, verifique firewall/rede"
+      echo -e "${CYAN}OpenRouter + Ollama:${NC}"
+      echo ""
+      read -p "Cole sua API key OpenRouter (sk-or-v1-...): " openrouter_key
+      if [ -n "$openrouter_key" ]; then
+        sed -i "s|^OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$openrouter_key|" "$config_file"
+        sed -i "s|^# OPENROUTER_API_KEY=.*|OPENROUTER_API_KEY=$openrouter_key|" "$config_file"
+        sed -i "s|^DEFAULT_MODEL=.*|DEFAULT_MODEL=qwen/qwen3-coder:free|" "$config_file"
+        sed -i "s|^# DEFAULT_MODEL=.*|DEFAULT_MODEL=qwen/qwen3-coder:free|" "$config_file"
+        sed -i "s|^FAST_MODEL=.*|FAST_MODEL=ollama/gptoss-20b|" "$config_file"
+        sed -i "s|^# FAST_MODEL=.*|FAST_MODEL=ollama/gptoss-20b|" "$config_file"
+        success "OpenRouter configurado!"
       fi
+      echo ""
+      configure_ollama
       ;;
     4)
-      info "Configuração manual: edite $config_file"
+      warning "API keys não configuradas - edite ~/.config/fazai/fazai.conf manualmente"
       ;;
     *)
-      warning "Opção inválida. Configure manualmente depois."
+      warning "Opção inválida - API keys não configuradas"
       ;;
   esac
+}
+
+# Função separada para configurar Ollama
+configure_ollama() {
+  echo -e "${CYAN}Ollama (Local ou Remoto):${NC}"
+  echo -e "→ Local: http://localhost:11434"
+  echo -e "→ Remoto: http://192.168.0.101:11434 (servidor gptoss-20b)"
+  local ollama_url="http://192.168.0.101:11434"
+  read -p "URL do Ollama [$ollama_url]: " custom_ollama_url
+  ollama_url="${custom_ollama_url:-$ollama_url}"
   
-  echo ""
+  # Testa conexão
+  echo -e "${YELLOW}Testando conexão com $ollama_url...${NC}"
+  if curl -s --max-time 3 "$ollama_url/api/tags" &> /dev/null; then
+    sed -i "s|^OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
+    sed -i "s|^# OLLAMA_BASE_URL=.*|OLLAMA_BASE_URL=$ollama_url|" "$config_file"
+    sed -i "s|^LOCAL_MODEL=.*|LOCAL_MODEL=ollama/gptoss-20b|" "$config_file"
+    sed -i "s|^# LOCAL_MODEL=.*|LOCAL_MODEL=ollama/gptoss-20b|" "$config_file"
+    success "Ollama configurado e acessível: $ollama_url (gptoss-20b)"
+  else
+    warning "Ollama não acessível em $ollama_url"
+    echo -e "→ Se local, instale: ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
+    echo -e "→ Depois rode: ${CYAN}ollama pull gptoss-20b${NC}"
+    echo -e "→ Se remoto (192.168.0.101), verifique:"
+    echo -e "   - Servidor está rodando?"
+    echo -e "   - Firewall permite porta 11434?"
+    echo -e "   - Rede local acessível?"
+  fi
 }
 
 # Criar arquivo de configuração

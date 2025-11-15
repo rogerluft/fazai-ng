@@ -7,42 +7,39 @@
 
 # OpenRouter API Key (access 200+ models via single API)
 # Get yours at: https://openrouter.ai/keys
-# Recommended: Use OpenRouter for unified access to Claude, GPT, Gemini, etc.
-OPENROUTER_API_KEY=sk-or-v1-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+# Free tier available: qwen/qwen3-coder:free (Qwen3 Coder 480B A35B)
+OPENROUTER_API_KEY=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
 
 # Default model for general tasks
 # Examples:
-#   DEFAULT_MODEL=openai/gpt-4o-mini           # Fast & cheap (via OpenRouter)
-#   DEFAULT_MODEL=anthropic/claude-3-haiku     # Via OpenRouter
-#   DEFAULT_MODEL=ollama/llama3.2              # Local & private
-DEFAULT_MODEL=openai/gpt-4o-mini
+#   DEFAULT_MODEL=qwen/qwen3-coder:free        # Free via OpenRouter (480B A35B)
+#   DEFAULT_MODEL=ollama/gptoss-20b            # Local model
+DEFAULT_MODEL=qwen/qwen3-coder:free
 
 # Complex reasoning tasks (optional - falls back to DEFAULT_MODEL)
-COMPLEX_MODEL=anthropic/claude-3.5-sonnet    # Best reasoning
-# COMPLEX_MODEL=openai/gpt-4o                  # Latest GPT
+# Use same model as default (Qwen3 Coder is powerful for complex tasks)
+# COMPLEX_MODEL=qwen/qwen3-coder:free
 
 # Fast/cheap tasks (optional - falls back to DEFAULT_MODEL)
-# FAST_MODEL=anthropic/claude-3-haiku          # Super fast
-# FAST_MODEL=openai/gpt-4o-mini                # Cheap
+# Use local Ollama for fastest response (no API latency)
+FAST_MODEL=ollama/gptoss-20b
 
 # Local model via Ollama (optional - for privacy)
-LOCAL_MODEL=ollama/llama3.2
-# LOCAL_MODEL=ollama/qwen2.5:7b
+LOCAL_MODEL=ollama/gptoss-20b
+# LOCAL_MODEL=ollama/llama3.2
 
 # Prefer local models when available (privacy mode)
-# Set to true to use LOCAL_MODEL first, fallback to DEFAULT_MODEL
-# PREFER_LOCAL=false
+# Set to true to use LOCAL_MODEL (gptoss-20b) first, fallback to OpenRouter
+PREFER_LOCAL=false
 
 # =============================================================================
-# LEGACY API KEYS (Direct Provider Access - Still Supported)
+# LEGACY API KEYS (Optional - Not Required for Current Setup)
 # =============================================================================
 
-# Anthropic Claude API Key (direct - use if not using OpenRouter)
-# Get from: https://console.anthropic.com
+# Anthropic Claude API Key (not available in current setup)
 # ANTHROPIC_API_KEY=sk-ant-api03-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
-# OpenAI API Key (direct - use if not using OpenRouter)
-# Get from: https://platform.openai.com/api-keys
+# OpenAI API Key (not available in current setup)
 # OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 # =============================================================================
