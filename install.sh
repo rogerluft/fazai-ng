@@ -27,6 +27,7 @@ NC='\033[0m' # No Color
 FAZAI_VERSION="3.1.0-beta"
 # SEMPRE instala em /opt/fazai (centralizado)
 INSTALL_DIR="/opt/fazai"
+BIN_DIR="/usr/local/bin"
 REPO_URL="https://github.com/rogerluft/fazai-ng"
 QDRANT_DEFAULT_URL="http://localhost:6333"
 
