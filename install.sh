@@ -25,14 +25,8 @@ NC='\033[0m' # No Color
 
 # Configurações
 FAZAI_VERSION="3.1.0-beta"
-# Instala global se root, senão user local
-if [[ $EUID -eq 0 ]]; then
-  INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
-  BIN_DIR="${FAZAI_BIN_DIR:-/usr/local/bin}"
-else
-  INSTALL_DIR="${FAZAI_INSTALL_DIR:-$HOME/.fazai}"
-  BIN_DIR="${FAZAI_BIN_DIR:-$HOME/.local/bin}"
-fi
+# Sempre instala em /opt/fazai e adiciona ao PATH
+INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
 REPO_URL="https://github.com/rogerluft/fazai-ng"
 QDRANT_DEFAULT_URL="http://localhost:6333"
 
@@ -287,38 +281,36 @@ build_project() {
   fi
 }
 
-# Criar symlink
+# Criar wrapper script
 create_symlink() {
-  info "Criando symlink..."
-
-  ln -sf "$INSTALL_DIR/bin/fazai.js" "$BIN_DIR/fazai"
-  chmod +x "$BIN_DIR/fazai"
-  chmod +x "$INSTALL_DIR/bin/fazai.js"
-
-  success "Symlink criado: $BIN_DIR/fazai"
+  info "Criando script de inicialização..."
+  
+  # Cria um wrapper script em /usr/local/bin
+  local wrapper="/usr/local/bin/fazai"
+  
+  if [ "$EUID" -eq 0 ]; then
+    cat > "$wrapper" << 'EOFWRAPPER'
+#!/usr/bin/env bash
+exec /opt/fazai/bin/fazai.js "$@"
+EOFWRAPPER
+    chmod +x "$wrapper"
+    chmod +x "/opt/fazai/bin/fazai.js"
+    success "Wrapper criado: $wrapper"
+  else
+    sudo bash -c "cat > '$wrapper' << 'EOFWRAPPER'
+#!/usr/bin/env bash
+exec /opt/fazai/bin/fazai.js \"\$@\"
+EOFWRAPPER
+chmod +x '$wrapper'
+chmod +x '/opt/fazai/bin/fazai.js'"
+    success "Wrapper criado: $wrapper (com sudo)"
+  fi
 }
 
 # Configurar PATH
 setup_path() {
-  local shell_rc=""
-
-  if [ -n "$BASH_VERSION" ]; then
-    shell_rc="$HOME/.bashrc"
-  elif [ -n "$ZSH_VERSION" ]; then
-    shell_rc="$HOME/.zshrc"
-  else
-    shell_rc="$HOME/.profile"
-  fi
-
-  if ! grep -q "$BIN_DIR" "$shell_rc" 2>/dev/null; then
-    info "Adicionando $BIN_DIR ao PATH em $shell_rc..."
-    echo "" >> "$shell_rc"
-    echo "# FazAI Terminal" >> "$shell_rc"
-    echo "export PATH=\"$BIN_DIR:\$PATH\"" >> "$shell_rc"
-    success "PATH configurado"
-  else
-    success "PATH já configurado"
-  fi
+  # /usr/local/bin já está no PATH por padrão
+  success "PATH configurado (/usr/local/bin)"
 }
 
 # Configurar fazai.conf
