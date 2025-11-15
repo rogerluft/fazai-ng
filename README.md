@@ -536,7 +536,6 @@ O modo `fazai --cli` oferece:
 Para iniciar o FazAI com a marca registrada do projeto e exibir o contexto do **Andarilho dos Véus** antes do CLI:
 
 ```bash
-./scripts/start-codex.sh
 ```
 
 O script:
