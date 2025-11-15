@@ -8,6 +8,10 @@
 #   ou
 #   wget -qO- https://raw.githubusercontent.com/rogerluft/fazai-ng/master/install.sh | bash
 #
+# Instalação não-interativa (CI/CD):
+#   FAZAI_AUTO_INSTALL=1 bash install.sh
+#   (Auto-instala Docker/Podman e Qdrant sem perguntar)
+#
 
 set -e
 
@@ -529,10 +533,21 @@ install_qdrant() {
     return 0
   fi
 
+  # Modo não-interativo: tenta Docker automaticamente
+  if [ -n "$FAZAI_AUTO_INSTALL" ]; then
+    info "Modo auto-install: tentando Docker..."
+    install_qdrant_docker && return 0
+    warning "Docker falhou, tentando Podman..."
+    install_qdrant_podman && return 0
+    warning "Containers falharam. Qdrant não instalado."
+    return 1
+  fi
+
+  # Modo interativo
   echo ""
   echo -e "${YELLOW}Qdrant não está rodando. Deseja instalar?${NC}"
-  echo -e "${CYAN}1)${NC} Docker (recomendado)"
-  echo -e "${CYAN}2)${NC} Podman"
+  echo -e "${CYAN}1)${NC} Docker (recomendado - auto-instala se necessário)"
+  echo -e "${CYAN}2)${NC} Podman (auto-instala se necessário)"
   echo -e "${CYAN}3)${NC} Binário nativo"
   echo -e "${CYAN}4)${NC} Pular (instalar manualmente depois)"
   echo ""
@@ -563,7 +578,41 @@ install_qdrant() {
 # Instalar Qdrant via Docker
 install_qdrant_docker() {
   if ! command -v docker &> /dev/null; then
-    error "Docker não encontrado. Instale Docker primeiro: https://docs.docker.com/get-docker/"
+    warning "Docker não encontrado. Tentando instalar automaticamente..."
+    
+    # Detectar gerenciador de pacotes
+    if command -v apt-get &> /dev/null; then
+      info "Instalando Docker via apt..."
+      sudo apt-get update -qq
+      sudo apt-get install -y docker.io docker-compose
+      sudo systemctl start docker
+      sudo systemctl enable docker
+      sudo usermod -aG docker "$USER" || true
+      success "Docker instalado via apt!"
+    elif command -v yum &> /dev/null; then
+      info "Instalando Docker via yum..."
+      sudo yum install -y docker
+      sudo systemctl start docker
+      sudo systemctl enable docker
+      sudo usermod -aG docker "$USER" || true
+      success "Docker instalado via yum!"
+    elif command -v dnf &> /dev/null; then
+      info "Instalando Docker via dnf..."
+      sudo dnf install -y docker
+      sudo systemctl start docker
+      sudo systemctl enable docker
+      sudo usermod -aG docker "$USER" || true
+      success "Docker instalado via dnf!"
+    else
+      error "Gerenciador de pacotes não suportado. Instale Docker manualmente: https://docs.docker.com/get-docker/"
+    fi
+    
+    # Verificar instalação
+    if ! command -v docker &> /dev/null; then
+      error "Falha ao instalar Docker automaticamente"
+    fi
+    
+    warning "Docker instalado! Pode ser necessário fazer logout/login para usar sem sudo."
   fi
 
   info "Instalando Qdrant via Docker..."
@@ -599,7 +648,30 @@ install_qdrant_docker() {
 # Instalar Qdrant via Podman
 install_qdrant_podman() {
   if ! command -v podman &> /dev/null; then
-    error "Podman não encontrado. Instale Podman primeiro: https://podman.io/getting-started/installation"
+    warning "Podman não encontrado. Tentando instalar automaticamente..."
+    
+    # Detectar gerenciador de pacotes
+    if command -v apt-get &> /dev/null; then
+      info "Instalando Podman via apt..."
+      sudo apt-get update -qq
+      sudo apt-get install -y podman
+      success "Podman instalado via apt!"
+    elif command -v yum &> /dev/null; then
+      info "Instalando Podman via yum..."
+      sudo yum install -y podman
+      success "Podman instalado via yum!"
+    elif command -v dnf &> /dev/null; then
+      info "Instalando Podman via dnf..."
+      sudo dnf install -y podman
+      success "Podman instalado via dnf!"
+    else
+      error "Gerenciador de pacotes não suportado. Instale Podman manualmente: https://podman.io/getting-started/installation"
+    fi
+    
+    # Verificar instalação
+    if ! command -v podman &> /dev/null; then
+      error "Falha ao instalar Podman automaticamente"
+    fi
   fi
 
   info "Instalando Qdrant via Podman..."
