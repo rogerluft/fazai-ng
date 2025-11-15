@@ -25,8 +25,8 @@ NC='\033[0m' # No Color
 
 # Configurações
 FAZAI_VERSION="3.1.0-beta"
-# Sempre instala em /opt/fazai e adiciona ao PATH
-INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
+# SEMPRE instala em /opt/fazai (centralizado)
+INSTALL_DIR="/opt/fazai"
 REPO_URL="https://github.com/rogerluft/fazai-ng"
 QDRANT_DEFAULT_URL="http://localhost:6333"
 
@@ -139,8 +139,14 @@ setup_directories() {
   # Diretórios do usuário
   mkdir -p "$INSTALL_DIR"
   mkdir -p "$BIN_DIR"
-  mkdir -p "$HOME/.fazai"
   mkdir -p "$HOME/.config/fazai"
+  
+  # Limpar instalações antigas em $HOME
+  if [ -d "$HOME/.fazai" ] && [ "$HOME/.fazai" != "$INSTALL_DIR" ]; then
+    warning "Removendo instalação antiga em $HOME/.fazai..."
+    rm -rf "$HOME/.fazai"
+    success "Instalação antiga removida"
+  fi
 
   # Diretório de config do sistema (requer sudo)
   if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
