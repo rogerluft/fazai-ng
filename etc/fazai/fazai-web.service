@@ -1,5 +1,5 @@
 [Unit]
-Description=FazAI v3.1-beta - Terminal Admin Linux Inteligente
+Description=FazAI Web Interface (Next.js)
 Documentation=https://github.com/rogerluft/fazai-ng
 After=network.target qdrant.service
 Wants=qdrant.service
@@ -7,21 +7,22 @@ Wants=qdrant.service
 [Service]
 Type=simple
 User=%i
-WorkingDirectory=/home/%i/.fazai
-EnvironmentFile=/home/%i/.config/fazai/fazai.conf
-ExecStart=/home/%i/.local/bin/fazai --cli
+WorkingDirectory=/home/%i/.fazai/web
+Environment=NODE_ENV=production
+Environment=PORT=3000
+ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
 StandardError=journal
-SyslogIdentifier=fazai
+SyslogIdentifier=fazai-web
 
 # Security hardening
 NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/%i/.fazai /home/%i/.config/fazai /var/log/fazai
+ReadWritePaths=/home/%i/.fazai/web/.next
 
 [Install]
 WantedBy=multi-user.target

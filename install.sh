@@ -717,6 +717,133 @@ setup_collections() {
   fi
 }
 
+# Instalar Web Interface (opcional)
+install_web_interface() {
+  echo ""
+  info "═══════════════════════════════════════════════════════"
+  info "  Interface Web FazAI (Next.js) - Opcional"
+  info "═══════════════════════════════════════════════════════"
+  echo ""
+  
+  read -p "$(echo -e ${YELLOW}"Deseja instalar a interface web? [y/N]: "${NC})" -n 1 -r
+  echo
+  
+  if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+    info "Interface web pulada. Instale manualmente:"
+    info "  cd $INSTALL_DIR/web && npm install && npm run build"
+    return 0
+  fi
+  
+  # Verificar se diretório web existe
+  if [ ! -d "$INSTALL_DIR/web" ]; then
+    warning "Diretório web/ não encontrado. Interface web não disponível."
+    return 1
+  fi
+  
+  info "Instalando dependências da interface web..."
+  cd "$INSTALL_DIR/web"
+  
+  # Verificar package.json
+  if [ ! -f "package.json" ]; then
+    warning "package.json não encontrado em web/"
+    return 1
+  fi
+  
+  # Instalar dependências
+  npm install || {
+    warning "Falha ao instalar dependências web. Continue manualmente."
+    return 1
+  }
+  
+  success "Dependências web instaladas"
+  
+  # Criar .env se não existir
+  if [ ! -f ".env" ]; then
+    info "Criando arquivo .env para interface web..."
+    cp .env.example .env || cat > .env <<'WEBENV'
+# Qdrant Vector Database
+QDRANT_URL=http://localhost:6333
+QDRANT_API_KEY=
+
+# FazAI CLI Agent API
+NEXT_PUBLIC_API_URL=http://localhost:3000
+
+# WebSocket for real-time logs
+NEXT_PUBLIC_WS_URL=ws://localhost:3000
+WEBENV
+    success "Arquivo .env criado"
+  fi
+  
+  # Build da aplicação
+  info "Construindo interface web (Next.js)... (pode demorar)"
+  npm run build || {
+    warning "Falha ao construir interface web. Tente manualmente:"
+    warning "  cd $INSTALL_DIR/web && npm run build"
+    return 1
+  }
+  
+  success "Interface web instalada e construída!"
+  
+  # Oferecer criar serviço systemd
+  if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
+    echo ""
+    read -p "$(echo -e ${YELLOW}"Criar serviço systemd para interface web? [y/N]: "${NC})" -n 1 -r
+    echo
+    
+    if [[ $REPLY =~ ^[Yy]$ ]]; then
+      create_web_service
+    else
+      info "Para criar serviço manualmente:"
+      info "  sudo cp $INSTALL_DIR/etc/fazai/fazai-web.service /etc/systemd/system/"
+      info "  sudo systemctl daemon-reload"
+      info "  sudo systemctl enable fazai-web@\$(whoami)"
+      info "  sudo systemctl start fazai-web@\$(whoami)"
+    fi
+  fi
+  
+  echo ""
+  info "Para iniciar manualmente:"
+  info "  cd $INSTALL_DIR/web && npm run dev    # Desenvolvimento (port 3000)"
+  info "  cd $INSTALL_DIR/web && npm start      # Produção (port 3000)"
+}
+
+# Criar serviço systemd para web
+create_web_service() {
+  local web_user=$(whoami)
+  
+  info "Criando serviço systemd fazai-web@$web_user..."
+  
+  # Copiar arquivo de serviço
+  sudo cp "$INSTALL_DIR/etc/fazai/fazai-web.service" /etc/systemd/system/ || {
+    warning "Falha ao copiar fazai-web.service"
+    return 1
+  }
+  
+  sudo systemctl daemon-reload
+  sudo systemctl enable "fazai-web@$web_user" || {
+    warning "Falha ao habilitar serviço"
+    return 1
+  }
+  
+  sudo systemctl start "fazai-web@$web_user" || {
+    warning "Falha ao iniciar serviço"
+    warning "Verifique logs: sudo journalctl -u fazai-web@$web_user -n 50"
+    return 1
+  }
+  
+  # Aguardar inicialização
+  sleep 3
+  
+  if systemctl is-active --quiet "fazai-web@$web_user"; then
+    success "Serviço fazai-web@$web_user criado e iniciado!"
+    info "Interface web disponível em: http://localhost:3000"
+    info "Logs: sudo journalctl -u fazai-web@$web_user -f"
+  else
+    warning "Serviço criado mas não está rodando"
+    info "Verifique: sudo systemctl status fazai-web@$web_user"
+  fi
+}
+
 # Mensagem final
 print_success() {
   echo ""
@@ -749,6 +876,9 @@ print_success() {
   echo -e "     ${CYAN}fazai --cli${NC}              # Modo CLI interativo"
   echo -e "     ${CYAN}fazai ask \"pergunta\"${NC}    # Perguntas gerais"
   echo ""
+  echo -e "  ${BLUE}6.${NC} Acesse a interface web (se instalada):"
+  echo -e "     ${CYAN}http://localhost:3000${NC}    # Interface web"
+  echo ""
   echo -e "${CYAN}📖 Documentação:${NC} $INSTALL_DIR/README.md"
   echo -e "${CYAN}🐛 Issues:${NC} https://github.com/rogerluft/fazai-ng/issues"
   echo ""
@@ -769,6 +899,7 @@ main() {
   setup_config
   install_qdrant  # Instalação interativa do Qdrant
   setup_collections
+  install_web_interface  # Instalação opcional da interface web
   print_success
 }
 
