@@ -24,6 +24,7 @@
     "postbuild": "node scripts/postbuild.js",
     "dev": "tsx src/app.ts",
     "start": "node dist/app.cjs",
+    "deploy": "npm run build && bash scripts/deploy.sh",
     "test": "vitest",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
