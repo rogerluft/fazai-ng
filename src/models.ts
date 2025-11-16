@@ -19,21 +19,26 @@ export const models: {
     provider: "openrouter",
     nickName: "llama33",
   },
-  // Ollama models (local)
+  // Ollama models (local on 192.168.0.101)
   {
-    name: "gptoss-20b",
+    name: "gpt-oss:20b",
     provider: "ollama",
-    nickName: "gptoss",
+    nickName: "gptoss-20b",
   },
   {
-    name: "llama3.2",
+    name: "llama3.2:latest",
     provider: "ollama",
     nickName: "llama32",
   },
   {
-    name: "qwen2.5:7b",
+    name: "llama3.1:latest",
     provider: "ollama",
-    nickName: "qwen25",
+    nickName: "llama31",
+  },
+  {
+    name: "fazai:latest",
+    provider: "ollama",
+    nickName: "fazai",
   },
   // OpenAI models (optional - requires API key)
   {
