@@ -6,7 +6,13 @@ import { execSync } from 'child_process';
 import { existsSync } from 'fs';
 import { logger } from '../logger';
 
-const REPO_PATH = process.env.FAZAI_REPO || `${process.env.HOME}/fazai-ng`;
+// Detecta o usuário real mesmo quando rodando com sudo
+const REAL_USER = process.env.SUDO_USER || process.env.USER || 'root';
+const REAL_HOME = REAL_USER === 'root' 
+  ? '/root' 
+  : `/home/${REAL_USER}`;
+
+const REPO_PATH = process.env.FAZAI_REPO || `${REAL_HOME}/fazai-ng`;
 const INSTALL_PATH = '/opt/fazai';
 
 interface SyncOptions {
@@ -16,11 +22,22 @@ interface SyncOptions {
 
 export async function syncCommand(options: SyncOptions = {}): Promise<void> {
   logger.info('🔄 Syncing repository to production...\n');
+  
+  // Check if we have sudo permissions for /opt/fazai
+  if (process.getuid && process.getuid() !== 0) {
+    logger.error('❌ Sync requires sudo privileges to write to /opt/fazai');
+    logger.info('💡 Run: sudo -E fazai sync');
+    process.exit(1);
+  }
+
+  logger.info(`📂 Repository: ${REPO_PATH}`);
+  logger.info(`📂 Install path: ${INSTALL_PATH}`);
+  logger.info(`👤 Real user: ${REAL_USER}\n`);
 
   // Check if repo exists
   if (!existsSync(REPO_PATH)) {
     logger.error(`❌ Repository not found at ${REPO_PATH}`);
-    logger.info(`Set FAZAI_REPO environment variable or ensure ~/fazai-ng exists`);
+    logger.info(`Set FAZAI_REPO environment variable or ensure ${REAL_HOME}/fazai-ng exists`);
     process.exit(1);
   }
 
