@@ -115,8 +115,24 @@ install_fzalias() {
     ok "Diretório $ALIAS_DIR criado"
   fi
   
-  # Cria arquivo de aliases com a função fzalias
-  log "Criando $ALIAS_FILE..."
+  # Cria ou atualiza arquivo de aliases preservando conteúdo existente
+  if [[ -f "$ALIAS_FILE" ]]; then
+    warn "Arquivo $ALIAS_FILE já existe - preservando conteúdo"
+    # Apenas ajusta permissões
+    chmod 666 "$ALIAS_FILE"
+    chown root:root "$ALIAS_FILE"
+    ok "Permissões atualizadas (666)"
+    
+    # Verifica se função fzalias já existe
+    if grep -q "^fzalias()" "$ALIAS_FILE"; then
+      ok "Função fzalias já presente - instalação completa"
+      return 0
+    else
+      warn "Função fzalias não encontrada - será adicionada"
+    fi
+  fi
+  
+  log "Criando/atualizando $ALIAS_FILE..."
   cat > "$ALIAS_FILE" <<'EOFALIASFILE'
 # =============================================================================
 # FazAI Global Aliases - Gerenciado por fzalias
@@ -205,8 +221,10 @@ fzalias-list() {
 
 EOFALIASFILE
 
-  chmod 644 "$ALIAS_FILE"
-  ok "Arquivo $ALIAS_FILE criado"
+  # Permissões 666 para permitir edição por todos os usuários
+  chmod 666 "$ALIAS_FILE"
+  chown root:root "$ALIAS_FILE"
+  ok "Arquivo $ALIAS_FILE criado com permissões 666"
   
   # Integração com /etc/profile (universal)
   if ! grep -qF "source $ALIAS_FILE" /etc/profile 2>/dev/null; then
