@@ -166,13 +166,13 @@ setup_directories() {
 
   # Criar diretório de logs (tentar com sudo se necessário)
   if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
-    sudo mkdir -p /var/log/fazai 2>/dev/null || mkdir -p "$HOME/.fazai/logs"
+    sudo mkdir -p /var/log/fazai 2>/dev/null || mkdir -p /opt/fazai/logs
     sudo chmod 775 /var/log/fazai 2>/dev/null || true
     sudo chown $(whoami):$(id -gn) /var/log/fazai 2>/dev/null || true
     success "Diretório de logs criado: /var/log/fazai"
   else
-    mkdir -p "$HOME/.fazai/logs"
-    warning "Usando $HOME/.fazai/logs (necessita sudo para /var/log/fazai)"
+    mkdir -p /opt/fazai/logs
+    warning "Usando /opt/fazai/logs (necessita sudo para /var/log/fazai)"
   fi
 
   success "Diretórios configurados"
@@ -660,7 +660,7 @@ install_qdrant_docker() {
   docker rm qdrant 2>/dev/null || true
 
   # Criar volume para persistência
-  mkdir -p "$HOME/.fazai/qdrant_storage"
+  mkdir -p /opt/fazai/qdrant_storage
 
   # Iniciar Qdrant com restart automático
   docker run -d \
@@ -668,7 +668,7 @@ install_qdrant_docker() {
     --restart unless-stopped \
     -p 6333:6333 \
     -p 6334:6334 \
-    -v "$HOME/.fazai/qdrant_storage:/qdrant/storage:z" \
+    -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
     qdrant/qdrant:latest
 
   # Aguardar inicialização
@@ -787,7 +787,7 @@ install_qdrant_binary() {
   fi
 
   # Criar diretório de dados
-  mkdir -p "$HOME/.fazai/qdrant"
+  mkdir -p /opt/fazai/qdrant
 
   # Criar serviço systemd (se tiver permissão)
   if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
@@ -800,7 +800,7 @@ After=network.target
 [Service]
 Type=simple
 User=$(whoami)
-WorkingDirectory=$HOME/.fazai/qdrant
+WorkingDirectory=/opt/fazai/qdrant
 ExecStart=/usr/local/bin/qdrant
 Restart=on-failure
 RestartSec=5
@@ -824,7 +824,7 @@ SYSTEMD
     done
   else
     warning "Sem sudo. Inicie manualmente: qdrant"
-    info "Para iniciar: cd ~/.fazai/qdrant && qdrant"
+    info "Para iniciar: cd /opt/fazai/qdrant && qdrant"
   fi
 }
 
