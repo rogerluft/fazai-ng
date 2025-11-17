@@ -67,7 +67,7 @@ curl http://localhost:6333
 
 ```bash
 # Editar configuração
-nano ~/.config/fazai/fazai.conf
+nano /etc/fazai/fazai.conf
 ```
 
 **Mínimo necessário:**
@@ -222,7 +222,7 @@ ollama pull qwen2.5:7b
 ollama pull mistral
 
 # Configurar no fazai.conf
-echo "OLLAMA_BASE_URL=http://localhost:11434" >> ~/.config/fazai/fazai.conf
+echo "OLLAMA_BASE_URL=http://localhost:11434" >> /etc/fazai/fazai.conf
 ```
 
 ---
@@ -231,7 +231,7 @@ echo "OLLAMA_BASE_URL=http://localhost:11434" >> ~/.config/fazai/fazai.conf
 
 ### Pesquisa Assistida (MCP Context7 + Web)
 
-Adicione ao `~/.config/fazai/fazai.conf`:
+Adicione ao `/etc/fazai/fazai.conf`:
 
 ```ini
 # MCP Context7 (servidor local de contexto)
@@ -313,11 +313,11 @@ source ~/.zshrc
 
 ```bash
 # Verificar se arquivo existe
-cat ~/.config/fazai/fazai.conf
+cat /etc/fazai/fazai.conf
 
 # Recriar configuração
-cp ~/.fazai/fazai.conf.example ~/.config/fazai/fazai.conf
-nano ~/.config/fazai/fazai.conf
+cp /opt/fazai/fazai.conf.example /etc/fazai/fazai.conf
+nano /etc/fazai/fazai.conf
 ```
 
 ### ❌ "Qdrant não conecta"

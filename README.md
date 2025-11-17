@@ -268,7 +268,7 @@ sudo fzalias uninstall
 
 ### Configuração do Vector Store (Qdrant)
 
-**Arquivo de configuração** (`~/.config/fazai/fazai.conf` ou `/etc/fazai/fazai.conf`):
+**Arquivo de configuração** (`/etc/fazai/fazai.conf` ou `/etc/fazai/fazai.conf`):
 
 ```bash
 # Vector Store (Qdrant)
@@ -455,8 +455,8 @@ Durante a instalação, o FazAI pedirá suas API keys e criará o arquivo de con
 Copie e edite o arquivo de exemplo:
 
 ```bash
-cp fazai.conf.example ~/.config/fazai/fazai.conf
-nano ~/.config/fazai/fazai.conf
+cp fazai.conf.example /etc/fazai/fazai.conf
+nano /etc/fazai/fazai.conf
 ```
 
 **Exemplo de configuração completa:**
