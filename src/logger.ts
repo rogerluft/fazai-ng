@@ -135,8 +135,10 @@ export function initLogger(options: LoggerInitOptions = {}): void {
   const level = options.levelOverride ?? envLevel ?? configLevel ?? currentLevel;
   currentLevel = level;
 
-  const defaultLogPath = "/var/log/fazai/fazai.log";
-  const fallbackLogPath = path.join(process.cwd(), "fazai.log");
+  // Logs organizados por data: /var/log/fazai/2025-11-17.log
+  const logDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+  const defaultLogPath = `/var/log/fazai/${logDate}.log`;
+  const fallbackLogPath = path.join(process.cwd(), `fazai-${logDate}.log`);
   const logPathCandidate = options.logFilePathOverride ?? envLogPath ?? configLogPath ?? defaultLogPath;
 
   ensureStream(logPathCandidate);
