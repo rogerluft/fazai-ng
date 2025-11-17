@@ -3,6 +3,13 @@
 ## [3.1.1-beta] - 2025-11-17
 
 ### Added
+- **Google Gemini Native API Integration** (`src/linux-admin.ts`, `src/askAI.ts`)
+  - Suporte nativo via `@google/generative-ai` SDK
+  - 3 novos modelos: `gemini2flash`, `gemini15pro`, `gemini15flash`
+  - Free tier: 15 req/min, 1500 req/day
+  - Streaming de respostas com parse JSON robusto
+  - Configuração via `GOOGLE_API_KEY` ou `GEMINI_API_KEY` no `fazai.conf`
+  - Documentação completa em `docs/GEMINI_INTEGRATION.md`
 - **Sacred Coding Protocols** consolidados em `AGENTS.md` (seção 🔒 Sacred Coding Protocols)
   - Consistency Matrix: 6 items obrigatórios (help, completion, config, installer, docs, changelog)
   - Proibição de placeholders e código half-documented
