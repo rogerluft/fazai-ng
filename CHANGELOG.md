@@ -1,5 +1,56 @@
 # FazAI Changelog
 
+## [3.1.1-beta] - 2025-11-17
+
+### Added
+- **Sacred Coding Protocols** consolidados em `AGENTS.md` (seção 🔒 Sacred Coding Protocols)
+  - Consistency Matrix: 6 items obrigatórios (help, completion, config, installer, docs, changelog)
+  - Proibição de placeholders e código half-documented
+  - Feature Addition Protocol com 9 steps obrigatórios
+- **Comando `sync`**: Sincroniza alterações do repositório para `/opt/fazai`
+  - Build automático antes de sync
+  - Validação de integridade (tamanho de arquivos)
+  - Reinicia serviços automaticamente
+  - Suporta `--dry-run` e `--verbose`
+- **Integração Cloudflare**: Gerenciamento completo via API (`src/commands/cloudflare.ts`)
+  - `fazai cloudflare zones`: Listar todas as zonas
+  - `fazai cloudflare dns list <zoneId>`: Listar registros DNS
+  - `fazai cloudflare dns create <zoneId> <type> <name> <content> [proxied]`: Criar DNS
+  - `fazai cloudflare dns delete <zoneId> <recordId>`: Deletar DNS
+  - `fazai cloudflare workers list`: Listar Cloudflare Workers
+  - `fazai cloudflare cache purge <zoneId>`: Limpar cache de zona
+  - `fazai cloudflare ssl get <zoneId>`: Ver configuração SSL
+  - `fazai cloudflare ssl set <zoneId> <mode>`: Alterar modo SSL (off/flexible/full/strict)
+- **Bash Completion atualizado**: Inclui `sync` e `cloudflare` commands com subcommands
+- **Configurações Cloudflare** no `fazai.conf.example` (linhas 89-101):
+  - `CLOUDFLARE_API_TOKEN` (recomendado - scoped permissions)
+  - `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL` (legacy - global permissions)
+  - `CLOUDFLARE_ACCOUNT_ID` (opcional - para account-level operations)
+- **Configurações Gemini** preparadas para integração futura (linhas 103-110)
+
+### Changed
+- **Repository cleanup**: Removidos 16.390 linhas de código obsoleto
+  - Deletado `beta/` (Python framework - postponed)
+  - Deletado `.claude/`, `CLAUDE.md` (session artifacts)
+  - Deletado `AUDIT*.md` (4 arquivos consolidados)
+  - Deletado `CODING_PROTOCOLS.md` (movido para AGENTS.md)
+  - Deletado `TODO.md` (completed items)
+- **Commands organization**: Movido para `src/commands/` (cloudflare.ts, sync.ts)
+- **Instalação centralizada**: Tudo em `/opt/fazai`, sem symlinks em `/usr/local/bin`
+- **PATH configuração**: Usa `export PATH="/opt/fazai/bin:$PATH"` em vez de symlinks
+- **Help message**: Atualizado com novos comandos `sync` e `cloudflare`
+- **Completion**: Sincronizado com features atuais
+- **Workflow de desenvolvimento**: Repo (`~/fazai-ng`) → Build → Sync → `/opt/fazai`
+
+### Fixed
+- **Ollama model mapping**: `gptoss-20b` → `gpt-oss:20b` (nome correto no servidor)
+- **OpenRouter integration**: Adiciona `HTTP-Referer` header obrigatório
+- **Web service paths**: Corrige `WorkingDirectory` para `/opt/fazai/web`
+- **Build validation**: Usa exit code em vez de stderr
+- **Log permissions**: Usa `~/.cache/fazai/` em vez de `/tmp/`
+- **Config consistency**: `fazai.conf.example` reflete todas as features atuais
+- **Import paths**: Corrige relative imports em `src/commands/`
+
 ## [Unreleased] - 2025-11-17
 
 ### Added
