@@ -149,10 +149,12 @@ setup_directories() {
     success "Instalação antiga removida"
   fi
 
-  # Diretório de config do sistema (requer sudo)
+  # Diretórios do sistema (requer sudo)
   if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
     sudo mkdir -p /etc/fazai 2>/dev/null || warning "Não foi possível criar /etc/fazai (necessita sudo)"
+    sudo mkdir -p /var/log/fazai 2>/dev/null || warning "Não foi possível criar /var/log/fazai (necessita sudo)"
     sudo chmod 755 /etc/fazai 2>/dev/null || true
+    sudo chmod 777 /var/log/fazai 2>/dev/null || true  # Todos podem escrever logs
     
     # Criar arquivo fzalias com permissões corretas
     sudo touch /etc/fazai/fzalias
