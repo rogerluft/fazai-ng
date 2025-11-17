@@ -153,6 +153,12 @@ setup_directories() {
   if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
     sudo mkdir -p /etc/fazai 2>/dev/null || warning "Não foi possível criar /etc/fazai (necessita sudo)"
     sudo chmod 755 /etc/fazai 2>/dev/null || true
+    
+    # Criar arquivo fzalias com permissões corretas
+    sudo touch /etc/fazai/fzalias
+    sudo chmod 666 /etc/fazai/fzalias
+    sudo chown root:root /etc/fazai/fzalias
+    
     success "Diretório de sistema criado: /etc/fazai"
   else
     warning "Pule /etc/fazai (necessita sudo). Use ~/.config/fazai/"
@@ -291,6 +297,9 @@ build_project() {
 # Criar wrapper script
 create_symlink() {
   info "Criando script de inicialização..."
+  
+  # Limpar instalações antigas
+  rm -f /usr/bin/fazai 2>/dev/null || true
   
   # Cria um wrapper script em /usr/local/bin
   local wrapper="/usr/local/bin/fazai"

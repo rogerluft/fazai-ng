@@ -239,15 +239,24 @@ IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 
 Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
 
-  const stream = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: linuxAdminPrompt(task) }
-    ],
-    stream: true,
-    temperature: 0,
-  });
+  let stream;
+  try {
+    stream = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: linuxAdminPrompt(task) }
+      ],
+      stream: true,
+      temperature: 0,
+    });
+  } catch (error: any) {
+    if (error.status === 429) {
+      logger.error(`\n⚠️  Rate limit atingido: ${model} temporariamente indisponível`);
+      logger.error(`💡 Sugestão: Use outro modelo gratuito (gemini2flash, llama32) ou aguarde alguns minutos\n`);
+    }
+    throw error;
+  }
 
   const tokenStream = new Readable({
     read() {},
