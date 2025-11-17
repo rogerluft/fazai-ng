@@ -26,6 +26,8 @@ Usage:
   fazai search "query"                       # Manual research via Context7/Web
   fazai vector [validate|recreate]           # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>  # Importa conversas para Qdrant
+  fazai sync                                 # Sync repository changes to /opt/fazai
+  fazai cloudflare <action>                  # Manage Cloudflare (zones, dns, workers)
   fazai cf zones                             # Cloudflare: list zones
   fazai cf dns list <zoneId>                 # Cloudflare: manage DNS
 
@@ -402,8 +404,19 @@ async function main() {
     return;
   }
 
+  // Sync command
+  if (inputs[0] === "sync") {
+    const { syncCommand } = await import("./commands/sync");
+    await syncCommand({ 
+      verbose: debugFlag || verboseFlag,
+      dryRun: inputs.includes("--dry-run")
+    });
+    return;
+  }
+
   // Cloudflare command
   if (inputs[0] === "cf" || inputs[0] === "cloudflare") {
+    const { handleCloudflare } = await import("./commands/cloudflare");
     await handleCloudflare(inputs.slice(1));
     return;
   }
@@ -416,6 +429,7 @@ async function main() {
       "search",
       "vector",
       "import",
+      "sync",
       "cf",
       "cloudflare",
       "--debug",

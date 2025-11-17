@@ -12,7 +12,7 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    commands="ask config completion search vector import"
+    commands="ask config completion search vector import sync cloudflare"
 
     # Options/flags
     opts="--help -h --dry-run --cli --debug --verbose --log-file --auto-research --yolo -y"
@@ -89,6 +89,25 @@ _fazai_completion() {
                     else
                         COMPREPLY=( $(compgen -f -- ${cur}) )
                     fi
+                    return 0
+                    ;;
+            esac
+            ;;
+
+        sync)
+            # No arguments for sync
+            return 0
+            ;;
+
+        cloudflare)
+            cloudflare_cmds="zones dns workers purge analytics"
+            case "${prev}" in
+                cloudflare)
+                    COMPREPLY=( $(compgen -W "${cloudflare_cmds}" -- ${cur}) )
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=( $(compgen -W "${cloudflare_cmds}" -- ${cur}) )
                     return 0
                     ;;
             esac

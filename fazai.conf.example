@@ -84,3 +84,26 @@ OLLAMA_MODELS=gptoss-20b,llama3.2
 
 # Custom path for this config file (helpful for global installs)
 # FAZAI_CONFIG_PATH=/etc/fazai/fazai.conf
+
+# =============================================================================
+# CLOUDFLARE INTEGRATION
+# =============================================================================
+
+# Cloudflare API Token (recommended - scoped permissions)
+# Create at: https://dash.cloudflare.com/profile/api-tokens
+# CLOUDFLARE_API_TOKEN=your_api_token_here
+
+# Cloudflare API Key (legacy - global permissions)
+# CLOUDFLARE_API_KEY=your_global_api_key
+# CLOUDFLARE_EMAIL=your@email.com
+
+# Cloudflare Account ID (optional - for account-level operations)
+# CLOUDFLARE_ACCOUNT_ID=your_account_id
+
+# =============================================================================
+# GEMINI INTEGRATION (Future)
+# =============================================================================
+
+# Google Gemini API Key
+# Get yours at: https://makersuite.google.com/app/apikey
+# GEMINI_API_KEY=your_gemini_api_key

@@ -1,5 +1,48 @@
 # FazAI Changelog
 
+## [Unreleased] - 2025-11-17
+
+### Added
+- **Comando `sync`**: Sincroniza alterações do repositório para `/opt/fazai`
+  - Build automático antes de sync
+  - Validação de integridade (tamanho de arquivos)
+  - Reinicia serviços automaticamente
+  - Suporta `--dry-run` e `--verbose`
+- **Integração Cloudflare**: Gerenciamento completo via API
+  - `fazai cf zones`: Listar zonas
+  - `fazai cf dns list <zoneId>`: Gerenciar DNS
+  - `fazai cf workers`: Gerenciar Cloudflare Workers
+  - `fazai cf purge <zoneId>`: Limpar cache
+  - `fazai cf analytics <zoneId>`: Ver estatísticas
+- **Protocolos de Codificação**: Documento `CODING_PROTOCOLS.md` estabelecendo regras sagradas
+- **Bash Completion atualizado**: Inclui `sync` e `cloudflare` commands
+- **Configurações Cloudflare** no `fazai.conf.example`:
+  - `CLOUDFLARE_API_TOKEN` (recomendado)
+  - `CLOUDFLARE_API_KEY` + `CLOUDFLARE_EMAIL` (legacy)
+  - `CLOUDFLARE_ACCOUNT_ID`
+- **Configurações Gemini** preparadas para integração futura
+
+### Changed
+- **Instalação centralizada**: Tudo em `/opt/fazai`, sem symlinks em `/usr/local/bin`
+- **PATH configuração**: Usa `export PATH="/opt/fazai/bin:$PATH"` em vez de symlinks
+- **Help message**: Atualizado com novos comandos `sync` e `cloudflare`
+- **Completion**: Sincronizado com features atuais
+- **Workflow de desenvolvimento**: Repo (`~/fazai-ng`) → Build → Sync → `/opt/fazai`
+
+### Fixed
+- **Ollama model mapping**: `gptoss-20b` → `gpt-oss:20b` (nome correto no servidor)
+- **OpenRouter integration**: Adiciona `HTTP-Referer` header obrigatório
+- **Web service paths**: Corrige `WorkingDirectory` para `/opt/fazai/web`
+- **Build validation**: Usa exit code em vez de stderr
+- **Log permissions**: Usa `~/.cache/fazai/` em vez de `/tmp/`
+- **Config consistency**: `fazai.conf.example` reflete todas as features atuais
+
+### Documentation
+- **CODING_PROTOCOLS.md**: Regras imutáveis de desenvolvimento
+- **SYNC_WORKFLOW.md**: Atualizado com novo fluxo de trabalho
+- **README.md**: Documentação completa de instalação e uso
+- **QUICK-START.md**: Guia rápido atualizado
+
 ## [3.1.0-beta] - 2025-11-14
 
 ### Added
