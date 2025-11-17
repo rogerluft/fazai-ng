@@ -195,3 +195,4 @@ beta*/**
 # Claude Code generated context
 CLAUDE.md
 
+session-context-*.md
