@@ -720,7 +720,7 @@ install_qdrant_podman() {
   podman rm qdrant 2>/dev/null || true
 
   # Criar volume para persistência
-  mkdir -p "$HOME/.fazai/qdrant_storage"
+  mkdir -p /opt/fazai/qdrant_storage
 
   # Iniciar Qdrant com restart automático
   podman run -d \
@@ -728,7 +728,7 @@ install_qdrant_podman() {
     --restart unless-stopped \
     -p 6333:6333 \
     -p 6334:6334 \
-    -v "$HOME/.fazai/qdrant_storage:/qdrant/storage:z" \
+    -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
     qdrant/qdrant:latest
 
   # Aguardar inicialização
@@ -997,11 +997,11 @@ print_success() {
   echo -e "     ${CYAN}source ~/.bashrc${NC}  # ou ~/.zshrc"
   echo ""
   echo -e "  ${BLUE}2.${NC} Teste o sistema de aliases:"
-  echo -e "     ${CYAN}fzalias ll='ls -lh'${NC}        # Criar alias"
-  echo -e "     ${CYAN}fzalias${NC}                    # Listar aliases"
+  echo -e "     ${CYAN}fzalias ll 'ls -lh'${NC}        # Criar alias"
+  echo -e "     ${CYAN}fzalias-list${NC}               # Listar aliases"
   echo ""
   echo -e "  ${BLUE}3.${NC} Configure suas API keys:"
-  echo -e "     ${CYAN}nano ~/.config/fazai/fazai.conf${NC}"
+  echo -e "     ${CYAN}nano /etc/fazai/fazai.conf${NC}"
   echo ""
   echo -e "  ${BLUE}4.${NC} Inicie o Qdrant (se ainda não estiver rodando):"
   echo -e "     ${CYAN}docker run -d -p 6333:6333 qdrant/qdrant${NC}"
