@@ -28,23 +28,13 @@ export async function* getLinuxCommandsFromAI(
       throw new Error(`Provider não suportado: ${provider}`);
     }
   } catch (error: any) {
-    // Fallback automático em caso de rate limit
+    // Melhorar mensagem de erro para rate limits
     if (error?.status === 429 || error?.code === 429) {
-      logger.warn(`\n⚠️  Rate limit atingido em ${provider}. Tentando fallback...`);
+      const suggestion = provider === "openrouter" 
+        ? "Tente outro modelo: fazai --model gemini2flash ou fazai --model gptoss"
+        : "Aguarde alguns minutos ou use outro modelo";
       
-      // Tentar Gemini (Google free)
-      if (provider !== "google" && process.env.GOOGLE_API_KEY) {
-        logger.info("📱 Usando Gemini 2.0 Flash como fallback...");
-        yield* getLinuxCommandsFromGemini(systemInfo, task, "gemini-2.0-flash-exp");
-        return;
-      }
-      
-      // Tentar Ollama local
-      if (provider !== "ollama" && process.env.OLLAMA_BASE_URL) {
-        logger.info("🏠 Usando Ollama local como fallback...");
-        yield* getLinuxCommandsFromOllama(systemInfo, task, "gpt-oss:20b");
-        return;
-      }
+      logger.error(`\n❌ Rate limit atingido no ${provider}. ${suggestion}`);
     }
     
     throw error;
