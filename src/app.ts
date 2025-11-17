@@ -498,6 +498,10 @@ async function main() {
       displayHelp();
       process.exit(0);
     }
+    if (input === "--version" || input === "-v") {
+      console.log(`FazAI v${require('../package.json').version}`);
+      process.exit(0);
+    }
     return true;
   });
 
