@@ -11,18 +11,43 @@ export async function* getLinuxCommandsFromAI(
   systemInfo: string,
   task: string,
   model: string,
-  provider: "anthropic" | "openai" | "openrouter" | "ollama"
+  provider: "anthropic" | "openai" | "openrouter" | "ollama" | "google"
 ): LinuxCommandGenerator {
-  if (provider === "anthropic") {
-    yield* getLinuxCommandsFromClaude(systemInfo, task, model);
-  } else if (provider === "openai") {
-    yield* getLinuxCommandsFromOpenAI(systemInfo, task, model);
-  } else if (provider === "openrouter") {
-    yield* getLinuxCommandsFromOpenRouter(systemInfo, task, model);
-  } else if (provider === "ollama") {
-    yield* getLinuxCommandsFromOllama(systemInfo, task, model);
-  } else {
-    throw new Error(`Provider não suportado: ${provider}`);
+  try {
+    if (provider === "anthropic") {
+      yield* getLinuxCommandsFromClaude(systemInfo, task, model);
+    } else if (provider === "openai") {
+      yield* getLinuxCommandsFromOpenAI(systemInfo, task, model);
+    } else if (provider === "openrouter") {
+      yield* getLinuxCommandsFromOpenRouter(systemInfo, task, model);
+    } else if (provider === "ollama") {
+      yield* getLinuxCommandsFromOllama(systemInfo, task, model);
+    } else if (provider === "google") {
+      yield* getLinuxCommandsFromGemini(systemInfo, task, model);
+    } else {
+      throw new Error(`Provider não suportado: ${provider}`);
+    }
+  } catch (error: any) {
+    // Fallback automático em caso de rate limit
+    if (error?.status === 429 || error?.code === 429) {
+      logger.warn(`\n⚠️  Rate limit atingido em ${provider}. Tentando fallback...`);
+      
+      // Tentar Gemini (Google free)
+      if (provider !== "google" && process.env.GOOGLE_API_KEY) {
+        logger.info("📱 Usando Gemini 2.0 Flash como fallback...");
+        yield* getLinuxCommandsFromGemini(systemInfo, task, "gemini-2.0-flash-exp");
+        return;
+      }
+      
+      // Tentar Ollama local
+      if (provider !== "ollama" && process.env.OLLAMA_BASE_URL) {
+        logger.info("🏠 Usando Ollama local como fallback...");
+        yield* getLinuxCommandsFromOllama(systemInfo, task, "gpt-oss:20b");
+        return;
+      }
+    }
+    
+    throw error;
   }
 }
 
