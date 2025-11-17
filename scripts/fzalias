@@ -1,56 +1,140 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# shellcheck disable=SC2034,SC2155
 set -euo pipefail
 
-# ============================================================================
-# fzalias - Sistema de alias global multidistro
-# ============================================================================
+# =============================================================================
+# fzalias - Sistema Global de Alias Multi-Distribuição
+# =============================================================================
+# Parte do Terminal FazAI
+# Repositório: https://github.com/rogerluft/fazai-ng
+# Autor: Roger Luft (@rogerluft)
+# Licença: MIT
+# 
+# Descrição:
+#   Gerenciador de aliases bash persistentes e globais que funciona em
+#   Debian/Ubuntu e RedHat/CentOS/Fedora. Aliases são salvos em 
+#   /etc/fazai/fzalias e disponibilizados automaticamente para todos usuários.
+#
+# Uso:
+#   sudo fzalias install    - Instala o sistema de aliases
+#   sudo fzalias uninstall  - Remove completamente
+#   fzalias [nome] [cmd]    - Cria alias (após instalação)
+#   fzalias --help          - Ajuda
+# =============================================================================
 
-ALIAS_DIR="/etc/fazai"
-ALIAS_FILE="$ALIAS_DIR/fzalias"
+readonly VERSION="1.0.0"
+readonly ALIAS_DIR="/etc/fazai"
+readonly ALIAS_FILE="$ALIAS_DIR/fzalias"
+readonly SCRIPT_NAME="$(basename "$0")"
 
-R="\e[31m" G="\e[32m" Y="\e[33m" N="\e[0m"
+# Cores ANSI
+readonly R="\e[31m" G="\e[32m" Y="\e[33m" B="\e[34m" N="\e[0m"
 
-log() { echo -e "\e[34m[INFO]${N} $*"; }
-ok()  { echo -e "${G}[OK]${N} $*"; }
-err() { echo -e "${R}[ERRO]${N} $*" >&2; exit 1; }
+# Funções de logging
+log()  { echo -e "${B}ℹ${N} $*"; }
+ok()   { echo -e "${G}✓${N} $*"; }
+warn() { echo -e "${Y}⚠${N} $*" >&2; }
+err()  { echo -e "${R}✗${N} $*" >&2; exit 1; }
 
-# ============================================================================
-# Detecta distro
-# ============================================================================
+# =============================================================================
+# Funções Auxiliares
+# =============================================================================
 
+# Detecta distribuição Linux
 detect_distro() {
-  if [[ -f /etc/os-release ]]; then
-    . /etc/os-release
-    case "$ID" in
-      debian|ubuntu|mint|pop) echo "debian" ;;
-      rhel|centos|fedora|rocky|alma) echo "redhat" ;;
-      *) echo "unknown" ;;
-    esac
-  else
+  if [[ ! -f /etc/os-release ]]; then
+    warn "Arquivo /etc/os-release não encontrado"
     echo "unknown"
+    return 1
+  fi
+  
+  # Ler variáveis sem executar o arquivo (evita conflitos com variáveis readonly)
+  local distro_id
+  distro_id=$(grep "^ID=" /etc/os-release | cut -d= -f2 | tr -d '"')
+  distro_id="${distro_id:-unknown}"
+  distro_id="${distro_id:-unknown}"
+  
+  case "${distro_id}" in
+    debian|ubuntu|mint|pop|linuxmint)
+      echo "debian"
+      ;;
+    rhel|centos|fedora|rocky|almalinux|ol)
+      echo "redhat"
+      ;;
+    arch|manjaro)
+      echo "arch"
+      ;;
+    *)
+      warn "Distribuição '$ID' não reconhecida"
+      echo "unknown"
+      return 1
+      ;;
+  esac
+}
+
+# Verifica se comando existe
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
+# Verifica se está rodando como root
+require_root() {
+  if [[ $EUID -ne 0 ]]; then
+    err "Este comando requer privilégios root. Execute com sudo."
   fi
 }
 
-# ============================================================================
-# Instala fzalias
-# ============================================================================
+# Backup seguro de arquivo
+backup_file() {
+  local file="$1"
+  if [[ -f "$file" ]]; then
+    local backup="${file}.backup.$(date +%Y%m%d_%H%M%S)"
+    cp "$file" "$backup"
+    log "Backup criado: $backup"
+  fi
+}
+
+# =============================================================================
+# Instalação
+# =============================================================================
 
 install_fzalias() {
+  require_root
+  
   local distro
-  distro=$(detect_distro)
+  distro=$(detect_distro) || {
+    err "Não foi possível detectar a distribuição Linux"
+  }
   
-  [[ $EUID -eq 0 ]] || err "Execute como root"
+  log "Distribuição detectada: $distro"
   
-  log "Detectado: $distro"
+  # Cria diretório com permissões corretas
+  if [[ ! -d "$ALIAS_DIR" ]]; then
+    mkdir -p "$ALIAS_DIR" || err "Falha ao criar $ALIAS_DIR"
+    chmod 755 "$ALIAS_DIR"
+    ok "Diretório $ALIAS_DIR criado"
+  fi
   
-  mkdir -p "$ALIAS_DIR"
-  
-  # Cria função fzalias
-  cat > "$ALIAS_FILE" <<'EOF'
+  # Cria arquivo de aliases com a função fzalias
+  log "Criando $ALIAS_FILE..."
+  cat > "$ALIAS_FILE" <<'EOFALIASFILE'
+# =============================================================================
+# FazAI Global Aliases - Gerenciado por fzalias
+# =============================================================================
+# Este arquivo é carregado automaticamente em /etc/profile
+# Adicione aliases com: fzalias [nome] [comando]
+# =============================================================================
+
 fzalias() {
-  if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+  if [[ "$1" == "--help" || "$1" == "-h" || -z "${1:-}" ]]; then
     echo "Uso: fzalias [alias] [comando]"
-    echo "Lista: cat /etc/fazai/fzalias"
+    echo ""
+    echo "Exemplos:"
+    echo "  fzalias ll 'ls -lah --color=auto'"
+    echo "  fzalias update 'sudo apt update && sudo apt upgrade -y'"
+    echo ""
+    echo "Listar aliases: cat /etc/fazai/fzalias"
+    echo "Remover alias:  fzalias-remove [nome]"
     return 0
   fi
 
@@ -58,38 +142,115 @@ fzalias() {
   shift
   local cmd="$*"
 
-  if [[ -z "$name" ]] || [[ -z "$cmd" ]]; then
-    echo "Erro: alias ou comando ausente"
-    echo "Uso: fzalias [alias] [comando]"
+  # Validações
+  if [[ -z "$name" ]]; then
+    echo "✗ Erro: nome do alias não pode ser vazio" >&2
     return 1
   fi
 
-  # Remove alias anterior se existir
-  sed -i "/^alias $name=/d" /etc/fazai/fzalias
+  if [[ -z "$cmd" ]]; then
+    echo "✗ Erro: comando não pode ser vazio" >&2
+    return 1
+  fi
 
+  # Verifica se é um comando perigoso (básico)
+  if [[ "$cmd" =~ rm[[:space:]]+-rf[[:space:]]*/$ ]]; then
+    echo "⚠ Aviso: comando potencialmente perigoso detectado!" >&2
+    read -rp "Deseja continuar? [y/N]: " confirm
+    [[ "$confirm" != [yY] ]] && return 1
+  fi
+
+  # Remove alias anterior se existir
+  if grep -q "^alias $name=" /etc/fazai/fzalias 2>/dev/null; then
+    sed -i "/^alias $name=/d" /etc/fazai/fzalias
+    echo "ℹ Alias '$name' existente foi substituído"
+  fi
+
+  # Adiciona novo alias
   echo "alias $name='$cmd'" >> /etc/fazai/fzalias
-  echo "Alias '$name' criado"
+  echo "✓ Alias '$name' criado com sucesso"
+  
+  # Recarrega aliases na sessão atual
+  # shellcheck disable=SC1090
   source /etc/fazai/fzalias
 }
-EOF
 
-  chmod 664 "$ALIAS_FILE"
-  
-  # Profile global (ambas distros)
-  if ! grep -q "source $ALIAS_FILE" /etc/profile 2>/dev/null; then
-    echo "source $ALIAS_FILE" >> /etc/profile
+# Função auxiliar para remover aliases
+fzalias-remove() {
+  local name="$1"
+  if [[ -z "$name" ]]; then
+    echo "Uso: fzalias-remove [alias]"
+    return 1
   fi
   
-  # Bash config específico por distro
+  if sed -i "/^alias $name=/d" /etc/fazai/fzalias 2>/dev/null; then
+    echo "✓ Alias '$name' removido"
+    # shellcheck disable=SC1090
+    source /etc/fazai/fzalias
+    unalias "$name" 2>/dev/null || true
+  else
+    echo "✗ Alias '$name' não encontrado"
+    return 1
+  fi
+}
+
+# Função para listar aliases
+fzalias-list() {
+  if [[ -f /etc/fazai/fzalias ]]; then
+    grep "^alias " /etc/fazai/fzalias | sed 's/^alias //' | sort
+  else
+    echo "Nenhum alias configurado"
+  fi
+}
+
+EOFALIASFILE
+
+  chmod 644 "$ALIAS_FILE"
+  ok "Arquivo $ALIAS_FILE criado"
+  
+  # Integração com /etc/profile (universal)
+  if ! grep -qF "source $ALIAS_FILE" /etc/profile 2>/dev/null; then
+    backup_file /etc/profile
+    cat >> /etc/profile <<EOF
+
+# FazAI Global Aliases
+[[ -f $ALIAS_FILE ]] && source $ALIAS_FILE
+EOF
+    ok "Integrado em /etc/profile"
+  else
+    warn "/etc/profile já contém referência ao fzalias"
+  fi
+  
+  # Bash config específico por distribuição
   case "$distro" in
     debian)
-      if ! grep -q "source $ALIAS_FILE" /etc/bash.bashrc 2>/dev/null; then
-        echo "source $ALIAS_FILE" >> /etc/bash.bashrc
+      if [[ -f /etc/bash.bashrc ]]; then
+        if ! grep -qF "source $ALIAS_FILE" /etc/bash.bashrc; then
+          backup_file /etc/bash.bashrc
+          cat >> /etc/bash.bashrc <<EOF
+
+# FazAI Global Aliases
+[[ -f $ALIAS_FILE ]] && source $ALIAS_FILE
+EOF
+          ok "Integrado em /etc/bash.bashrc"
+        else
+          warn "/etc/bash.bashrc já contém referência ao fzalias"
+        fi
       fi
       ;;
     redhat)
-      if ! grep -q "source $ALIAS_FILE" /etc/bashrc 2>/dev/null; then
-        echo "source $ALIAS_FILE" >> /etc/bashrc
+      if [[ -f /etc/bashrc ]]; then
+        if ! grep -qF "source $ALIAS_FILE" /etc/bashrc; then
+          backup_file /etc/bashrc
+          cat >> /etc/bashrc <<EOF
+
+# FazAI Global Aliases
+[[ -f $ALIAS_FILE ]] && source $ALIAS_FILE
+EOF
+          ok "Integrado em /etc/bashrc"
+        else
+          warn "/etc/bashrc já contém referência ao fzalias"
+        fi
       fi
       ;;
   esac
@@ -105,55 +266,170 @@ EOF
     completion_dir="/etc/bash_completion.d"
   fi
   
-  cat > "$completion_dir/fzalias" <<'EOF'
+  log "Instalando bash completion em $completion_dir..."
+  cat > "$completion_dir/fzalias" <<'EOFCOMPLETION'
+# FazAI fzalias bash completion
+
 _fzalias_completions() {
-  COMPREPLY=($(compgen -W "--help -h" -- "${COMP_WORDS[COMP_CWORD]}"))
-}
-complete -F _fzalias_completions fzalias
-EOF
+  local cur="${COMP_WORDS[COMP_CWORD]}"
   
-  ok "fzalias instalado ($distro)"
-  echo "Reinicie shell ou: source $ALIAS_FILE"
+  if [[ $COMP_CWORD -eq 1 ]]; then
+    COMPREPLY=($(compgen -W "--help -h" -- "$cur"))
+  fi
 }
 
-# ============================================================================
-# Remove fzalias
-# ============================================================================
+_fzalias_remove_completions() {
+  local cur="${COMP_WORDS[COMP_CWORD]}"
+  local aliases
+  
+  if [[ -f /etc/fazai/fzalias ]]; then
+    aliases=$(grep "^alias " /etc/fazai/fzalias | sed 's/^alias \([^=]*\)=.*/\1/')
+    COMPREPLY=($(compgen -W "$aliases" -- "$cur"))
+  fi
+}
+
+complete -F _fzalias_completions fzalias
+complete -F _fzalias_remove_completions fzalias-remove
+EOFCOMPLETION
+  
+  chmod 644 "$completion_dir/fzalias"
+  ok "Bash completion instalado"
+  
+  echo ""
+  ok "fzalias instalado com sucesso! ($distro)"
+  echo ""
+  echo "Para começar a usar:"
+  echo "  1. Reinicie seu shell ou execute: source $ALIAS_FILE"
+  echo "  2. Crie aliases com: fzalias [nome] [comando]"
+  echo "  3. Liste aliases com: fzalias-list"
+  echo ""
+}
+
+# =============================================================================
+# Desinstalação
+# =============================================================================
 
 uninstall_fzalias() {
-  [[ $EUID -eq 0 ]] || err "Execute como root"
+  require_root
   
   log "Removendo fzalias..."
   
-  # Remove arquivos
-  rm -f "$ALIAS_FILE"
-  rmdir "$ALIAS_DIR" 2>/dev/null || true
+  # Remove arquivo de aliases
+  if [[ -f "$ALIAS_FILE" ]]; then
+    rm -f "$ALIAS_FILE"
+    ok "Arquivo $ALIAS_FILE removido"
+  fi
   
-  # Remove do profile
-  sed -i "\|source $ALIAS_FILE|d" /etc/profile 2>/dev/null || true
-  sed -i "\|source $ALIAS_FILE|d" /etc/bash.bashrc 2>/dev/null || true
-  sed -i "\|source $ALIAS_FILE|d" /etc/bashrc 2>/dev/null || true
+  # Remove diretório se estiver vazio
+  if [[ -d "$ALIAS_DIR" ]]; then
+    rmdir "$ALIAS_DIR" 2>/dev/null && ok "Diretório $ALIAS_DIR removido" || true
+  fi
   
-  # Remove completion
-  rm -f /usr/share/bash-completion/completions/fzalias 2>/dev/null || true
-  rm -f /etc/bash_completion.d/fzalias 2>/dev/null || true
+  # Remove de /etc/profile
+  if [[ -f /etc/profile ]]; then
+    backup_file /etc/profile
+    sed -i "\|# FazAI Global Aliases|d" /etc/profile
+    sed -i "\|\[[ -f $ALIAS_FILE \]\] && source $ALIAS_FILE|d" /etc/profile
+    sed -i "\|source $ALIAS_FILE|d" /etc/profile
+    ok "Removido de /etc/profile"
+  fi
   
-  ok "fzalias removido"
+  # Remove de /etc/bash.bashrc (Debian)
+  if [[ -f /etc/bash.bashrc ]]; then
+    backup_file /etc/bash.bashrc
+    sed -i "\|# FazAI Global Aliases|d" /etc/bash.bashrc
+    sed -i "\|\[[ -f $ALIAS_FILE \]\] && source $ALIAS_FILE|d" /etc/bash.bashrc
+    sed -i "\|source $ALIAS_FILE|d" /etc/bash.bashrc
+    ok "Removido de /etc/bash.bashrc"
+  fi
+  
+  # Remove de /etc/bashrc (RedHat)
+  if [[ -f /etc/bashrc ]]; then
+    backup_file /etc/bashrc
+    sed -i "\|# FazAI Global Aliases|d" /etc/bashrc
+    sed -i "\|\[[ -f $ALIAS_FILE \]\] && source $ALIAS_FILE|d" /etc/bashrc
+    sed -i "\|source $ALIAS_FILE|d" /etc/bashrc
+    ok "Removido de /etc/bashrc"
+  fi
+  
+  # Remove bash completion
+  local completion_files=(
+    "/usr/share/bash-completion/completions/fzalias"
+    "/etc/bash_completion.d/fzalias"
+  )
+  
+  for file in "${completion_files[@]}"; do
+    if [[ -f "$file" ]]; then
+      rm -f "$file"
+      ok "Completion removido: $file"
+    fi
+  done
+  
+  echo ""
+  ok "fzalias removido completamente!"
+  echo ""
+  echo "Para aplicar as mudanças:"
+  echo "  - Reinicie seu shell ou execute: exec bash"
+  echo "  - Ou faça logout e login novamente"
+  echo ""
 }
 
-# ============================================================================
-# Main
-# ============================================================================
+# =============================================================================
+# Exibir ajuda
+# =============================================================================
 
-case "${1:-}" in
-  install)
-    install_fzalias
-    ;;
-  uninstall)
-    uninstall_fzalias
-    ;;
-  *)
-    echo "Uso: $0 {install|uninstall}"
-    exit 1
-    ;;
-esac
+show_help() {
+  cat <<EOF
+fzalias v$VERSION - Sistema Global de Alias Multi-Distribuição
+
+Uso: $SCRIPT_NAME [comando]
+
+Comandos:
+  install         Instala o sistema de aliases globais
+  uninstall       Remove completamente o sistema
+  version         Exibe a versão
+  help            Exibe esta ajuda
+
+Após instalação:
+  fzalias [nome] [comando]      Cria um novo alias global
+  fzalias-remove [nome]         Remove um alias
+  fzalias-list                  Lista todos os aliases
+
+Exemplos:
+  sudo $SCRIPT_NAME install
+  fzalias ll 'ls -lah --color=auto'
+  fzalias update 'sudo apt update && sudo apt upgrade -y'
+  fzalias-list
+  fzalias-remove ll
+
+Documentação: https://github.com/rogerluft/fazai-ng
+EOF
+}
+
+# =============================================================================
+# Main
+# =============================================================================
+
+main() {
+  case "${1:-}" in
+    install)
+      install_fzalias
+      ;;
+    uninstall|remove)
+      uninstall_fzalias
+      ;;
+    version|--version|-v)
+      echo "fzalias v$VERSION"
+      ;;
+    help|--help|-h)
+      show_help
+      ;;
+    *)
+      err "Comando inválido: ${1:-}
+
+Use: $SCRIPT_NAME {install|uninstall|version|help}"
+      ;;
+  esac
+}
+
+main "$@"
