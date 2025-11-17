@@ -169,3 +169,21 @@ export function getSystemConfigDir(): string {
 export function getSystemConfigPath(): string {
   return SYSTEM_CONFIG_PATH;
 }
+
+/**
+ * Load all config values as an object with camelCase keys
+ */
+export function loadConfig(): Record<string, string> {
+  const raw = listConfigEntries();
+  const config: Record<string, string> = {};
+  
+  for (const [key, value] of Object.entries(raw)) {
+    // Convert SCREAMING_SNAKE_CASE to camelCase
+    const camelKey = key
+      .toLowerCase()
+      .replace(/_([a-z])/g, (_, letter) => letter.toUpperCase());
+    config[camelKey] = value;
+  }
+  
+  return config;
+}

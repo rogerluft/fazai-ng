@@ -150,17 +150,29 @@ export class CloudflareAPI {
 }
 
 export function loadCloudflareConfig(): CloudflareConfig {
+  // Tenta carregar do config primeiro
+  let fazaiConfig: any = {};
+  try {
+    const { loadConfig } = require('../config');
+    fazaiConfig = loadConfig();
+  } catch (e) {
+    // Fallback to env vars only
+  }
+
   const config: CloudflareConfig = {};
   
-  if (process.env.CLOUDFLARE_API_TOKEN) {
-    config.apiToken = process.env.CLOUDFLARE_API_TOKEN;
-  } else if (process.env.CLOUDFLARE_EMAIL && process.env.CLOUDFLARE_API_KEY) {
-    config.email = process.env.CLOUDFLARE_EMAIL;
-    config.apiKey = process.env.CLOUDFLARE_API_KEY;
+  // Prioridade: env vars > fazai config
+  // Suporta tanto CLOUDFLARE_API_TOKEN quanto CLOUDFLARE_API_KEY
+  if (process.env.CLOUDFLARE_API_TOKEN || fazaiConfig.cloudflareApiToken || fazaiConfig.cloudflareApiKey) {
+    config.apiToken = process.env.CLOUDFLARE_API_TOKEN || fazaiConfig.cloudflareApiToken || fazaiConfig.cloudflareApiKey;
+  } else if ((process.env.CLOUDFLARE_EMAIL && process.env.CLOUDFLARE_API_KEY) || 
+             (fazaiConfig.cloudflareEmail && fazaiConfig.cloudflareApiKey)) {
+    config.email = process.env.CLOUDFLARE_EMAIL || fazaiConfig.cloudflareEmail;
+    config.apiKey = process.env.CLOUDFLARE_API_KEY || fazaiConfig.cloudflareApiKey;
   }
   
-  if (process.env.CLOUDFLARE_ACCOUNT_ID) {
-    config.accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
+  if (process.env.CLOUDFLARE_ACCOUNT_ID || fazaiConfig.cloudflareAccountId) {
+    config.accountId = process.env.CLOUDFLARE_ACCOUNT_ID || fazaiConfig.cloudflareAccountId;
   }
   
   return config;
