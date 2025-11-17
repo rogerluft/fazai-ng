@@ -55,8 +55,19 @@ Examples:
   fazai config              # Show configured API keys
 
 Available Models:
+  Google Gemini (requer GOOGLE_API_KEY - free tier disponível):
+    gemini2flash   - Gemini 2.0 Flash Exp (rápido e gratuito)
+    gemini15pro    - Gemini 1.5 Pro (mais capaz)
+    gemini15flash  - Gemini 1.5 Flash (balanceado)
+
+  OpenRouter (requer API key - modelos gratuitos disponíveis):
+    qwen           - Qwen 3 Coder Free (DEFAULT)
+    gemini-or      - Gemini 2.0 Flash via OpenRouter
+    llama33        - Llama 3.3 70B Free
+    deepseek       - DeepSeek R1T2 Chimera Free
+
   OpenAI (requer API key):
-    gpt4mini    - GPT-4o-mini (DEFAULT - rápido e barato)
+    gpt4mini    - GPT-4o-mini (rápido e barato)
     gpt4o       - GPT-4o (mais recente e inteligente)
     gpt4turbo   - GPT-4 Turbo
 
@@ -65,8 +76,8 @@ Available Models:
     haiku       - Claude 3 Haiku (rápido e barato)
 
   Ollama (local - configure OLLAMA_BASE_URL no fazai.conf):
+    gptoss-20b  - GPT-OSS 20B (local no servidor)
     llama32     - Llama 3.2
-    qwen        - Qwen 2.5:7b
     mistral     - Mistral
 `;
   logger.info(helpText);
