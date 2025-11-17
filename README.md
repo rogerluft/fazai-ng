@@ -236,6 +236,36 @@ fazai import --source claude.db --min-messages 5 --before 2024-01-01
 - ✅ Melhora respostas contextuais futuras
 - ✅ Preserva histórico operacional
 
+### Sistema de Aliases Global (fzalias)
+
+O FazAI inclui o **fzalias**, um gerenciador de aliases global para todos os usuários:
+
+```bash
+# Criar alias global
+fzalias ll='ls -lh --color=auto'
+fzalias grep='grep --color=auto'
+
+# Listar todos os aliases
+fzalias
+
+# Remover alias
+fzalias ll=
+
+# Desinstalar completamente
+sudo fzalias uninstall
+```
+
+**Características:**
+- ✅ **Multidistro**: Funciona em Debian/Ubuntu e RedHat/Fedora/Rocky
+- ✅ **Global**: Aliases disponíveis para todos os usuários
+- ✅ **Persistente**: Sobrevive a reinicializações
+- ✅ **Bash completion**: Integração com tab completion do sistema
+- ✅ **Fácil gerenciamento**: Adicione/remova aliases em runtime
+
+**Arquivos:**
+- `/etc/fazai/fzalias` - Função e aliases globais
+- `/etc/bash.bashrc` ou `/etc/bashrc` - Source automático
+
 ### Configuração do Vector Store (Qdrant)
 
 **Arquivo de configuração** (`~/.config/fazai/fazai.conf` ou `/etc/fazai/fazai.conf`):

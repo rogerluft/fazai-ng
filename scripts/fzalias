@@ -1,0 +1,159 @@
+#!/bin/bash
+set -euo pipefail
+
+# ============================================================================
+# fzalias - Sistema de alias global multidistro
+# ============================================================================
+
+ALIAS_DIR="/etc/fazai"
+ALIAS_FILE="$ALIAS_DIR/fzalias"
+
+R="\e[31m" G="\e[32m" Y="\e[33m" N="\e[0m"
+
+log() { echo -e "\e[34m[INFO]${N} $*"; }
+ok()  { echo -e "${G}[OK]${N} $*"; }
+err() { echo -e "${R}[ERRO]${N} $*" >&2; exit 1; }
+
+# ============================================================================
+# Detecta distro
+# ============================================================================
+
+detect_distro() {
+  if [[ -f /etc/os-release ]]; then
+    . /etc/os-release
+    case "$ID" in
+      debian|ubuntu|mint|pop) echo "debian" ;;
+      rhel|centos|fedora|rocky|alma) echo "redhat" ;;
+      *) echo "unknown" ;;
+    esac
+  else
+    echo "unknown"
+  fi
+}
+
+# ============================================================================
+# Instala fzalias
+# ============================================================================
+
+install_fzalias() {
+  local distro
+  distro=$(detect_distro)
+  
+  [[ $EUID -eq 0 ]] || err "Execute como root"
+  
+  log "Detectado: $distro"
+  
+  mkdir -p "$ALIAS_DIR"
+  
+  # Cria função fzalias
+  cat > "$ALIAS_FILE" <<'EOF'
+fzalias() {
+  if [[ "$1" == "--help" || "$1" == "-h" ]]; then
+    echo "Uso: fzalias [alias] [comando]"
+    echo "Lista: cat /etc/fazai/fzalias"
+    return 0
+  fi
+
+  local name="$1"
+  shift
+  local cmd="$*"
+
+  if [[ -z "$name" ]] || [[ -z "$cmd" ]]; then
+    echo "Erro: alias ou comando ausente"
+    echo "Uso: fzalias [alias] [comando]"
+    return 1
+  fi
+
+  # Remove alias anterior se existir
+  sed -i "/^alias $name=/d" /etc/fazai/fzalias
+
+  echo "alias $name='$cmd'" >> /etc/fazai/fzalias
+  echo "Alias '$name' criado"
+  source /etc/fazai/fzalias
+}
+EOF
+
+  chmod 664 "$ALIAS_FILE"
+  
+  # Profile global (ambas distros)
+  if ! grep -q "source $ALIAS_FILE" /etc/profile 2>/dev/null; then
+    echo "source $ALIAS_FILE" >> /etc/profile
+  fi
+  
+  # Bash config específico por distro
+  case "$distro" in
+    debian)
+      if ! grep -q "source $ALIAS_FILE" /etc/bash.bashrc 2>/dev/null; then
+        echo "source $ALIAS_FILE" >> /etc/bash.bashrc
+      fi
+      ;;
+    redhat)
+      if ! grep -q "source $ALIAS_FILE" /etc/bashrc 2>/dev/null; then
+        echo "source $ALIAS_FILE" >> /etc/bashrc
+      fi
+      ;;
+  esac
+  
+  # Bash completion
+  local completion_dir
+  if [[ -d /usr/share/bash-completion/completions ]]; then
+    completion_dir="/usr/share/bash-completion/completions"
+  elif [[ -d /etc/bash_completion.d ]]; then
+    completion_dir="/etc/bash_completion.d"
+  else
+    mkdir -p /etc/bash_completion.d
+    completion_dir="/etc/bash_completion.d"
+  fi
+  
+  cat > "$completion_dir/fzalias" <<'EOF'
+_fzalias_completions() {
+  COMPREPLY=($(compgen -W "--help -h" -- "${COMP_WORDS[COMP_CWORD]}"))
+}
+complete -F _fzalias_completions fzalias
+EOF
+  
+  ok "fzalias instalado ($distro)"
+  echo "Reinicie shell ou: source $ALIAS_FILE"
+}
+
+# ============================================================================
+# Remove fzalias
+# ============================================================================
+
+uninstall_fzalias() {
+  [[ $EUID -eq 0 ]] || err "Execute como root"
+  
+  log "Removendo fzalias..."
+  
+  # Remove arquivos
+  rm -f "$ALIAS_FILE"
+  rmdir "$ALIAS_DIR" 2>/dev/null || true
+  
+  # Remove do profile
+  sed -i "\|source $ALIAS_FILE|d" /etc/profile 2>/dev/null || true
+  sed -i "\|source $ALIAS_FILE|d" /etc/bash.bashrc 2>/dev/null || true
+  sed -i "\|source $ALIAS_FILE|d" /etc/bashrc 2>/dev/null || true
+  
+  # Remove completion
+  rm -f /usr/share/bash-completion/completions/fzalias 2>/dev/null || true
+  rm -f /etc/bash_completion.d/fzalias 2>/dev/null || true
+  
+  ok "fzalias removido"
+}
+
+# ============================================================================
+# Main
+# ============================================================================
+
+case "${1:-}" in
+  install)
+    install_fzalias
+    ;;
+  uninstall)
+    uninstall_fzalias
+    ;;
+  *)
+    echo "Uso: $0 {install|uninstall}"
+    exit 1
+    ;;
+esac

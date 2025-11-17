@@ -320,6 +320,23 @@ setup_path() {
   success "PATH configurado (/usr/local/bin)"
 }
 
+# Instalar fzalias
+install_fzalias_system() {
+  info "Instalando fzalias (sistema de aliases global)..."
+  
+  if [ -f "$INSTALL_DIR/scripts/fzalias" ]; then
+    if [ "$EUID" -eq 0 ]; then
+      bash "$INSTALL_DIR/scripts/fzalias" install
+      success "fzalias instalado"
+    else
+      sudo bash "$INSTALL_DIR/scripts/fzalias" install
+      success "fzalias instalado"
+    fi
+  else
+    warning "Script fzalias não encontrado em $INSTALL_DIR/scripts/"
+  fi
+}
+
 # Configurar fazai.conf
 setup_config() {
   local user_config="$HOME/.config/fazai/fazai.conf"
@@ -970,21 +987,25 @@ print_success() {
   echo -e "  ${BLUE}1.${NC} Reinicie seu terminal ou rode:"
   echo -e "     ${CYAN}source ~/.bashrc${NC}  # ou ~/.zshrc"
   echo ""
-  echo -e "  ${BLUE}2.${NC} Configure suas API keys:"
+  echo -e "  ${BLUE}2.${NC} Teste o sistema de aliases:"
+  echo -e "     ${CYAN}fzalias ll='ls -lh'${NC}        # Criar alias"
+  echo -e "     ${CYAN}fzalias${NC}                    # Listar aliases"
+  echo ""
+  echo -e "  ${BLUE}3.${NC} Configure suas API keys:"
   echo -e "     ${CYAN}nano ~/.config/fazai/fazai.conf${NC}"
   echo ""
-  echo -e "  ${BLUE}3.${NC} Inicie o Qdrant (se ainda não estiver rodando):"
+  echo -e "  ${BLUE}4.${NC} Inicie o Qdrant (se ainda não estiver rodando):"
   echo -e "     ${CYAN}docker run -d -p 6333:6333 qdrant/qdrant${NC}"
   echo ""
-  echo -e "  ${BLUE}4.${NC} Crie as collections:"
+  echo -e "  ${BLUE}5.${NC} Crie as collections:"
   echo -e "     ${CYAN}fazai vector validate${NC}"
   echo ""
-  echo -e "  ${BLUE}5.${NC} Execute o FazAI:"
+  echo -e "  ${BLUE}6.${NC} Execute o FazAI:"
   echo -e "     ${CYAN}fazai${NC}                    # Modo admin Linux"
   echo -e "     ${CYAN}fazai --cli${NC}              # Modo CLI interativo"
   echo -e "     ${CYAN}fazai ask \"pergunta\"${NC}    # Perguntas gerais"
   echo ""
-  echo -e "  ${BLUE}6.${NC} Acesse a interface web (se instalada):"
+  echo -e "  ${BLUE}7.${NC} Acesse a interface web (se instalada):"
   echo -e "     ${CYAN}http://localhost:3000${NC}    # Interface web"
   echo ""
   echo -e "${CYAN}📖 Documentação:${NC} $INSTALL_DIR/README.md"
@@ -1004,6 +1025,7 @@ main() {
   build_project
   create_symlink
   setup_path
+  install_fzalias_system  # Instalar sistema de aliases global
   setup_config
   install_qdrant  # Instalação interativa do Qdrant
   setup_collections

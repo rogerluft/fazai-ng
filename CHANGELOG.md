@@ -3,6 +3,13 @@
 ## [3.1.1-beta] - 2025-11-17
 
 ### Added
+- **fzalias Integration**: Sistema de aliases global multidistro
+  - Gerenciador de aliases para todos os usuários (`/etc/fazai/fzalias`)
+  - Suporte Debian/Ubuntu e RedHat/Fedora/Rocky
+  - Comando `fzalias` para adicionar/listar/remover aliases em runtime
+  - Integração com bash completion do sistema
+  - Instalação automática via `install.sh`
+  - Documentação em README.md (seção "Sistema de Aliases Global")
 - **Google Gemini Native API Integration** (`src/linux-admin.ts`, `src/askAI.ts`)
   - Suporte nativo via `@google/generative-ai` SDK
   - 3 novos modelos: `gemini2flash`, `gemini15pro`, `gemini15flash`
@@ -19,6 +26,7 @@
   - Validação de integridade (tamanho de arquivos)
   - Reinicia serviços automaticamente
   - Suporta `--dry-run` e `--verbose`
+  - Detecta `$SUDO_USER` para encontrar repo do usuário real
 - **Integração Cloudflare**: Gerenciamento completo via API (`src/commands/cloudflare.ts`)
   - `fazai cloudflare zones`: Listar todas as zonas
   - `fazai cloudflare dns list <zoneId>`: Listar registros DNS
