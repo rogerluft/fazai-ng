@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.1-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.3-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
@@ -323,6 +323,111 @@ FAZAI_DISABLE_RESEARCH=true
 - ✅ Versões atualizadas de pacotes
 - ✅ Documentação de ferramentas recentes
 
+## 🔗 Integração GitHub
+
+O FazAI pode gerenciar repositórios GitHub, issues, forks e stars através de uma CLI integrada:
+
+### Autenticação GitHub
+
+```bash
+# Login com Personal Access Token
+fazai github auth login
+
+# Verificar status de autenticação
+fazai github auth status
+
+# Logout
+fazai github auth logout
+```
+
+**Configuração** (`fazai.conf`):
+```bash
+# GitHub Personal Access Token
+GITHUB_TOKEN=ghp_seu_token_aqui
+
+# Scopes necessários:
+# - repo (controle total de repositórios privados)
+# - read:user (ler dados de perfil)
+# - public_repo (acessar repositórios públicos)
+```
+
+**Obter token:**
+1. Acesse https://github.com/settings/tokens
+2. Crie novo token com scopes: `repo`, `read:user`, `public_repo`
+3. Cole em `GITHUB_TOKEN` no `fazai.conf`
+
+### Comandos GitHub
+
+```bash
+# Informações de usuário
+fazai github user              # Mostra perfil autenticado
+
+# Gerenciar repositórios
+fazai github repos             # Listar seus repositórios
+fazai github repo owner/repo   # Informações detalhadas de um repo
+
+# Operações com repositórios
+fazai github fork owner/repo   # Fazer fork de repositório
+fazai github star owner/repo   # Marcar repositório como favorito
+fazai github starred           # Listar repositórios favoritados
+
+# Gerenciar issues
+fazai github issues owner/repo # Listar issues abertas
+fazai github issue create owner/repo  # Criar nova issue
+
+# Pull requests (em desenvolvimento)
+fazai github pr                # Criar/gerenciar pull requests
+```
+
+## ☁️ Integração Google Gemini via Cloudflare
+
+O FazAI suporta integração com Google Gemini através de Cloudflare Workers, oferecendo acesso aos modelos mais avançados via endpoint OpenAI-compatível:
+
+### Modelos Disponíveis
+
+- **gemini-2.5-pro** - Modelo mais potente (1M tokens context, 65K max output)
+- **gemini-2.5-flash** - Modelo rápido (1M tokens context, 65K max output)
+- **gemini-2.5-flash-lite** - Modelo leve (1M tokens context, 65K max output)
+
+### Setup
+
+1. **Deploy gemini-cli-openai para Cloudflare Workers:**
+   ```bash
+   # Siga as instruções em: https://github.com/GewoonJaap/gemini-cli-openai
+   # Ou use sua própria instância do Cloudflare Worker
+   ```
+
+2. **Configurar em `fazai.conf`:**
+   ```bash
+   # URL do Cloudflare Worker (obrigatório)
+   GEMINI_WORKER_URL=https://seu-worker.seu-subdomain.workers.dev
+
+   # API Key opcional (para autenticação)
+   OPENAI_API_KEY=sua_api_key_opcional
+   ```
+
+3. **Usar os modelos:**
+   ```bash
+   # Listar modelos disponíveis
+   fazai --help
+
+   # Usar Gemini como modelo padrão (se configurado)
+   fazai "sua pergunta aqui"
+   ```
+
+### Características
+
+- ✅ Endpoint OpenAI-compatível (integra-se com OpenAI SDK)
+- ✅ Suporte a streaming de respostas
+- ✅ Contexto muito grande (1M tokens)
+- ✅ Implantação global via Cloudflare Edge
+- ✅ Gratuito ou baixo custo (via Cloudflare)
+
+### Referência
+
+- Projeto: [gemini-cli-openai](https://github.com/GewoonJaap/gemini-cli-openai)
+- Documentação: https://github.com/GewoonJaap/gemini-cli-openai#readme
+
 ## 🛡️ Sistema de Segurança
 
 FazAI possui **5 camadas de proteção**:
@@ -526,7 +631,7 @@ nano /etc/fazai/fazai.conf
 **Exemplo de configuração completa:**
 ```bash
 # ============================================
-# FAZAI v3.1-beta - Configuração
+# FAZAI v3.3-beta - Configuração
 # ============================================
 
 # --- APIs de IA ---

@@ -1,5 +1,65 @@
 # FazAI Changelog
 
+## [3.3.0-beta] - 2025-11-18
+
+### Added
+- **Integração GitHub** (`src/github-auth.ts`, `src/commands/github.ts`)
+  - Autenticação via Personal Access Token (PAT)
+  - Gerenciamento de repositórios (listar, informações detalhadas)
+  - Operações com issues (listar, criar)
+  - Operações com repositórios (fork, star, listar favoritos)
+  - Comando `fazai github` com subcommands: `auth`, `user`, `repos`, `repo`, `issues`, `issue`, `fork`, `star`, `starred`, `pr`
+  - Integração com Octokit SDK (REST API oficial do GitHub)
+  - Configuração via `GITHUB_TOKEN` em `/etc/fazai/fazai.conf`
+  - Padrão de singleton seguindo arquitetura existente
+
+- **Integração Google Gemini via Cloudflare** (`src/cloudflare-gemini.ts`)
+  - Suporte a modelos: `gemini-2.5-pro`, `gemini-2.5-flash`, `gemini-2.5-flash-lite`
+  - Endpoints OpenAI-compatível via Cloudflare Workers (gemini-cli-openai)
+  - Suporte a streaming de respostas
+  - Contexto massivo (1M tokens)
+  - Integração com OpenAI SDK
+  - Configuração via `GEMINI_WORKER_URL` em `/etc/fazai/fazai.conf`
+  - Padrão de singleton seguindo arquitetura existente
+
+- **Dependência**: `@octokit/rest` ^21.0.2 para operações GitHub
+
+- **Documentação atualizada** (`README.md`)
+  - Seção "🔗 Integração GitHub" com autenticação, configuração e exemplos de comandos
+  - Seção "☁️ Integração Google Gemini via Cloudflare" com setup e características
+  - Guia para obter Personal Access Tokens (GitHub)
+  - Instruções para deploy de gemini-cli-openai em Cloudflare Workers
+
+- **Bash Completion atualizado** (`completion/fazai-completion.bash`)
+  - Adicionado comando `github` à lista de comandos
+  - Subcommands: `auth`, `user`, `repos`, `repo`, `issues`, `issue`, `fork`, `star`, `starred`, `pr`, `help`
+  - Nested completion para `auth` (login/logout/status)
+  - Nested completion para `issue` (create)
+
+- **Configuração estendida** (`fazai.conf.example`)
+  - Seção "GITHUB INTEGRATION" (linhas 75-88)
+  - Seção "CLOUDFLARE GEMINI INTEGRATION" (linhas 52-73)
+  - Documentação de scopes necessários para GitHub
+  - Exemplos de setup para Cloudflare Workers
+
+### Changed
+- **Consistency Matrix Compliance**: Todas as 6 camadas mantidas em sincronismo
+  1. Help text (src/app.ts - adicionado github command)
+  2. Bash completion (completion/fazai-completion.bash)
+  3. Config file (fazai.conf.example)
+  4. Installer (install.sh)
+  5. Documentation (README.md)
+  6. Changelog (este arquivo)
+- **Versão**: Atualizada para 3.3.0-beta em todos os arquivos
+  - README.md header
+  - completion/fazai-completion.bash
+
+### Technical
+- Dependência nova: `@octokit/rest` ^21.0.2
+- Padrão arquitetural: Classes singleton seguindo `CloudflareAuth` e `CloudflareGeminiClient`
+- Configuração centralizada em `/etc/fazai/fazai.conf` com fallback para env vars
+- Integração completa com sistema existente de modelos e providers
+
 ## [3.2.0-beta] - 2025-11-18
 
 ### Added

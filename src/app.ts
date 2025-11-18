@@ -15,6 +15,7 @@ import type { VectorValidationOptions, VectorValidationResult } from "./vector-s
 import { importConversations } from "./conversation-importer";
 import { decomposeTask } from "./agentic/task-decomposer";
 import { DAGExecutor } from "./agentic/dag-executor";
+import { handleGitHubCommand } from "./commands/github";
 
 function displayHelp() {
   const helpText = `
@@ -32,6 +33,7 @@ Usage:
   fazai cloudflare <action>                  # Manage Cloudflare (zones, dns, workers)
   fazai cf zones                             # Cloudflare: list zones
   fazai cf dns list <zoneId>                 # Cloudflare: manage DNS
+  fazai github <action>                      # GitHub integration (auth, repos, issues, etc)
 
 Options:
   --dry-run                Simulate commands without executing
@@ -431,6 +433,12 @@ async function main() {
   if (inputs[0] === "cf" || inputs[0] === "cloudflare") {
     const { handleCloudflare } = await import("./commands/cloudflare");
     await handleCloudflare(inputs.slice(1));
+    return;
+  }
+
+  // GitHub command
+  if (inputs[0] === "github") {
+    await handleGitHubCommand(inputs.slice(1));
     return;
   }
 

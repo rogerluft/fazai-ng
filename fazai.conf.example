@@ -50,6 +50,44 @@ OPENROUTER_API_KEY=your_openrouter_key_here
 # GEMINI_API_KEY=your_gemini_api_key
 
 # =============================================================================
+# CLOUDFLARE GEMINI INTEGRATION
+# =============================================================================
+#
+# Use Google's Gemini models via Cloudflare Workers
+# Based on: https://github.com/GewoonJaap/gemini-cli-openai
+#
+# Supported Models:
+# - gemini-2.5-pro (1M context, 65K max tokens)
+# - gemini-2.5-flash (1M context, 65K max tokens)
+# - gemini-2.5-flash-lite (1M context, 65K max tokens)
+#
+# Setup:
+# 1. Deploy gemini-cli-openai to your Cloudflare Worker
+# 2. Set GEMINI_WORKER_URL to your Worker endpoint
+# 3. (Optional) Set OPENAI_API_KEY for authentication
+
+# Cloudflare Worker URL (Gemini endpoint)
+# GEMINI_WORKER_URL=https://your-worker.your-subdomain.workers.dev
+
+# (Optional) API Key for authentication
+# OPENAI_API_KEY=your_optional_api_key
+
+# =============================================================================
+# GITHUB INTEGRATION
+# =============================================================================
+#
+# Authenticate with GitHub for repository operations
+# Create a Personal Access Token: https://github.com/settings/tokens
+#
+# Scopes needed:
+# - repo (full control of private repositories)
+# - read:user (read user profile data)
+# - public_repo (access public repositories)
+
+# GitHub Personal Access Token
+# GITHUB_TOKEN=ghp_xxxxxxxxxxxxxxxx
+
+# =============================================================================
 # LOCAL MODELS (OLLAMA)
 # =============================================================================
 

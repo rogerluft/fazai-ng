@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bash completion for Terminal FazAI v3.1-beta
+# Bash completion for Terminal FazAI v3.3-beta
 # Installation:
 #   sudo cp completion/fazai-completion.bash /etc/bash_completion.d/fazai
 # Or:
@@ -12,7 +12,7 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    commands="ask config completion search vector import sync cloudflare"
+    commands="ask config completion search vector import sync cloudflare github"
 
     # Options/flags
     opts="--help -h --dry-run --cli --debug --verbose --log-file --auto-research --yolo -y"
@@ -101,6 +101,28 @@ _fazai_completion() {
         sync)
             # No arguments for sync
             return 0
+            ;;
+
+        github)
+            github_cmds="auth user repos repo issues issue fork star starred pr help"
+            case "${prev}" in
+                github)
+                    COMPREPLY=( $(compgen -W "${github_cmds}" -- ${cur}) )
+                    return 0
+                    ;;
+                auth)
+                    COMPREPLY=( $(compgen -W "login logout status" -- ${cur}) )
+                    return 0
+                    ;;
+                issue)
+                    COMPREPLY=( $(compgen -W "create" -- ${cur}) )
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=( $(compgen -W "${github_cmds}" -- ${cur}) )
+                    return 0
+                    ;;
+            esac
             ;;
 
         cloudflare)
