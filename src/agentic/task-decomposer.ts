@@ -1,0 +1,198 @@
+import { askAI } from "../askAI";
+import { logger } from "../logger";
+import chalk from "chalk";
+
+export interface SubTask {
+  id: string;
+  description: string;
+  command?: string;
+  dependencies: string[]; // IDs de subtarefas que devem executar antes
+  estimatedComplexity: number; // 1-10
+  requiresInstallation: boolean;
+  installCommand?: string;
+  verificationCommand?: string; // Comando para verificar se já está instalado/configurado
+}
+
+export interface DecomposedTask {
+  originalTask: string;
+  subtasks: SubTask[];
+  executionPlan: string; // Explicação da ordem de execução
+}
+
+const DECOMPOSER_PROMPT = `Você é um especialista em administração Linux. Sua tarefa é decompor uma instrução complexa em subtarefas atômicas e executáveis.
+
+INSTRUÇÕES:
+1. Analise a tarefa e identifique TODAS as subtarefas necessárias
+2. Identifique dependências (ex: instalar antes de configurar)
+3. Para cada subtarefa, gere:
+   - description: Descrição clara da subtarefa
+   - command: Comando Linux específico (ou null se for instalação)
+   - dependencies: Array de IDs de subtarefas que devem executar ANTES
+   - estimatedComplexity: 1-10 (1=simples, 10=complexo)
+   - requiresInstallation: true se precisa instalar algo
+   - installCommand: comando de instalação (apt/yum/dnf)
+   - verificationCommand: comando para verificar se já existe
+
+IMPORTANTE:
+- Se precisar instalar algo, crie uma subtarefa separada ANTES
+- Use comandos específicos, não genéricos
+- Identifique dependências CORRETAMENTE (ex: precisa ter iptables antes de configurar regras)
+
+TAREFA A DECOMPOR:
+{{TASK}}
+
+Responda APENAS com JSON válido neste formato:
+{
+  "subtasks": [
+    {
+      "id": "task-1",
+      "description": "Verificar se netstat/ss está instalado",
+      "command": null,
+      "dependencies": [],
+      "estimatedComplexity": 1,
+      "requiresInstallation": false,
+      "verificationCommand": "which ss || which netstat"
+    },
+    {
+      "id": "task-2",
+      "description": "Instalar net-tools se necessário",
+      "command": null,
+      "dependencies": ["task-1"],
+      "estimatedComplexity": 2,
+      "requiresInstallation": true,
+      "installCommand": "apt-get update && apt-get install -y net-tools",
+      "verificationCommand": "which netstat"
+    }
+  ],
+  "executionPlan": "Primeiro verifica ferramentas, depois instala faltantes, então executa a tarefa principal"
+}`;
+
+export async function decomposeTask(
+  task: string,
+  model: string,
+  provider: "anthropic" | "openai" | "openrouter" | "ollama" | "google"
+): Promise<DecomposedTask> {
+  logger.info(chalk.cyan("\n🧩 Decompondo tarefa complexa..."));
+  logger.debug(`Provider: ${provider}, Model: ${model}`);
+
+  const prompt = DECOMPOSER_PROMPT.replace("{{TASK}}", task);
+
+  // Usar askAI para streaming da resposta
+  let fullResponse = "";
+  const stream = askAI("", prompt, model, provider, false);
+
+  logger.debug("Iniciando streaming do modelo...");
+  let chunkCount = 0;
+  let hasError = false;
+
+  try {
+    for await (const chunk of stream) {
+      chunkCount++;
+      fullResponse += chunk;
+      if (chunkCount % 10 === 0) {
+        logger.debug(`Recebidos ${chunkCount} chunks, ${fullResponse.length} chars...`);
+      }
+    }
+  } catch (error: any) {
+    logger.error(chalk.red(`❌ Erro no streaming: ${error.message}`));
+    hasError = true;
+  }
+
+  if (hasError || fullResponse.length === 0) {
+    logger.warn(chalk.yellow("⚠️  Decomposição falhou, usando fallback"));
+    return {
+      originalTask: task,
+      subtasks: [{
+        id: "task-1",
+        description: task,
+        command: task,
+        dependencies: [],
+        estimatedComplexity: 5,
+        requiresInstallation: false
+      }],
+      executionPlan: "Execução direta (fallback - streaming falhou)"
+    };
+  }
+
+  logger.debug(`Stream completo: ${chunkCount} chunks, ${fullResponse.length} chars total`);
+  
+  if (fullResponse.length < 10) {
+    logger.warn(chalk.yellow("⚠️  Resposta muito curta, usando fallback"));
+    return {
+      originalTask: task,
+      subtasks: [{
+        id: "task-1",
+        description: task,
+        command: task,
+        dependencies: [],
+        estimatedComplexity: 5,
+        requiresInstallation: false
+      }],
+      executionPlan: "Execução direta (fallback - resposta incompleta)"
+    };
+  }
+  
+  logger.debug(`Primeiros 200 chars: ${fullResponse.substring(0, 200)}`);
+
+
+  // Parse JSON da resposta
+  try {
+    // Extrair JSON do markdown se necessário
+    let jsonStr = fullResponse.trim();
+
+    // Remover metadata de markdown (---\nfilePath:...)
+    jsonStr = jsonStr.replace(/^---[\s\S]*?\n\{/m, '{');
+    
+    // Se vier wrapped em ```json, extrair
+    if (jsonStr.includes("```json")) {
+      const match = jsonStr.match(/```json\s*(\{[\s\S]*?\})\s*```/);
+      if (match) {
+        jsonStr = match[1];
+      }
+    } else if (jsonStr.includes("```")) {
+      const match = jsonStr.match(/```\s*(\{[\s\S]*?\})\s*```/);
+      if (match) {
+        jsonStr = match[1];
+      }
+    }
+
+    // Encontrar primeiro { e último }
+    const firstBrace = jsonStr.indexOf('{');
+    const lastBrace = jsonStr.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonStr = jsonStr.substring(firstBrace, lastBrace + 1);
+    }
+
+    const parsed = JSON.parse(jsonStr);
+
+    const result: DecomposedTask = {
+      originalTask: task,
+      subtasks: parsed.subtasks || [],
+      executionPlan: parsed.executionPlan || "Execução sequencial baseada em dependências"
+    };
+
+    logger.info(chalk.green(`✅ Tarefa decomposta em ${result.subtasks.length} subtarefas`));
+    logger.info(chalk.gray(`📋 Plano: ${result.executionPlan}`));
+
+    return result;
+
+  } catch (error) {
+    logger.error(chalk.red("❌ Erro ao parsear resposta do decomposer:"), error);
+    logger.debug("Resposta recebida (primeiros 500 chars):", fullResponse.substring(0, 500));
+    logger.debug("Resposta recebida (últimos 500 chars):", fullResponse.substring(Math.max(0, fullResponse.length - 500)));
+
+    // Fallback: retorna tarefa única
+    return {
+      originalTask: task,
+      subtasks: [{
+        id: "task-1",
+        description: task,
+        command: task,
+        dependencies: [],
+        estimatedComplexity: 5,
+        requiresInstallation: false
+      }],
+      executionPlan: "Execução direta (fallback - decomposição falhou)"
+    };
+  }
+}

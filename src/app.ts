@@ -13,6 +13,8 @@ import { runCliMode } from "./cli-mode";
 import { initLogger, logger } from "./logger";
 import type { VectorValidationOptions, VectorValidationResult } from "./vector-store";
 import { importConversations } from "./conversation-importer";
+import { decomposeTask } from "./agentic/task-decomposer";
+import { DAGExecutor } from "./agentic/dag-executor";
 
 function displayHelp() {
   const helpText = `
@@ -566,16 +568,41 @@ async function main() {
 
   // Check if direct command mode (first arg is not a model nickname and not a flag)
   let directCommand: string | null = null;
-  const modelNickname = inputs[inputs.length - 1]; // Model is always last if provided
-  let selectedModel = models.find((model) => model.nickName === modelNickname);
+  let selectedModel: typeof models[number] | undefined;
 
-  if (!selectedModel && inputs.length > 0) {
-    // No model specified, all inputs are the command
-    directCommand = inputs.join(" ");
-    selectedModel = models[0]; // Use default
-  } else if (selectedModel && inputs.length > 1) {
-    // Model specified, everything before it is the command
-    directCommand = inputs.slice(0, -1).join(" ");
+  // Try to find model in inputs (can be last or second-to-last)
+  if (inputs.length > 0) {
+    // Check if last arg is a model
+    const lastArg = inputs[inputs.length - 1];
+    logger.debug(`Parsing model: inputs=${JSON.stringify(inputs)}, lastArg=${lastArg}`);
+    selectedModel = models.find((model) => model.nickName === lastArg);
+    logger.debug(`Found model: ${selectedModel ? selectedModel.nickName : 'none'}`);
+
+    if (selectedModel && inputs.length > 1) {
+      // Model found at end, everything before is the command
+      directCommand = inputs.slice(0, -1).join(" ");
+    } else if (inputs.length > 1) {
+      // Check if second-to-last is a model (task might be last)
+      const secondLast = inputs[inputs.length - 2];
+      const modelAtSecondLast = models.find((model) => model.nickName === secondLast);
+
+      if (modelAtSecondLast) {
+        selectedModel = modelAtSecondLast;
+        // Everything except second-to-last is command
+        directCommand = inputs.filter((_, i) => i !== inputs.length - 2).join(" ");
+      } else {
+        // No model found, all inputs are the command
+        directCommand = inputs.join(" ");
+      }
+    } else {
+      // Single input, no model specified
+      directCommand = inputs[0];
+    }
+  }
+
+  // Use default model if none specified
+  if (!selectedModel) {
+    selectedModel = models[0];
   }
 
   logger.info(`Modelo: ${selectedModel ? selectedModel.nickName : models[0].nickName} (${selectedModel ? selectedModel.name : models[0].name})\n`);
@@ -603,7 +630,7 @@ async function main() {
     validate: (input: string) => input.trim() !== "" || "Tarefa não pode estar vazia",
   });
 
-  // Generate Linux commands
+  // MODO NORMAL: Execução tradicional
   const commandStream = getLinuxCommandsFromAI(
     systemInfo,
     task,

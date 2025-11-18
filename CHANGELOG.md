@@ -1,5 +1,41 @@
 # FazAI Changelog
 
+## [3.2.0-beta] - 2025-11-18
+
+### Added
+- **Config-Driven Model Architecture** (`src/models.ts`)
+  - Modelos agora são carregados de `/etc/fazai/fazai.conf` (fonte de verdade)
+  - Máximo 3 modelos por provedor (organização clara)
+  - Fallback automático para built-in defaults se config não disponível
+  - Suporta: Ollama, OpenRouter, OpenAI, Anthropic, Google
+  - Novos campos: `description` para melhor UX
+
+- **Configuration Entries** (`fazai.conf.example` e `/etc/fazai/fazai.conf`)
+  - `MODELS_OLLAMA=model1,model2,model3` (local, max 3)
+  - `MODELS_OPENROUTER=model1,model2,model3` (cloud, max 3)
+  - `MODELS_OPENAI=model1,model2,model3` (cloud, max 3)
+  - `MODELS_ANTHROPIC=model1,model2,model3` (cloud, max 3)
+  - `MODELS_GOOGLE=model1,model2,model3` (cloud, max 3)
+
+- **Updated Documentation**
+  - README.md: Nova seção "🎯 Modelos Disponíveis (Config-Driven)" com tabelas por provider
+  - Exemplos claros de como usar cada modelo por nickname
+  - Documentação de como configurar modelos em `/etc/fazai/fazai.conf`
+  - Links para obter API keys de cada provider
+
+- **Bash Completion** (`completion/fazai-completion.bash`)
+  - Atualizado para refletir nicknames: gptoss, llama32, llama31, qwen, llama33, gemini, gpt4o, gpt4mini, sonnet, haiku
+  - Comentários indicando provedor de cada modelo
+
+### Changed
+- **Consistency Matrix Compliance**: Todas as 6 camadas mantidas em sincronismo
+  1. Help text (src/app.ts)
+  2. Bash completion (completion/fazai-completion.bash)
+  3. Config file (fazai.conf.example, /etc/fazai/fazai.conf)
+  4. Installer (install.sh - já menciona modelos)
+  5. Documentation (README.md)
+  6. Changelog (este arquivo)
+
 ## [3.1.1-beta] - 2025-11-17
 
 ### Added

@@ -17,8 +17,12 @@ _fazai_completion() {
     # Options/flags
     opts="--help -h --dry-run --cli --debug --verbose --log-file --auto-research --yolo -y"
 
-    # AI models
-    models="gemini2flash gemini15pro gemini15flash gemini-or gpt4mini gpt4o gpt4turbo sonnet35 haiku llama32 qwen mistral"
+    # AI models (from config: max 3 per provider)
+    # Ollama: gptoss, llama32, llama31
+    # OpenRouter: qwen, llama33, gemini
+    # OpenAI: gpt4o, gpt4mini
+    # Anthropic: sonnet, haiku
+    models="gptoss llama32 llama31 qwen llama33 gemini gpt4o gpt4mini sonnet haiku"
 
     # Vector subcommands
     vector_opts="validate recreate reset"

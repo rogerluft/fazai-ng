@@ -420,29 +420,93 @@ Executar? [Y/n] y
 ⭐ FAZAI - Administração Linux com IA
 ```
 
-## 🎯 Modelos Disponíveis
+## 🎯 Modelos Disponíveis (Config-Driven)
 
-### Claude (Anthropic)
-| Modelo | Velocidade | Custo | Quando Usar |
-|--------|-----------|-------|-------------|
-| `sonnet35` | Rápido | Médio | Tarefas complexas, múltiplos serviços (default) |
-| `haiku` | Muito Rápido | Baixo | Tarefas simples, comandos únicos |
+Os modelos são **carregados de `/etc/fazai/fazai.conf`** (máx 3 por provedor).
+Cada provedor pode ser customizado adicionando modelos separados por vírgula.
 
-### OpenAI (GPT)
-| Modelo | Velocidade | Custo | Quando Usar |
-|--------|-----------|-------|-------------|
-| `gpt4o` | Rápido | Médio | Mais recente, tarefas complexas |
-| `gpt4mini` | Muito Rápido | Baixo | Rápido e barato |
-| `gpt4turbo` | Rápido | Alto | Tarefas que exigem máxima capacidade |
+### Ollama (Local - Privado)
+```bash
+MODELS_OLLAMA=gptoss-20b,llama3.2,llama3.1
+```
+| Nickname | Modelo | Velocidade | Custo | Quando Usar |
+|----------|--------|-----------|-------|-------------|
+| `gptoss` | gpt-oss:20b | Variável | Grátis | Local, RTX 3050 8GB (recomendado) |
+| `llama32` | llama3.2:latest | Variável | Grátis | 100% privado, multi-modal |
+| `llama31` | llama3.1:latest | Variável | Grátis | Raciocínio complexo |
 
-### Ollama (Local)
-| Modelo | Velocidade | Custo | Quando Usar |
-|--------|-----------|-------|-------------|
-| `llama32` | Variável | Grátis | Execução 100% local, privacidade total |
-| `qwen` | Variável | Grátis | Modelo Qwen 2.5:7b local |
-| `mistral` | Variável | Grátis | Modelo Mistral local |
+**Configuração**: `OLLAMA_BASE_URL=http://192.168.0.101:11434`
 
-**Nota**: Ollama requer servidor Ollama rodando (local ou remoto).
+### OpenRouter (Cloud - 200+ Modelos)
+```bash
+MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b,google/gemini-2.0-flash-exp:free
+OPENROUTER_API_KEY=sk-or-v1-xxxxx
+```
+| Nickname | Modelo | Velocidade | Custo | Quando Usar |
+|----------|--------|-----------|-------|-------------|
+| `qwen` | qwen/qwen3-coder:free | Rápido | **GRÁTIS** | Tarefas complexas, free tier |
+| `llama33` | meta-llama/llama-3.3-70b | Rápido | Paid | Raciocínio, instrução |
+| `gemini` | google/gemini-2.0-flash-exp:free | Rápido | **GRÁTIS** | Multi-modal, video/audio |
+
+**API Key**: https://openrouter.ai/keys (free tier disponível!)
+
+### OpenAI (Cloud - GPT)
+```bash
+# MODELS_OPENAI=gpt-4o,gpt-4o-mini
+# OPENAI_API_KEY=sk-xxxxx
+```
+| Nickname | Modelo | Velocidade | Custo | Quando Usar |
+|----------|--------|-----------|-------|-------------|
+| `gpt4o` | gpt-4o | Rápido | Médio | Tarefas complexas, multi-modal |
+| `gpt4mini` | gpt-4o-mini | Muito Rápido | Baixo | Tarefas simples, custo eficiente |
+
+**API Key**: https://platform.openai.com/api-keys
+
+### Anthropic Claude (Cloud)
+```bash
+# MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+# ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+```
+| Nickname | Modelo | Velocidade | Custo | Quando Usar |
+|----------|--------|-----------|-------|-------------|
+| `sonnet` | claude-3-5-sonnet-latest | Rápido | Médio | Tarefas complexas (default) |
+| `haiku` | claude-3-haiku-20240307 | Muito Rápido | Baixo | Tarefas simples, rápido |
+
+**API Key**: https://console.anthropic.com/
+
+### Google Gemini (Cloud - via OpenRouter ou nativo)
+```bash
+# MODELS_GOOGLE=gemini-2.0-flash-exp,gemini-1.5-pro
+# GEMINI_API_KEY=xxxxx (opcional, use OpenRouter para free tier)
+```
+
+### Como Configurar Modelos
+
+Edite `/etc/fazai/fazai.conf`:
+
+```bash
+# Máximo 3 modelos por provedor
+MODELS_OLLAMA=gptoss-20b,llama3.2,llama3.1
+MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b,google/gemini-2.0-flash-exp:free
+MODELS_OPENAI=gpt-4o,gpt-4o-mini
+MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+```
+
+### Usar Modelos
+
+```bash
+# Modelo primeiro no config (padrão)
+fazai
+
+# Especificar modelo por nickname
+fazai qwen                    # OpenRouter Qwen3 Coder
+fazai llama32                 # Ollama Llama 3.2
+fazai gpt4o                   # OpenAI GPT-4o
+fazai sonnet                  # Anthropic Claude Sonnet
+
+# Com tarefa em uma linha
+fazai qwen "instalar nginx"
+```
 
 ## 🔑 Configuração de API Keys
 

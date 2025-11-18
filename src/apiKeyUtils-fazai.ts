@@ -89,6 +89,8 @@ function getEnvVarName(provider: string): string {
       return "OPENAI_API_KEY";
     case "openrouter":
       return "OPENROUTER_API_KEY";
+    case "google":
+      return "GOOGLE_API_KEY";
     case "fireworks":
       return "FIREWORKS_API_KEY";
     case "ollama":

@@ -84,6 +84,8 @@ export async function* askAI(
     const openai = new OpenAI({
       baseURL: `${baseUrl}/v1`,
       apiKey: "ollama", // Ollama não precisa de API key real
+      timeout: 120000, // 2 minutos para K2-500 com 2 Netscape abertos 😂
+      maxRetries: 0,
     });
 
     const systemMessage = isGeneralQuestion
