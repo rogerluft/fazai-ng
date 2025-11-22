@@ -192,16 +192,47 @@ clone_repo() {
       info "Repositório já existe. Atualizando..."
       cd "$INSTALL_DIR"
 
+      # Verificar se é um repositório git válido
+      if ! git rev-parse --git-dir > /dev/null 2>&1; then
+        warning "Repositório corrompido, recriando..."
+        cd /
+        rm -rf "$INSTALL_DIR"
+        git clone "$REPO_URL" "$INSTALL_DIR" || error "Falha ao clonar"
+        success "Repositório clonado"
+        return
+      fi
+
+      # Verificar se tem commits
+      if ! git rev-parse HEAD > /dev/null 2>&1; then
+        warning "Repositório sem commits, recriando..."
+        cd /
+        rm -rf "$INSTALL_DIR"
+        git clone "$REPO_URL" "$INSTALL_DIR" || error "Falha ao clonar"
+        success "Repositório clonado"
+        return
+      fi
+
       # Salvar mudanças locais se houver
       if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         warning "Detectadas mudanças locais. Fazendo stash..."
         git stash push -m "Install script auto-stash $(date +%Y-%m-%d_%H:%M:%S)" || true
       fi
 
+      # Detectar branch principal
+      local main_branch=$(git remote show origin 2>/dev/null | grep "HEAD branch" | cut -d: -f2 | tr -d ' ')
+      if [ -z "$main_branch" ]; then
+        main_branch="master"
+      fi
+
       # Atualizar repositório
-      git fetch origin || warning "Falha ao fazer fetch"
-      git reset --hard origin/master || warning "Falha ao resetar"
-      git pull origin master || warning "Falha ao atualizar"
+      git fetch origin 2>/dev/null || {
+        warning "Fetch falhou, reconfigurando remote..."
+        git remote set-url origin "$REPO_URL"
+        git fetch origin || warning "Fetch ainda falhou, usando código atual"
+      }
+      
+      git reset --hard "origin/$main_branch" 2>/dev/null || warning "Reset falhou, usando estado atual"
+      git pull origin "$main_branch" 2>/dev/null || warning "Pull falhou, usando código atual"
 
       success "Repositório atualizado"
     else
@@ -267,9 +298,13 @@ build_project() {
   info "Compilando FazAI..."
   cd "$INSTALL_DIR"
   
-  # Verificar tsconfig.json
+  # Verificar arquivos necessários
   if [ ! -f "tsconfig.json" ]; then
-    warning "tsconfig.json não encontrado"
+    error "tsconfig.json não encontrado em $INSTALL_DIR. Repositório incompleto?"
+  fi
+  
+  if [ ! -f "tsup.config.js" ]; then
+    error "tsup.config.js não encontrado em $INSTALL_DIR. Repositório incompleto?"
   fi
   
   # Limpar build anterior
