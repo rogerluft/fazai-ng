@@ -435,18 +435,7 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
       const token = chunk.choices[0]?.delta?.content || "";
       if (token) {
         fullJSON += token;
-        
-        // Filtrar texto antes do primeiro {
-        if (!jsonStarted) {
-          const bracketPos = token.indexOf('{');
-          if (bracketPos !== -1) {
-            jsonStarted = true;
-            tokenStream.push(token.substring(bracketPos));
-            logger.debug("JSON iniciado, prefixo removido");
-          }
-        } else {
-          tokenStream.push(token);
-        }
+        tokenStream.push(token);
       }
     }
   } catch (error) {
