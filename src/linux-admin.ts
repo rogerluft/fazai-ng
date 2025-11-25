@@ -158,9 +158,14 @@ async function* getLinuxCommandsFromOllama(
   model: string
 ): LinuxCommandGenerator {
   const baseUrl = process.env.OLLAMA_BASE_URL || "http://192.168.0.101:11434";
+  
+  logger.debug(`[DEBUG] Ollama baseURL: ${baseUrl}/v1`);
+  logger.debug(`[DEBUG] Model: ${model}`);
+  
   const openai = new OpenAI({
     baseURL: `${baseUrl}/v1`,
     apiKey: "ollama", // Ollama doesn't need real API key
+    timeout: 30000, // 30s timeout
   });
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Ollama (${model}) em ${baseUrl}...`);
@@ -172,6 +177,8 @@ IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 
 Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
 
+  logger.debug("[DEBUG] Criando stream com Ollama...");
+  
   const stream = await openai.chat.completions.create({
     model,
     messages: [
@@ -182,9 +189,13 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
     temperature: 0,
   });
 
+  logger.debug("[DEBUG] Stream criado, iniciando parse...");
+
   // Use unified streaming parser
   const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
   yield* parseStreamingJSON(iterateOpenAIStream(stream), "ollama");
+  
+  logger.debug("[DEBUG] Parse concluído!");
 }
 
 async function* getLinuxCommandsFromGemini(

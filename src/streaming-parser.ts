@@ -145,12 +145,24 @@ export async function* iterateAnthropicStream(stream: AsyncIterable<any>): Async
 }
 
 export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIterable<string> {
+  logger.debug("[DEBUG] iterateOpenAIStream: Starting stream iteration");
+  let chunkCount = 0;
+  
   for await (const chunk of stream) {
-    const content = chunk.choices[0]?.delta?.content;
+    chunkCount++;
+    logger.debug(`[DEBUG] Chunk #${chunkCount} received`);
+    
+    const delta = chunk.choices[0]?.delta;
+    // Some models (like gpt-oss) use "reasoning" instead of "content"
+    const content = delta?.content || delta?.reasoning;
+    
     if (content) {
+      logger.debug(`[DEBUG] Content: ${content.substring(0, 100)}...`);
       yield content;
     }
   }
+  
+  logger.debug(`[DEBUG] Stream iteration complete. Total chunks: ${chunkCount}`);
 }
 
 export async function* iterateGoogleStream(stream: AsyncIterable<any>): AsyncIterable<string> {
