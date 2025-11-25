@@ -125,6 +125,10 @@ export async function* parseStreamingJSON(
   // Wait for oboe to finish parsing
   await parsePromise;
 
+  // Log complete JSON for debugging
+  logger.debug(`[DEBUG] Full JSON received (${fullJSON.length} chars):`, fullJSON.substring(0, 500));
+  logger.info(`[DEBUG] Commands collected: ${collectedCommands.length}`);
+
   // Yield all collected and validated commands
   for (const command of collectedCommands) {
     yield { type: "command", command };
@@ -150,15 +154,26 @@ export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIte
   
   for await (const chunk of stream) {
     chunkCount++;
-    logger.debug(`[DEBUG] Chunk #${chunkCount} received`);
+    logger.debug(`[DEBUG] Chunk #${chunkCount} received:`, JSON.stringify(chunk).substring(0, 200));
     
-    const delta = chunk.choices[0]?.delta;
-    // Some models (like gpt-oss) use "reasoning" instead of "content"
-    const content = delta?.content || delta?.reasoning;
+    // Handle OpenAI-style streaming (choices array with delta)
+    const delta = chunk.choices?.[0]?.delta;
+    if (delta) {
+      // Some models use "reasoning" instead of "content"
+      const content = delta.content || delta.reasoning;
+      if (content) {
+        logger.debug(`[DEBUG] Content (OpenAI): ${content.substring(0, 100)}...`);
+        yield content;
+      }
+      continue;
+    }
     
-    if (content) {
-      logger.debug(`[DEBUG] Content: ${content.substring(0, 100)}...`);
-      yield content;
+    // Handle Ollama-style streaming (direct response/thinking fields)
+    // Ollama returns NDJSON with "response" or "thinking" fields
+    const ollamaContent = chunk.response || chunk.thinking;
+    if (ollamaContent) {
+      logger.debug(`[DEBUG] Content (Ollama): ${ollamaContent.substring(0, 100)}...`);
+      yield ollamaContent;
     }
   }
   
