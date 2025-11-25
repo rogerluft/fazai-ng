@@ -1,10 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
-import { z } from "zod";
-import { Readable, Transform } from "stream";
-import oboe from "oboe";
 import { linuxAdminPrompt } from "./linux-prompt";
-import { LinuxCommandGenerator, LinuxCommandSchema, LinuxCommand } from "./types-linux";
+import { LinuxCommandGenerator } from "./types-linux";
 import { logger } from "./logger";
 
 export async function* getLinuxCommandsFromAI(
@@ -48,97 +45,32 @@ async function* getLinuxCommandsFromClaude(
 ): LinuxCommandGenerator {
   const anthropic = new Anthropic();
 
-  const jsonStart = "[";
-
-  const messages = [
-    {
-      role: "user" as const,
-      content: linuxAdminPrompt(task),
-    },
-    {
-      role: "assistant" as const,
-      content: jsonStart,
-    },
-  ];
-
-  logger.info("\n\n🖥️  Gerando comandos Linux com Claude...");
+  logger.info(`\n\n🖥️  Gerando comandos Linux com Claude (${model})...`);
 
   const tokens = model.includes("sonnet") ? 8192 : 4096;
 
   const stream = await anthropic.messages.create({
-    messages,
+    messages: [
+      {
+        role: "user" as const,
+        content: linuxAdminPrompt(task),
+      },
+    ],
     model,
     max_tokens: tokens,
     stream: true,
     temperature: 0,
-    system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.`,
+    system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
+
+IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
+{"commands": [array de comandos]}
+
+Cada comando deve ter a estrutura exata definida no prompt do usuário.`,
   });
 
-  const tokenStream = new Readable({
-    read() {},
-  });
-
-  const jsonStream = new Transform({
-    transform(chunk: any, encoding: any, callback: any) {
-      this.push(chunk);
-      callback();
-    },
-  });
-
-  tokenStream.pipe(jsonStream);
-
-  let fullJSON = jsonStart;
-  let collectedCommands: LinuxCommand[] = [];
-  let streamStatus: string = "notStarted";
-
-  const parsePromise = new Promise<void>((resolve, reject) => {
-    oboe(jsonStream)
-      .node("!.*", (command: any) => {
-        try {
-          const validatedCommand = LinuxCommandSchema.parse(command);
-          collectedCommands.push(validatedCommand);
-        } catch (error) {
-          if (error instanceof z.ZodError) {
-            logger.warn("⚠️  Comando Linux inválido encontrado:", error.issues);
-          }
-        }
-      })
-      .on("done", () => {
-        streamStatus = "completed";
-        resolve();
-      })
-      .on("fail", (error: any) => {
-        logger.error("❌ Erro ao fazer parse dos comandos:", error);
-        reject(error);
-      });
-  });
-
-  try {
-    for await (const chunk of stream) {
-      if (chunk.type === "content_block_delta" && chunk.delta?.type === "text_delta") {
-        const token = chunk.delta.text;
-        fullJSON += token;
-        tokenStream.push(token);
-      }
-    }
-  } catch (error) {
-    logger.error("❌ Erro no stream:", error);
-  }
-
-  tokenStream.push(null);
-
-  try {
-    await parsePromise;
-  } catch (error) {
-    // Ignorar erros de parse e continuar com comandos coletados
-  }
-
-  // Yield dos comandos coletados
-  for (const command of collectedCommands) {
-    yield { type: "command", command };
-  }
-
-  yield { type: "allcommands", commands: collectedCommands };
+  // Use unified streaming parser
+  const { parseStreamingJSON, iterateAnthropicStream } = await import("./streaming-parser");
+  yield* parseStreamingJSON(iterateAnthropicStream(stream), "anthropic");
 }
 
 async function* getLinuxCommandsFromOpenAI(
@@ -148,7 +80,7 @@ async function* getLinuxCommandsFromOpenAI(
 ): LinuxCommandGenerator {
   const openai = new OpenAI();
 
-  logger.info("\n\n🖥️  Gerando comandos Linux com OpenAI...");
+  logger.info(`\n\n🖥️  Gerando comandos Linux com OpenAI (${model})...`);
 
   const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
 
@@ -168,67 +100,9 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
     response_format: { type: "json_object" },
   });
 
-  const tokenStream = new Readable({
-    read() {},
-  });
-
-  const jsonStream = new Transform({
-    transform(chunk: any, encoding: any, callback: any) {
-      this.push(chunk);
-      callback();
-    },
-  });
-
-  tokenStream.pipe(jsonStream);
-
-  let fullJSON = "";
-  let collectedCommands: LinuxCommand[] = [];
-
-  const parsePromise = new Promise<void>((resolve, reject) => {
-    oboe(jsonStream)
-      .node("commands.*", (command: any) => {
-        try {
-          const validatedCommand = LinuxCommandSchema.parse(command);
-          collectedCommands.push(validatedCommand);
-        } catch (error) {
-          if (error instanceof z.ZodError) {
-            logger.warn("⚠️  Comando Linux inválido encontrado:", error.issues);
-          }
-        }
-      })
-      .on("done", () => resolve())
-      .on("fail", (error: any) => {
-        logger.error("❌ Erro ao fazer parse dos comandos:", error);
-        reject(error);
-      });
-  });
-
-  try {
-    for await (const chunk of stream) {
-      const token = chunk.choices[0]?.delta?.content || "";
-      if (token) {
-        fullJSON += token;
-        tokenStream.push(token);
-      }
-    }
-  } catch (error) {
-    logger.error("❌ Erro no stream:", error);
-  }
-
-  tokenStream.push(null);
-
-  try {
-    await parsePromise;
-  } catch (error) {
-    // Ignorar erros de parse e continuar com comandos coletados
-  }
-
-  // Yield dos comandos coletados
-  for (const command of collectedCommands) {
-    yield { type: "command", command };
-  }
-
-  yield { type: "allcommands", commands: collectedCommands };
+  // Use unified streaming parser
+  const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
+  yield* parseStreamingJSON(iterateOpenAIStream(stream), "openai");
 }
 
 async function* getLinuxCommandsFromOpenRouter(
@@ -273,76 +147,9 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
     throw error;
   }
 
-  const tokenStream = new Readable({
-    read() {},
-  });
-
-  const jsonStream = new Transform({
-    transform(chunk: any, encoding: any, callback: any) {
-      this.push(chunk);
-      callback();
-    },
-  });
-
-  tokenStream.pipe(jsonStream);
-
-  let fullJSON = "";
-  let collectedCommands: LinuxCommand[] = [];
-
-  const parsePromise = new Promise<void>((resolve, reject) => {
-    oboe(jsonStream)
-      .node("commands.*", (command: any) => {
-        try {
-          const validatedCommand = LinuxCommandSchema.parse(command);
-          collectedCommands.push(validatedCommand);
-        } catch (error) {
-          if (error instanceof z.ZodError) {
-            logger.warn("⚠️  Comando Linux inválido encontrado:", error.issues);
-          }
-        }
-      })
-      .on("done", () => resolve())
-      .on("fail", (error: any) => {
-        logger.error("❌ Erro ao fazer parse dos comandos:", error);
-        reject(error);
-      });
-  });
-
-  (async () => {
-    try {
-      for await (const chunk of stream) {
-        const content = chunk.choices[0]?.delta?.content || "";
-        fullJSON += content;
-
-        if (content) {
-          tokenStream.push(Buffer.from(content, "utf-8"));
-        }
-      }
-
-      tokenStream.push(null);
-      await parsePromise;
-    } catch (error) {
-      logger.error("❌ Erro ao processar stream OpenRouter:", error);
-      tokenStream.push(null);
-    }
-  })();
-
-  let lastYieldedIndex = 0;
-
-  while (true) {
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
-    if (collectedCommands.length > lastYieldedIndex) {
-      for (let i = lastYieldedIndex; i < collectedCommands.length; i++) {
-        yield collectedCommands[i];
-      }
-      lastYieldedIndex = collectedCommands.length;
-    }
-
-    if (tokenStream.readableEnded && collectedCommands.length === lastYieldedIndex) {
-      break;
-    }
-  }
+  // Use unified streaming parser
+  const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
+  yield* parseStreamingJSON(iterateOpenAIStream(stream), "openai");
 }
 
 async function* getLinuxCommandsFromOllama(
@@ -350,13 +157,13 @@ async function* getLinuxCommandsFromOllama(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+  const baseUrl = process.env.OLLAMA_BASE_URL || "http://192.168.0.101:11434";
   const openai = new OpenAI({
     baseURL: `${baseUrl}/v1`,
-    apiKey: "ollama", // Ollama não precisa de API key real
+    apiKey: "ollama", // Ollama doesn't need real API key
   });
 
-  logger.info(`\n\n🖥️  Gerando comandos Linux com Ollama (${model})...`);
+  logger.info(`\n\n🖥️  Gerando comandos Linux com Ollama (${model}) em ${baseUrl}...`);
 
   const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
 
@@ -375,96 +182,40 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
     temperature: 0,
   });
 
-  const tokenStream = new Readable({
-    read() {},
-  });
+  // Use unified streaming parser
+  const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
+  yield* parseStreamingJSON(iterateOpenAIStream(stream), "ollama");
+}
 
-  const jsonStream = new Transform({
-    transform(chunk: any, encoding: any, callback: any) {
-      this.push(chunk);
-      callback();
-    },
-  });
-
-  tokenStream.pipe(jsonStream);
-
-  let fullJSON = "";
-  let jsonStarted = false; // Detectar início do JSON
-  let collectedCommands: LinuxCommand[] = [];
-
-  const parsePromise = new Promise<void>((resolve, reject) => {
-    oboe(jsonStream)
-      .node("commands.*", (command: any) => {
-        try {
-          const validatedCommand = LinuxCommandSchema.parse(command);
-          collectedCommands.push(validatedCommand);
-        } catch (error) {
-          if (error instanceof z.ZodError) {
-            logger.warn("⚠️  Comando Linux inválido encontrado:", error.issues);
-          }
-        }
-      })
-      .on("done", () => resolve())
-      .on("fail", (error: any) => {
-        logger.error("❌ Erro ao fazer parse dos comandos:", error);
-        
-        // Fallback: extrair JSON via regex
-        try {
-          const jsonMatch = fullJSON.match(/\{[\s\S]*"commands"[\s\S]*\}/);
-          if (jsonMatch) {
-            const parsed = JSON.parse(jsonMatch[0]);
-            if (parsed.commands && Array.isArray(parsed.commands)) {
-              logger.warn("⚠️  JSON extraído via fallback");
-              parsed.commands.forEach((cmd: any) => {
-                try {
-                  collectedCommands.push(LinuxCommandSchema.parse(cmd));
-                } catch {}
-              });
-              resolve();
-              return;
-            }
-          }
-        } catch {}
-        
-        reject(error);
-      });
-  });
-
-  try {
-    for await (const chunk of stream) {
-      const token = chunk.choices[0]?.delta?.content || "";
-      if (token) {
-        fullJSON += token;
-        
-        // Filtrar texto antes do primeiro {
-        if (!jsonStarted) {
-          const bracketPos = token.indexOf('{');
-          if (bracketPos !== -1) {
-            jsonStarted = true;
-            tokenStream.push(token.substring(bracketPos));
-            logger.debug("JSON iniciado, prefixo removido");
-          }
-        } else {
-          tokenStream.push(token);
-        }
-      }
-    }
-  } catch (error) {
-    logger.error("❌ Erro no stream:", error);
+async function* getLinuxCommandsFromGemini(
+  systemInfo: string,
+  task: string,
+  model: string
+): LinuxCommandGenerator {
+  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  
+  if (!apiKey) {
+    throw new Error("GOOGLE_API_KEY ou GEMINI_API_KEY não configurada. Configure no /etc/fazai/fazai.conf");
   }
 
-  tokenStream.push(null);
+  const { GoogleGenerativeAI } = await import("@google/generative-ai");
+  const genAI = new GoogleGenerativeAI(apiKey);
+  const geminiModel = genAI.getGenerativeModel({ model });
 
-  try {
-    await parsePromise;
-  } catch (error) {
-    // Ignorar erros de parse e continuar com comandos coletados
-  }
+  logger.info(`\n\n🖥️  Gerando comandos Linux com Gemini (${model})...`);
 
-  // Yield dos comandos coletados
-  for (const command of collectedCommands) {
-    yield { type: "command", command };
-  }
+  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
 
-  yield { type: "allcommands", commands: collectedCommands };
+IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
+{"commands": [array de comandos]}
+
+Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
+
+  const prompt = `${systemMessage}\n\n${linuxAdminPrompt(task)}`;
+
+  const result = await geminiModel.generateContentStream(prompt);
+
+  // Use unified streaming parser
+  const { parseStreamingJSON, iterateGoogleStream } = await import("./streaming-parser");
+  yield* parseStreamingJSON(iterateGoogleStream(result.stream), "google");
 }
