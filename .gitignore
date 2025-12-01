@@ -193,6 +193,7 @@ gege*
 beta*
 beta*/**
 # Claude Code generated context
-CLAUDE.md
+CLAUDE.*
+.CLADE*
 
 session-context-*.md

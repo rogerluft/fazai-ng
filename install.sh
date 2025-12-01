@@ -331,32 +331,29 @@ build_project() {
   fi
 }
 
-# Criar wrapper script
-create_symlink() {
-  info "Criando script de inicialização..."
+# Criar ponto de entrada no PATH
+create_entry_point() {
+  info "Criando ponto de entrada em /usr/local/bin/fazai..."
   
-  # Limpar instalações antigas
-  rm -f /usr/bin/fazai 2>/dev/null || true
+  local entry_point="/usr/local/bin/fazai"
+  local target_executable="/opt/fazai/bin/fazai"
+
+  if [ "$EUID" -ne 0 ] && ! sudo -n true 2>/dev/null; then
+    fail "Permissão de superusuário (sudo) é necessária para criar o link em ${entry_point}"
+  fi
   
-  # Cria um wrapper script em /usr/local/bin
-  local wrapper="/usr/local/bin/fazai"
+  info "Garantindo que o alvo '${target_executable}' seja executável..."
+  sudo chmod +x "$target_executable"
+
+  info "Criando link simbólico: ${entry_point} -> ${target_executable}"
+  # Use ln -sf para forçar a sobreposição de qualquer link ou arquivo antigo
+  sudo ln -sf "$target_executable" "$entry_point"
   
-  if [ "$EUID" -eq 0 ]; then
-    cat > "$wrapper" << 'EOFWRAPPER'
-#!/usr/bin/env bash
-exec /opt/fazai/bin/fazai.js "$@"
-EOFWRAPPER
-    chmod +x "$wrapper"
-    chmod +x "/opt/fazai/bin/fazai.js"
-    success "Wrapper criado: $wrapper"
+  # Verificar
+  if [ "$(readlink -f "$entry_point")" == "$target_executable" ]; then
+    success "Ponto de entrada criado com sucesso."
   else
-    sudo bash -c "cat > '$wrapper' << 'EOFWRAPPER'
-#!/usr/bin/env bash
-exec /opt/fazai/bin/fazai.js \"\$@\"
-EOFWRAPPER
-chmod +x '$wrapper'
-chmod +x '/opt/fazai/bin/fazai.js'"
-    success "Wrapper criado: $wrapper (com sudo)"
+    fail "Falha ao criar ou verificar o ponto de entrada."
   fi
 }
 
@@ -1063,19 +1060,41 @@ print_success() {
 
 # Main
 main() {
+  # Dev environment check
+  if [ -f "scripts/link-for-dev.sh" ]; then
+    echo -e "${YELLOW}ℹ Installer detected it's running from a local repository.${C_RESET}"
+    read -p "$(echo -e ${CYAN}"Do you want to set up a development environment (symlinks /opt/fazai to this repo)? [Y/n] "${C_RESET})" dev_choice
+    if [[ "$dev_choice" =~ ^[Yy]$ ]] || [[ -z "$dev_choice" ]]; then
+      info "Starting development environment setup..."
+      sudo bash scripts/link-for-dev.sh
+      success "Development environment linked successfully."
+      info "The 'fazai' command is now linked to this repository."
+      exit 0
+    else
+      info "Proceeding with standard production installation..."
+    fi
+  fi
+
   print_banner
   check_dependencies
   setup_directories
   clone_repo
   install_deps
   build_project
-  create_symlink
+  create_entry_point
   setup_path
   install_fzalias_system  # Instalar sistema de aliases global
   setup_config
   install_qdrant  # Instalação interativa do Qdrant
   setup_collections
   install_web_interface  # Instalação opcional da interface web
+  
+  # Setup environment alias and variables
+  if [ -f "$INSTALL_DIR/scripts/setup-env.sh" ]; then
+    info "Running environment setup..."
+    bash "$INSTALL_DIR/scripts/setup-env.sh"
+  fi
+
   print_success
 }
 

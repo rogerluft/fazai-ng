@@ -1,0 +1,383 @@
+/**
+ * Embeddings Service Module
+ *
+ * Provides text embedding generation with multiple provider support.
+ * Primary: Ollama mxbai-embed-large (1024 dim, local, free)
+ * Fallback: OpenAI text-embedding-3-small (1536 dim, cloud, paid)
+ *
+ * Features:
+ * - Automatic provider selection and fallback
+ * - Batch processing for efficiency
+ * - Retry logic for transient failures
+ * - Dimension validation
+ * - Progress tracking for large batches
+ */
+
+import { getConfigValue } from "../config";
+import { logger } from "../logger";
+import { withRetry } from "../utils/retry";
+import { API_TIMEOUTS } from "../config/timeouts";
+import { processBatches } from "../utils/batch-processor";
+
+/**
+ * Embedding provider types
+ */
+export type EmbeddingProvider = "ollama" | "openai";
+
+/**
+ * Embedding service interface
+ */
+export interface EmbeddingService {
+  /**
+   * Generate embedding for a single text
+   */
+  generate(text: string): Promise<number[]>;
+
+  /**
+   * Generate embeddings for multiple texts in batch
+   * More efficient than calling generate() multiple times
+   */
+  generateBatch(texts: string[]): Promise<number[][]>;
+
+  /**
+   * Get provider info
+   */
+  getInfo(): {
+    provider: EmbeddingProvider;
+    model: string;
+    dimension: number;
+    isLocal: boolean;
+  };
+}
+
+/**
+ * Ollama Embedding Service
+ *
+ * Uses local Ollama server for embedding generation.
+ * Model: mxbai-embed-large (1024 dimensions)
+ * Free, local, no API key required.
+ */
+class OllamaEmbeddingService implements EmbeddingService {
+  private readonly baseUrl: string;
+  private readonly model: string;
+  private readonly dimension: number;
+
+  constructor(
+    baseUrl: string = "http://192.168.0.101:11434",
+    model: string = "mxbai-embed-large",
+    dimension: number = 1024
+  ) {
+    this.baseUrl = baseUrl;
+    this.model = model;
+    this.dimension = dimension;
+  }
+
+  async generate(text: string): Promise<number[]> {
+    const embeddings = await this.generateBatch([text]);
+    return embeddings[0];
+  }
+
+  async generateBatch(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) {
+      return [];
+    }
+
+    const embeddings: number[][] = [];
+
+    // Ollama API endpoint: POST /api/embeddings
+    const endpoint = `${this.baseUrl}/api/embeddings`;
+
+    // Process one text at a time (Ollama API doesn't support batch)
+    for (let i = 0; i < texts.length; i++) {
+      const text = texts[i];
+
+      try {
+        const embedding = await withRetry(
+          async () => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(
+              () => controller.abort(),
+              API_TIMEOUTS.ollama
+            );
+
+            try {
+              const response = await fetch(endpoint, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({
+                  model: this.model,
+                  prompt: text,
+                }),
+                signal: controller.signal,
+              });
+
+              clearTimeout(timeoutId);
+
+              if (!response.ok) {
+                const errorText = await response.text().catch(() => "");
+                throw new Error(
+                  `Ollama API error ${response.status}: ${errorText}`
+                );
+              }
+
+              const data = await response.json();
+
+              if (!data.embedding || !Array.isArray(data.embedding)) {
+                throw new Error("Invalid response from Ollama API");
+              }
+
+              // Validate dimension
+              if (data.embedding.length !== this.dimension) {
+                logger.warn(
+                  `Expected ${this.dimension} dimensions, got ${data.embedding.length}`
+                );
+              }
+
+              return data.embedding as number[];
+            } catch (error: any) {
+              clearTimeout(timeoutId);
+              throw error;
+            }
+          },
+          {
+            provider: "ollama",
+            maxRetries: 2,
+          }
+        );
+
+        embeddings.push(embedding);
+
+        // Log progress for large batches
+        if (texts.length > 10 && (i + 1) % 10 === 0) {
+          logger.debug(
+            `Ollama embeddings: ${i + 1}/${texts.length} (${Math.round(((i + 1) / texts.length) * 100)}%)`
+          );
+        }
+      } catch (error: any) {
+        logger.error(`Failed to generate embedding for text ${i + 1}: ${error.message}`);
+        // Return zero vector as fallback
+        embeddings.push(new Array(this.dimension).fill(0));
+      }
+    }
+
+    return embeddings;
+  }
+
+  getInfo() {
+    return {
+      provider: "ollama" as const,
+      model: this.model,
+      dimension: this.dimension,
+      isLocal: true,
+    };
+  }
+}
+
+/**
+ * OpenAI Embedding Service
+ *
+ * Uses OpenAI API for embedding generation.
+ * Model: text-embedding-3-small (1536 dimensions)
+ * Paid, cloud, requires API key.
+ */
+class OpenAIEmbeddingService implements EmbeddingService {
+  private readonly apiKey: string;
+  private readonly model: string;
+  private readonly dimension: number;
+
+  /**
+   * Maximum batch size for OpenAI API
+   * OpenAI allows up to 2048 texts per request, but we use conservative limit
+   */
+  private readonly MAX_BATCH_SIZE = 100;
+
+  constructor(
+    apiKey: string,
+    model: string = "text-embedding-3-small",
+    dimension: number = 1536
+  ) {
+    this.apiKey = apiKey;
+    this.model = model;
+    this.dimension = dimension;
+  }
+
+  async generate(text: string): Promise<number[]> {
+    const embeddings = await this.generateBatch([text]);
+    return embeddings[0];
+  }
+
+  async generateBatch(texts: string[]): Promise<number[][]> {
+    if (texts.length === 0) {
+      return [];
+    }
+
+    const allEmbeddings: number[][] = [];
+
+    // Process in chunks of MAX_BATCH_SIZE
+    const result = await processBatches(
+      texts,
+      async (batch) => {
+        const batchEmbeddings = await this.generateBatchInternal(batch);
+        allEmbeddings.push(...batchEmbeddings);
+      },
+      {
+        batchSize: this.MAX_BATCH_SIZE,
+        operationName: "OpenAI embeddings",
+        logProgress: texts.length > 100,
+      }
+    );
+
+    if (result.failed.length > 0) {
+      logger.warn(
+        `OpenAI embeddings: ${result.failed.length}/${texts.length} failed, using zero vectors`
+      );
+      // Fill failed with zero vectors
+      for (let i = 0; i < result.failed.length; i++) {
+        allEmbeddings.push(new Array(this.dimension).fill(0));
+      }
+    }
+
+    return allEmbeddings;
+  }
+
+  private async generateBatchInternal(texts: string[]): Promise<number[][]> {
+    return withRetry(
+      async () => {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          API_TIMEOUTS.openai
+        );
+
+        try {
+          const response = await fetch(
+            "https://api.openai.com/v1/embeddings",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${this.apiKey}`,
+              },
+              body: JSON.stringify({
+                model: this.model,
+                input: texts,
+                dimensions: this.dimension,
+              }),
+              signal: controller.signal,
+            }
+          );
+
+          clearTimeout(timeoutId);
+
+          if (!response.ok) {
+            const errorData = await response.json().catch(() => ({}));
+            throw new Error(
+              `OpenAI API error ${response.status}: ${errorData.error?.message || response.statusText}`
+            );
+          }
+
+          const data = await response.json();
+
+          if (!data.data || !Array.isArray(data.data)) {
+            throw new Error("Invalid response from OpenAI API");
+          }
+
+          // Extract embeddings in correct order
+          return data.data
+            .sort((a: any, b: any) => a.index - b.index)
+            .map((item: any) => item.embedding as number[]);
+        } catch (error: any) {
+          clearTimeout(timeoutId);
+          throw error;
+        }
+      },
+      {
+        provider: "openai",
+        maxRetries: 3,
+      }
+    );
+  }
+
+  getInfo() {
+    return {
+      provider: "openai" as const,
+      model: this.model,
+      dimension: this.dimension,
+      isLocal: false,
+    };
+  }
+}
+
+/**
+ * Create embedding service with automatic provider selection
+ *
+ * Priority:
+ * 1. Ollama (if OLLAMA_BASE_URL configured and reachable)
+ * 2. OpenAI (if OPENAI_API_KEY configured)
+ * 3. Error (if neither available)
+ *
+ * @returns EmbeddingService instance
+ *
+ * @example
+ * const embeddings = await createEmbeddingService();
+ * const vector = await embeddings.generate("Hello world");
+ */
+export async function createEmbeddingService(): Promise<EmbeddingService> {
+  // Try Ollama first (local, free)
+  const ollamaBaseUrl =
+    getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
+
+  try {
+    logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
+
+    // Quick health check
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000);
+
+    const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
+      signal: controller.signal,
+    }).catch(() => null);
+
+    clearTimeout(timeoutId);
+
+    if (response && response.ok) {
+      logger.info("✓ Using Ollama for embeddings (mxbai-embed-large, 1024 dim)");
+      return new OllamaEmbeddingService(ollamaBaseUrl, "mxbai-embed-large", 1024);
+    }
+  } catch (error: any) {
+    logger.debug(`Ollama not available: ${error.message}`);
+  }
+
+  // Fallback to OpenAI
+  const openaiApiKey = getConfigValue("OPENAI_API_KEY");
+
+  if (openaiApiKey) {
+    logger.info("✓ Using OpenAI for embeddings (text-embedding-3-small, 1536 dim)");
+    logger.warn("⚠️  OpenAI embeddings are paid ($0.02/1M tokens)");
+    return new OpenAIEmbeddingService(
+      openaiApiKey,
+      "text-embedding-3-small",
+      1536
+    );
+  }
+
+  // No provider available
+  throw new Error(
+    "No embedding provider available. Configure OLLAMA_BASE_URL or OPENAI_API_KEY."
+  );
+}
+
+/**
+ * Get embedding dimension for current provider
+ *
+ * Useful for validating Qdrant collection dimension before inserting.
+ *
+ * @returns Embedding dimension (1024 for Ollama, 1536 for OpenAI)
+ */
+export async function getEmbeddingDimension(): Promise<number> {
+  const service = await createEmbeddingService();
+  const info = service.getInfo();
+  return info.dimension;
+}

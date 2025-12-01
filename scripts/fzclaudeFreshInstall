@@ -1,0 +1,219 @@
+#!/bin/bash
+# fzclaudeFreshInstall: A tool to completely reset and reinstall the Claude CLI environment.
+
+# --- Helper Functions ---
+# Color definitions
+readonly C_RESET='\033[0m'
+readonly C_RED='\033[0;31m'
+readonly C_GREEN='\033[0;32m'
+readonly C_YELLOW='\033[0;33m'
+readonly C_BLUE='\033[0;34m'
+readonly C_CYAN='\033[0;36m'
+
+info() {
+    echo -e "${C_BLUE}INFO: $1${C_RESET}"
+}
+
+success() {
+    echo -e "${C_GREEN}SUCCESS: $1${C_RESET}"
+}
+
+warn() {
+    echo -e "${C_YELLOW}WARN: $1${C_RESET}"
+}
+
+fail() {
+    echo -e "${C_RED}ERROR: $1${C_RESET}"
+    exit 1
+}
+
+# Prompt user for confirmation
+confirm() {
+    local prompt="$1"
+    while true;
+ do
+        read -p "$(echo -e "${C_YELLOW}CONFIRM: ${prompt} [y/n] ${C_RESET}")" yn
+        case $yn in
+            [Yy]* ) return 0;; 
+            [Nn]* ) return 1;; 
+            * ) echo "Please answer yes (y) or no (n).";;
+        esac
+    done
+}
+
+# --- Core Functions ---
+
+# Backup existing configurations
+backup_configs() {
+    info "Starting configuration backup..."
+    local backup_dir="/root/claude_backups/backup_$(date +%Y%m%d_%H%M%S)"
+    
+    if confirm "Create backup in ${backup_dir}?"; then
+        info "Creating backup directory..."
+        sudo mkdir -p "$backup_dir" || fail "Could not create backup directory."
+
+        local paths_to_backup=(
+            "/root/.claude"
+            "/root/.claude.json"
+            "/home/rluft/.claude"
+            "/home/rluft/.claude.json"
+            "/home/rluft/fazai-ng/.claude"
+            "/home/rluft/fazai-ng/.mcp.json"
+        )
+
+        for path in "${paths_to_backup[@]}"; do
+            if [ -e "$path" ]; then
+                info "Backing up ${path}..."
+                sudo cp -a "$path" "$backup_dir/" || warn "Failed to back up ${path}. It may not exist."
+            else
+                info "Skipping ${path}, does not exist."
+            fi
+        done
+        success "Backup completed successfully to ${backup_dir}"
+    else
+        warn "Backup cancelled by user."
+    fi
+}
+
+# Restore configurations from a backup
+restore_configs() {
+    info "Starting configuration restore..."
+    local backup_parent_dir="/root/claude_backups"
+
+    if [ ! -d "$backup_parent_dir" ] || [ -z "$(ls -A $backup_parent_dir)" ]; then
+        fail "No backup directory found at ${backup_parent_dir}. Cannot restore."
+    fi
+
+    info "Available backups:"
+    select backup_to_restore in $(ls -r $backup_parent_dir); do
+        if [ -n "$backup_to_restore" ]; then
+            break
+        else
+            echo "Invalid selection."
+        fi
+    done
+
+    local selected_backup_path="${backup_parent_dir}/${backup_to_restore}"
+    if confirm "Restore all files from ${selected_backup_path}?"; then
+        info "Restoring files..."
+        sudo cp -a "${selected_backup_path}/." / || warn "Failed to restore some files. Check permissions."
+        success "Restore completed from ${selected_backup_path}."
+        info "Note: You may need to adjust file ownership after restoring."
+    else
+        warn "Restore cancelled by user."
+    fi
+}
+
+# Perform the full cleanup
+full_cleanup() {
+    warn "This will perform a deep clean of all Claude CLI installations and configurations."
+    if ! confirm "Are you sure you want to proceed with the full cleanup?"; then
+        warn "Cleanup cancelled."
+        return
+    fi
+    
+    info "--- Starting Full Cleanup ---"
+    
+    # Step 1: Uninstall global npm packages
+    info "Attempting to uninstall global npm packages..."
+    if confirm "Uninstall global 'claude-cli', '@anthropic-ai/claude-code', and 'claude-code-templates' packages?"; then
+        sudo npm uninstall -g claude-cli || warn "Could not uninstall 'claude-cli' (it may not be installed)."
+        sudo npm uninstall -g @anthropic-ai/claude-code || warn "Could not uninstall '@anthropic-ai/claude-code' (it may not be installed)."
+        sudo npm uninstall -g claude-code-templates || warn "Could not uninstall 'claude-code-templates' (it may not be installed)."
+        success "Global packages uninstalled."
+    fi
+
+    # Step 2: Remove conflicting executables
+    info "Removing conflicting executables..."
+    if [ -f "/usr/local/bin/claude" ]; then
+        if confirm "Remove executable at /usr/local/bin/claude?"; then
+            sudo rm /usr/local/bin/claude || warn "Failed to remove /usr/local/bin/claude."
+        fi
+    fi
+    if [ -f "/usr/local/sbin/claude" ]; then
+        if confirm "Remove executable at /usr/local/sbin/claude?"; then
+            sudo rm /usr/local/sbin/claude || warn "Failed to remove /usr/local/sbin/claude."
+        fi
+    fi
+    success "Executable cleanup finished."
+
+    # Step 3: Remove all found configuration files and directories
+    info "Removing all configuration directories..."
+    local config_paths=(
+        "/root/.claude"
+        "/root/.claude.json"
+        "/home/rluft/.claude"
+        "/home/rluft/.claude.json"
+        "/home/rluft/.cache/claude-cli-nodejs"
+        "/home/rluft/fazai-ng/.claude"
+        "/home/rluft/fazai-ng/.mcp.json"
+        "/home/rluft/fazai-ng/.claude.bak"
+    )
+    for path in "${config_paths[@]}"; do
+        if [ -e "$path" ]; then
+            if confirm "Remove ${path}?"; then
+                sudo rm -rf "$path" || warn "Failed to remove ${path}."
+            fi
+        fi
+    done
+    success "Configuration cleanup finished."
+
+    success "--- Full Cleanup Complete ---"
+}
+
+# Perform a clean reinstallation
+clean_reinstall() {
+    info "--- Starting Clean Reinstallation ---"
+    if confirm "Proceed with installing '@anthropic-ai/claude-code' globally via npm?"; then
+        sudo npm install -g @anthropic-ai/claude-code || fail "Failed to install Claude CLI."
+        success "Claude CLI installed successfully."
+        info "Installation complete. Please run 'claude doctor' to verify."
+        info "To install component templates, run 'npx claude-code-templates@latest' inside your project directory."
+    else
+        warn "Reinstallation cancelled."
+    fi
+}
+
+# --- Main Menu ---
+main_menu() {
+    echo -e "\n${C_CYAN}--- Claude CLI Fresh Install Tool ---${C_RESET}"
+    echo "Select an option:"
+    echo "1) Full Cleanup & Reinstall"
+    echo "2) Only Backup Configurations"
+    echo "3) Only Restore Configurations"
+    echo "4) Only Perform Full Cleanup"
+    echo "5) Exit"
+    echo ""
+    read -p "Enter your choice [1-5]: " choice
+    
+    case $choice in
+        1)
+            backup_configs
+            full_cleanup
+            clean_reinstall
+            ;; 
+        2)
+            backup_configs
+            ;; 
+        3)
+            restore_configs
+            ;; 
+        4)
+            full_cleanup
+            ;; 
+        5)
+            info "Exiting."
+            exit 0
+            ;; 
+        *)
+            fail "Invalid option. Please try again."
+            ;; 
+    esac
+}
+
+# --- Script Execution ---
+if [ "$(whoami)" != "root" ]; then
+    fail "This script requires root privileges for some operations. Please run with 'sudo'."
+fi
+
+main_menu

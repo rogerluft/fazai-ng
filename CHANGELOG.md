@@ -1,5 +1,36 @@
 # FazAI Changelog
 
+## [3.4.0-beta] - 2025-11-29
+
+### Added
+- **Gemini 3 Preview Feature**:
+  - Introduced a new "Gemini 3" model (`gemini3`) as a preview feature, pointing to the latest `gemini-1.5-pro-latest` model.
+  - Added an `ENABLE_PREVIEW_FEATURES=true` flag in `fazai.conf` to activate preview models and features.
+  - Implemented an "Auto" mode for model selection. When no model is specified and preview features are enabled, `fazai` will automatically default to `gemini3`.
+  - Updated the model list in the help text to a new, more descriptive format that appears when preview features are enabled.
+  - Added new built-in model definitions for `gemini-2.5-pro` (`pro`), `gemini-2.5-flash` (`flash`), and `gemini-2.5-flash-lite` (`flash-lite`).
+
+### Changed
+- **Consistency Matrix Compliance**: All relevant layers updated for the new feature:
+  - **Help text** (`src/app.ts`): Now dynamically displays the new model menu.
+  - **Bash completion** (`completion/fazai-completion.bash`): Added `gemini3`, `pro`, `flash`, and `flash-lite`.
+  - **Config file** (`fazai.conf.example`): Added `ENABLE_PREVIEW_FEATURES` flag.
+  - **Model Definitions** (`src/models.ts`): Updated to include new models and preview logic.
+  - **Changelog** (`CHANGELOG.md`): This entry.
+
+## [3.3.1-beta] - 2025-11-29
+
+### Changed
+- **Architecture Consolidation**: Refactored the installation and sync process to enforce a single, canonical point of entry for the `fazai` executable.
+  - `install.sh` now creates a robust symbolic link (`/usr/local/bin/fazai`) instead of a brittle wrapper script, ensuring updates to the launcher script in `/opt/fazai/bin` are automatically reflected.
+  - The `fazai sync` command is now the official method for updating the global installation from a development repository, replacing all manual `cp` workflows. Its logic was corrected to properly sync the `bin/` directory and remove incorrect internal symlink creation.
+  - Redundant launcher scripts were deprecated in favor of a single, canonical launcher (`/opt/fazai/bin/fazai`). A new consolidation script (`scripts/consolidate-fazai.sh`) was created to help users clean up old, redundant executables.
+  - An environment setup script (`scripts/setup-env.sh`) was created and integrated into the build, install, and runtime processes to manage aliases (`repo`), environment variables (`FAZAI_REPO`), and log permissions automatically.
+
+### Documentation
+- **`SYNC_WORKFLOW.md`**: Overhauled to reflect the new `fazai sync`-centric workflow and the single-point-of-entry architecture. All manual `cp` instructions were replaced.
+- **`CHANGELOG.md`**: Added this entry to document the consolidation.
+
 ## [3.3.0-beta] - 2025-11-18
 
 ### Added

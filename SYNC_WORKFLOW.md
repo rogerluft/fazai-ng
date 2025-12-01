@@ -39,62 +39,50 @@
 
 ## 🛠️ Comandos de Sincronização
 
-### 1️⃣ Desenvolvimento → Produção (Manual)
+### 1️⃣ Sincronização do Desenvolvimento para Produção
+
+O método canônico para sincronizar as alterações do seu diretório de desenvolvimento (`~/fazai-ng`) para a instalação global (`/opt/fazai`) é usando o comando `fazai sync`.
+
+Este comando deve ser executado com `sudo` para ter permissão de escrita em `/opt/fazai`. O `-E` é importante para preservar as variáveis de ambiente, como `FAZAI_REPO`.
 
 ```bash
-# No diretório do repo
-cd ~/fazai-ng
-
-# Rebuild + sync
-npm run build
-sudo cp -f dist/app.cjs /opt/fazai/dist/
-sudo cp -f bin/fazai /opt/fazai/bin/
-
-# Testar
-fazai --version
+# No diretório do repo ou em qualquer lugar
+sudo -E fazai sync
 ```
 
-### 2️⃣ Sincronização Automática (Futuro: `fazai sync`)
+O comando irá automaticamente:
+- Puxar as últimas alterações do seu repositório Git.
+- Instalar quaisquer dependências novas ou atualizadas.
+- Recompilar o projeto (`npm run build`).
+- Sincronizar os arquivos necessários para `/opt/fazai` usando `rsync`.
+- Reiniciar serviços relacionados, se necessário.
 
-```bash
-# Comando planejado (não implementado ainda)
-fazai sync --from-repo ~/fazai-ng
-```
 
-### 3️⃣ Atualização via Git
+### 2️⃣ Sincronização Automática com `fazai sync`
 
-```bash
-# Dentro de /opt/fazai (instalação produção)
-cd /opt/fazai
-git pull origin master
-npm install --production
-npm run build
-sudo systemctl restart fazai-web@$USER
-```
+O comando `fazai sync` é a maneira oficial de manter a instalação em `/opt/fazai` atualizada. Ele combina o `git pull` e o processo de build e cópia. Consulte a seção anterior para o uso correto.
 
 ---
 
 ## 📋 Checklist de Modificações
 
 ### Se você alterou código TypeScript (`src/`):
-- [ ] `npm run build` no repo
-- [ ] `sudo cp dist/app.cjs /opt/fazai/dist/`
+- [ ] Execute `sudo -E fazai sync` para reconstruir e sincronizar.
 - [ ] Testar: `fazai ask "teste"`
 
 ### Se você alterou o launcher (`bin/fazai`):
-- [ ] `sudo cp bin/fazai /opt/fazai/bin/`
+- [ ] Execute `sudo -E fazai sync` para sincronizar o novo launcher.
 - [ ] Testar: `fazai --help`
 
 ### Se você alterou a web (`web/`):
-- [ ] `cd web && npm run build`
-- [ ] `sudo cp -r .next /opt/fazai/web/`
-- [ ] `sudo systemctl restart fazai-web@$USER`
+- [ ] Execute `sudo -E fazai sync`, que irá reconstruir e sincronizar a pasta `web/`.
+- [ ] O `sync` tentará reiniciar o serviço `fazai-web` automaticamente.
 
 ### Se você alterou dependências (`package.json`):
-- [ ] `cd /opt/fazai && sudo npm install --production`
+- [ ] Execute `sudo -E fazai sync`. O comando irá rodar `npm install` no seu repo e copiar o `node_modules` atualizado.
 
 ### Se você alterou configuração (`fazai.conf.example`):
-- [ ] Atualizar `/etc/fazai/fazai.conf` manualmente
+- [ ] Atualizar `/etc/fazai/fazai.conf` manualmente.
 - [ ] Documentar no CHANGELOG.md
 
 ---

@@ -17,7 +17,67 @@ import { decomposeTask } from "./agentic/task-decomposer";
 import { DAGExecutor } from "./agentic/dag-executor";
 import { handleGitHubCommand } from "./commands/github";
 
+import { getConfigValue } from "./config";
+
 function displayHelp() {
+  const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
+
+  let modelsHelpText = `
+Available Models:
+  Google Gemini (requer GOOGLE_API_KEY):`;
+  
+  if (previewEnabled) {
+    modelsHelpText = `
+  ┌───────────────────────────────────────────────────────────────────────────┐
+  │                                                                           │
+  │ Gemini 3 is now available.                                                │
+  │ To use Gemini 3, enable "Preview features" in /etc/fazai/fazai.conf.      │
+  │ Learn more at https://goo.gle/enable-preview-features                     │
+  │                                                                           │
+  └───────────────────────────────────────────────────────────────────────────┘
+
+  Select Model:
+  ● 1. Auto (default)
+       Let the system choose the best model for your task.
+    2. Pro (pro)
+       For complex tasks that require deep reasoning and creativity
+    3. Flash (flash)
+       For tasks that need a balance of speed and reasoning
+    4. Flash-Lite (flash-lite)
+       For simple tasks that need to be done quickly
+
+  To use a specific Gemini model on startup, use the --model flag.
+`;
+  } else {
+    modelsHelpText += `
+    gemini2flash   - Gemini 2.0 Flash Exp (rápido e gratuito)
+    gemini15pro    - Gemini 1.5 Pro (mais capaz)
+    gemini15flash  - Gemini 1.5 Flash (balanceado)
+    `;
+  }
+
+  modelsHelpText += `
+  OpenRouter (requer API key - modelos gratuitos disponíveis):
+    qwen           - Qwen 3 Coder Free (DEFAULT)
+    gemini-or      - Gemini 2.0 Flash via OpenRouter
+    llama33        - Llama 3.3 70B Free
+    deepseek       - DeepSeek R1T2 Chimera Free
+
+  OpenAI (requer API key):
+    gpt4mini    - GPT-4o-mini (rápido e barato)
+    gpt4o       - GPT-4o (mais recente e inteligente)
+    gpt4turbo   - GPT-4 Turbo
+
+  Claude (Anthropic - requer API key):
+    sonnet35    - Claude 3.5 Sonnet (mais inteligente)
+    haiku       - Claude 3 Haiku (rápido e barato)
+
+  Ollama (local - configure OLLAMA_BASE_URL no fazai.conf):
+    gptoss-20b  - GPT-OSS 20B (local no servidor)
+    llama32     - Llama 3.2
+    mistral     - Mistral
+`;
+
   const helpText = `
 🖥️  FAZAI - Administrador Linux Inteligente com IA
 
@@ -57,33 +117,7 @@ Examples:
 
   # Configuration
   fazai config              # Show configured API keys
-
-Available Models:
-  Google Gemini (requer GOOGLE_API_KEY - free tier disponível):
-    gemini2flash   - Gemini 2.0 Flash Exp (rápido e gratuito)
-    gemini15pro    - Gemini 1.5 Pro (mais capaz)
-    gemini15flash  - Gemini 1.5 Flash (balanceado)
-
-  OpenRouter (requer API key - modelos gratuitos disponíveis):
-    qwen           - Qwen 3 Coder Free (DEFAULT)
-    gemini-or      - Gemini 2.0 Flash via OpenRouter
-    llama33        - Llama 3.3 70B Free
-    deepseek       - DeepSeek R1T2 Chimera Free
-
-  OpenAI (requer API key):
-    gpt4mini    - GPT-4o-mini (rápido e barato)
-    gpt4o       - GPT-4o (mais recente e inteligente)
-    gpt4turbo   - GPT-4 Turbo
-
-  Claude (Anthropic - requer API key):
-    sonnet35    - Claude 3.5 Sonnet (mais inteligente)
-    haiku       - Claude 3 Haiku (rápido e barato)
-
-  Ollama (local - configure OLLAMA_BASE_URL no fazai.conf):
-    gptoss-20b  - GPT-OSS 20B (local no servidor)
-    llama32     - Llama 3.2
-    mistral     - Mistral
-`;
+${modelsHelpText}`;
   logger.info(helpText);
 }
 
@@ -610,7 +644,15 @@ async function main() {
 
   // Use default model if none specified
   if (!selectedModel) {
-    selectedModel = models[0];
+    const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
+    if (previewEnabled) {
+      selectedModel = models.find(m => m.nickName === 'gemini3');
+      logger.info('🤖 Auto-selecting preview model: Gemini 3');
+    }
+    // If preview not enabled or gemini3 not found, fallback to the absolute default
+    if (!selectedModel) {
+      selectedModel = models[0];
+    }
   }
 
   logger.info(`Modelo: ${selectedModel ? selectedModel.nickName : models[0].nickName} (${selectedModel ? selectedModel.name : models[0].name})\n`);

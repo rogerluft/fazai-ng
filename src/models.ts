@@ -61,8 +61,16 @@ function loadModelsFromConfig(): Model[] {
             nickName = "llama32";
           } else if (modelName.includes("llama3.1")) {
             nickName = "llama31";
+          } else if (modelName.includes("gemini-3.0")) {
+            nickName = "gemini3";
+          } else if (modelName.includes("gemini-2.5-pro")) {
+            nickName = "pro";
+          } else if (modelName.includes("gemini-2.5-flash-lite")) {
+            nickName = "flash-lite";
+          } else if (modelName.includes("gemini-2.5-flash")) {
+            nickName = "flash";
           } else if (modelName.includes("gemini")) {
-            nickName = "gemini";
+            nickName = "gemini-or"; // Generic fallback for other gemini, e.g. from OpenRouter
           } else if (modelName.includes("claude")) {
             nickName = modelName.includes("haiku") ? "haiku" : "sonnet";
           } else if (modelName.includes("gpt-4o")) {
@@ -92,7 +100,40 @@ function loadModelsFromConfig(): Model[] {
 }
 
 function getBuiltInModels(): Model[] {
+  const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
+
+  const googleModels: Model[] = [
+    {
+      name: "gemini-2.5-pro",
+      provider: "google",
+      nickName: "pro",
+      description: "Gemini 2.5 Pro (deep reasoning)",
+    },
+    {
+      name: "gemini-2.5-flash",
+      provider: "google",
+      nickName: "flash",
+      description: "Gemini 2.5 Flash (fast & balanced)",
+    },
+    {
+      name: "gemini-2.5-flash-lite",
+      provider: "google",
+      nickName: "flash-lite",
+      description: "Gemini 2.5 Flash Lite (quick tasks)",
+    },
+  ];
+
+  if (previewEnabled) {
+    googleModels.unshift({
+      name: "gemini-3.0-pro-latest", // Hypothetical latest model
+      provider: "google",
+      nickName: "gemini3",
+      description: "Gemini 3 (Preview)",
+    });
+  }
+
   return [
+    ...googleModels,
     // Ollama (local, max 3)
     {
       name: "gpt-oss:20b",
@@ -129,7 +170,7 @@ function getBuiltInModels(): Model[] {
     {
       name: "google/gemini-2.0-flash-exp:free",
       provider: "openrouter",
-      nickName: "gemini",
+      nickName: "gemini-or",
       description: "Google Gemini 2.0 Flash via OpenRouter",
     },
 

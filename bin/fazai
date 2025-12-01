@@ -4,6 +4,9 @@
 # Wrapper script que executa o CLI principal
 #
 
+# Run environment setup silently in the background to not clutter the command output
+bash "$(dirname "$0")/../scripts/setup-env.sh" > /dev/null 2>&1 &
+
 set -euo pipefail
 
 # Detecta o diretório de instalação

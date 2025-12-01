@@ -430,7 +430,7 @@ fazai ask "test"
 ```
 
 ---
-
+QUEM DEFINI QUANDO ESTA PRONTO NAO EH VOCE.. PORTANTO DETENHA-SE AO SEU PAPEL. EU VOU DIZER A HORA DE TERMINAR.
 **🎉 Terminal FazAI v3.1-beta está COMPLETO e pronto para produção!**
 
 **Data de conclusão:** 2025-11-14

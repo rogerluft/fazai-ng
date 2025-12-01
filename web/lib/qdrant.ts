@@ -8,12 +8,15 @@ export const qdrant = new QdrantClient({
   ...(qdrantApiKey && { apiKey: qdrantApiKey }),
 });
 
+/**
+ * Collection names (corrected from jarvis_* to fazai_*)
+ */
 export const COLLECTIONS = [
-  "jarvis_personality",
-  "jarvis_memory",
-  "jarvis_learning",
-  "jarvis_kb",
-  "jarvis_inference",
+  "fazai_personality",
+  "fazai_memory",
+  "fazai_learning",
+  "fazai_kb",
+  "fazai_inference",
 ] as const;
 
 export type CollectionName = (typeof COLLECTIONS)[number];

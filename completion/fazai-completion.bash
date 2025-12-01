@@ -22,7 +22,7 @@ _fazai_completion() {
     # OpenRouter: qwen, llama33, gemini
     # OpenAI: gpt4o, gpt4mini
     # Anthropic: sonnet, haiku
-    models="gptoss llama32 llama31 qwen llama33 gemini gpt4o gpt4mini sonnet haiku"
+    models="gptoss llama32 llama31 qwen llama33 gemini-or gpt4o gpt4mini sonnet haiku gemini3 pro flash flash-lite"
 
     # Vector subcommands
     vector_opts="validate recreate reset"
@@ -140,7 +140,7 @@ _fazai_completion() {
             ;;
 
         # Model selected (admin mode)
-        gemini2flash|gemini15pro|gemini15flash|gemini-or|gpt4mini|gpt4o|gpt4turbo|sonnet35|haiku|llama32|qwen|mistral)
+        gemini3|pro|flash|flash-lite|gemini-or|gpt4mini|gpt4o|gpt4turbo|sonnet35|haiku|llama32|qwen|mistral)
             # Complete with options
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0

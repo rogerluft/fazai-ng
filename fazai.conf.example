@@ -124,6 +124,18 @@ OLLAMA_BASE_URL=http://192.168.0.101:11434
 # Custom path for this config file (helpful for global installs)
 # FAZAI_CONFIG_PATH=/etc/fazai/fazai.conf
 
+# FAZAI_MAX_RETRIES=3
+
+
+# =============================================================================
+# PREVIEW & EXPERIMENTAL FEATURES
+# =============================================================================
+#
+# Enable pre-release or unstable features. Use with caution.
+#
+# ENABLE_PREVIEW_FEATURES=true
+ENABLE_PREVIEW_FEATURES=false
+
 # =============================================================================
 # CLOUDFLARE INTEGRATION
 # =============================================================================

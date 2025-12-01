@@ -19,6 +19,13 @@ export interface StreamResult {
   commands?: LinuxCommand[];
 }
 
+export interface ParseStats {
+  totalCommands: number;
+  validCommands: number;
+  invalidCommands: number;
+  parseErrors: number;
+}
+
 /**
  * Unified streaming JSON parser that works with all AI providers
  * Uses oboe for incremental JSON parsing from streaming responses
@@ -46,15 +53,30 @@ export async function* parseStreamingJSON(
   let jsonStarted = false;
   let fullJSON = "";
 
+  // Track parsing statistics
+  const stats: ParseStats = {
+    totalCommands: 0,
+    validCommands: 0,
+    invalidCommands: 0,
+    parseErrors: 0,
+  };
+
+  // Setup timeout detection for stalled streams
+  let lastChunkTime = Date.now();
+  const STREAM_TIMEOUT_MS = 30000; // 30 seconds without data = stalled
+
   // Setup oboe parser for incremental JSON parsing
-  const parsePromise = new Promise<void>((resolve) => {
+  const parsePromise = new Promise<void>((resolve, reject) => {
     oboe(jsonStream)
       .node("commands.*", (command: any) => {
+        stats.totalCommands++;
         try {
           const validatedCommand = LinuxCommandSchema.parse(command);
           collectedCommands.push(validatedCommand);
+          stats.validCommands++;
           logger.debug(`✓ Command parsed: ${validatedCommand.command.substring(0, 50)}...`);
         } catch (error) {
+          stats.invalidCommands++;
           if (error instanceof z.ZodError) {
             logger.warn("⚠️  Invalid command skipped:", error.issues[0]?.message);
           }
@@ -66,9 +88,15 @@ export async function* parseStreamingJSON(
         resolve();
       })
       .on("fail", (error: any) => {
-        // Oboe often fires 'fail' at end of stream, which is normal
-        logger.debug("Parsing finished:", error.thrown?.message || "stream ended");
-        resolve();
+        stats.parseErrors++;
+        // Oboe may fail if JSON is incomplete, try to salvage what we have
+        if (collectedCommands.length > 0) {
+          logger.debug(`Parsing ended with ${collectedCommands.length} commands collected`);
+          resolve();
+        } else {
+          logger.warn("⚠️  JSON parsing failed:", error.thrown?.message || "stream ended");
+          reject(new Error(`JSON parsing failed: ${error.thrown?.message || "unknown error"}`));
+        }
       });
   });
 
@@ -76,6 +104,9 @@ export async function* parseStreamingJSON(
   try {
     for await (const chunk of streamSource) {
       if (!chunk) continue;
+
+      // Update timeout tracker
+      lastChunkTime = Date.now();
 
       fullJSON += chunk;
 
@@ -114,20 +145,49 @@ export async function* parseStreamingJSON(
           }
           break;
       }
+
+      // Check for stream timeout
+      if (Date.now() - lastChunkTime > STREAM_TIMEOUT_MS) {
+        logger.warn("⚠️  Stream timeout: No data received for 30s");
+        throw new Error("Stream timeout: No data received for 30 seconds");
+      }
     }
   } catch (error) {
     logger.error("❌ Stream error:", error);
+    // Try to salvage partial results if we have any commands
+    if (collectedCommands.length === 0) {
+      throw error; // Re-throw if we have nothing
+    }
+    logger.info(`Continuing with ${collectedCommands.length} partially parsed commands`);
   }
 
   // Signal end of stream
   tokenStream.push(null);
 
   // Wait for oboe to finish parsing
-  await parsePromise;
+  try {
+    await parsePromise;
+  } catch (error) {
+    // If parsing failed but we have some commands, continue with warnings
+    if (collectedCommands.length > 0) {
+      logger.warn(`⚠️  Parsing incomplete, but recovered ${collectedCommands.length} commands`);
+    } else {
+      logger.error("❌ Parsing failed with no commands recovered");
+      throw error;
+    }
+  }
 
-  // Log complete JSON for debugging
+  // Log parsing statistics
   logger.debug(`[DEBUG] Full JSON received (${fullJSON.length} chars):`, fullJSON.substring(0, 500));
-  logger.info(`[DEBUG] Commands collected: ${collectedCommands.length}`);
+  logger.info(`✓ Commands: ${stats.validCommands} valid, ${stats.invalidCommands} invalid, ${stats.parseErrors} errors`);
+
+  // Warn if validation failure rate is high
+  if (stats.totalCommands > 0) {
+    const failureRate = (stats.invalidCommands / stats.totalCommands) * 100;
+    if (failureRate > 50) {
+      logger.warn(`⚠️  High validation failure rate: ${failureRate.toFixed(1)}%`);
+    }
+  }
 
   // Yield all collected and validated commands
   for (const command of collectedCommands) {

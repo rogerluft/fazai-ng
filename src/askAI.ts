@@ -3,6 +3,8 @@ import OpenAI from "openai";
 import { askPrompt, generalAskPrompt } from "./askPrompt";
 import { Readable } from "stream";
 import { models } from "./models";
+import { withRetry } from "./utils/retry";
+import { API_TIMEOUTS } from "./config/timeouts";
 
 export async function* askAI(
   fileContent: string,
@@ -14,18 +16,23 @@ export async function* askAI(
   const prompt = isGeneralQuestion ? generalAskPrompt(question) : askPrompt(question);
 
   if (provider === "anthropic") {
-    const anthropic = new Anthropic();
+    const anthropic = new Anthropic({
+      timeout: API_TIMEOUTS.anthropic,
+    });
     const systemMessage = isGeneralQuestion
       ? "Você é um assistente inteligente e bem-informado. Responda perguntas de forma clara e útil."
       : `CODE:\n${fileContent}\n`;
 
-    const stream = await anthropic.messages.create({
-      messages: [{ role: "user", content: prompt }],
-      model: model,
-      max_tokens: 4096,
-      stream: true,
-      system: systemMessage,
-    });
+    const stream = await withRetry(
+      () => anthropic.messages.create({
+        messages: [{ role: "user", content: prompt }],
+        model: model,
+        max_tokens: 4096,
+        stream: true,
+        system: systemMessage,
+      }),
+      { provider: "anthropic" }
+    );
 
     for await (const chunk of stream) {
       if (
@@ -36,19 +43,24 @@ export async function* askAI(
       }
     }
   } else if (provider === "openai") {
-    const openai = new OpenAI();
+    const openai = new OpenAI({
+      timeout: API_TIMEOUTS.openai,
+    });
     const systemMessage = isGeneralQuestion
       ? "Você é um assistente inteligente e bem-informado. Responda perguntas de forma clara e útil."
       : `CODE:\n${fileContent}\n`;
 
-    const stream = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      stream: true,
-    });
+    const stream = await withRetry(
+      () => openai.chat.completions.create({
+        model: model,
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: prompt },
+        ],
+        stream: true,
+      }),
+      { provider: "openai" }
+    );
 
     for await (const chunk of stream) {
       yield chunk.choices[0]?.delta?.content || "";
@@ -57,6 +69,7 @@ export async function* askAI(
     const openai = new OpenAI({
       baseURL: "https://openrouter.ai/api/v1",
       apiKey: process.env.OPENROUTER_API_KEY,
+      timeout: API_TIMEOUTS.openrouter,
       defaultHeaders: {
         "HTTP-Referer": "https://github.com/rogerluft/fazai-ng",
         "X-Title": "FazAI Terminal Assistant",
@@ -67,14 +80,17 @@ export async function* askAI(
       ? "Você é um assistente inteligente e bem-informado. Responda perguntas de forma clara e útil."
       : `CODE:\n${fileContent}\n`;
 
-    const stream = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      stream: true,
-    });
+    const stream = await withRetry(
+      () => openai.chat.completions.create({
+        model: model,
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: prompt },
+        ],
+        stream: true,
+      }),
+      { provider: "openrouter" }
+    );
 
     for await (const chunk of stream) {
       yield chunk.choices[0]?.delta?.content || "";
@@ -84,22 +100,25 @@ export async function* askAI(
     const openai = new OpenAI({
       baseURL: `${baseUrl}/v1`,
       apiKey: "ollama", // Ollama não precisa de API key real
-      timeout: 120000, // 2 minutos para K2-500 com 2 Netscape abertos 😂
-      maxRetries: 0,
+      timeout: API_TIMEOUTS.ollama,
+      maxRetries: 0, // Retries handled by withRetry()
     });
 
     const systemMessage = isGeneralQuestion
       ? "Você é um assistente inteligente e bem-informado. Responda perguntas de forma clara e útil."
       : `CODE:\n${fileContent}\n`;
 
-    const stream = await openai.chat.completions.create({
-      model: model,
-      messages: [
-        { role: "system", content: systemMessage },
-        { role: "user", content: prompt },
-      ],
-      stream: true,
-    });
+    const stream = await withRetry(
+      () => openai.chat.completions.create({
+        model: model,
+        messages: [
+          { role: "system", content: systemMessage },
+          { role: "user", content: prompt },
+        ],
+        stream: true,
+      }),
+      { provider: "ollama" }
+    );
 
     for await (const chunk of stream) {
       yield chunk.choices[0]?.delta?.content || "";

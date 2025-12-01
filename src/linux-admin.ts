@@ -3,6 +3,8 @@ import OpenAI from "openai";
 import { linuxAdminPrompt } from "./linux-prompt";
 import { LinuxCommandGenerator } from "./types-linux";
 import { logger } from "./logger";
+import { withRetry } from "./utils/retry";
+import { API_TIMEOUTS } from "./config/timeouts";
 
 export async function* getLinuxCommandsFromAI(
   systemInfo: string,
@@ -43,30 +45,35 @@ async function* getLinuxCommandsFromClaude(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const anthropic = new Anthropic();
+  const anthropic = new Anthropic({
+    timeout: API_TIMEOUTS.anthropic,
+  });
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Claude (${model})...`);
 
   const tokens = model.includes("sonnet") ? 8192 : 4096;
 
-  const stream = await anthropic.messages.create({
-    messages: [
-      {
-        role: "user" as const,
-        content: linuxAdminPrompt(task),
-      },
-    ],
-    model,
-    max_tokens: tokens,
-    stream: true,
-    temperature: 0,
-    system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
+  const stream = await withRetry(
+    () => anthropic.messages.create({
+      messages: [
+        {
+          role: "user" as const,
+          content: linuxAdminPrompt(task),
+        },
+      ],
+      model,
+      max_tokens: tokens,
+      stream: true,
+      temperature: 0,
+      system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
 
 IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 {"commands": [array de comandos]}
 
 Cada comando deve ter a estrutura exata definida no prompt do usuário.`,
-  });
+    }),
+    { provider: "anthropic" }
+  );
 
   // Use unified streaming parser
   const { parseStreamingJSON, iterateAnthropicStream } = await import("./streaming-parser");
@@ -78,7 +85,9 @@ async function* getLinuxCommandsFromOpenAI(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const openai = new OpenAI();
+  const openai = new OpenAI({
+    timeout: API_TIMEOUTS.openai,
+  });
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com OpenAI (${model})...`);
 
@@ -89,16 +98,19 @@ IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 
 Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
 
-  const stream = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: linuxAdminPrompt(task) }
-    ],
-    stream: true,
-    temperature: 0,
-    response_format: { type: "json_object" },
-  });
+  const stream = await withRetry(
+    () => openai.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: linuxAdminPrompt(task) }
+      ],
+      stream: true,
+      temperature: 0,
+      response_format: { type: "json_object" },
+    }),
+    { provider: "openai" }
+  );
 
   // Use unified streaming parser
   const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
@@ -113,6 +125,7 @@ async function* getLinuxCommandsFromOpenRouter(
   const openai = new OpenAI({
     baseURL: "https://openrouter.ai/api/v1",
     apiKey: process.env.OPENROUTER_API_KEY,
+    timeout: API_TIMEOUTS.openrouter,
     defaultHeaders: {
       "HTTP-Referer": "https://github.com/rogerluft/fazai-ng",
       "X-Title": "FazAI Terminal Assistant",
@@ -128,9 +141,8 @@ IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 
 Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
 
-  let stream;
-  try {
-    stream = await openai.chat.completions.create({
+  const stream = await withRetry(
+    () => openai.chat.completions.create({
       model,
       messages: [
         { role: "system", content: systemMessage },
@@ -138,14 +150,9 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
       ],
       stream: true,
       temperature: 0,
-    });
-  } catch (error: any) {
-    if (error.status === 429) {
-      logger.error(`\n⚠️  Rate limit atingido: ${model} temporariamente indisponível`);
-      logger.error(`💡 Sugestão: Use outro modelo gratuito (gemini2flash, llama32) ou aguarde alguns minutos\n`);
-    }
-    throw error;
-  }
+    }),
+    { provider: "openrouter" }
+  );
 
   // Use unified streaming parser
   const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
@@ -158,14 +165,14 @@ async function* getLinuxCommandsFromOllama(
   model: string
 ): LinuxCommandGenerator {
   const baseUrl = process.env.OLLAMA_BASE_URL || "http://192.168.0.101:11434";
-  
+
   logger.debug(`[DEBUG] Ollama baseURL: ${baseUrl}/v1`);
   logger.debug(`[DEBUG] Model: ${model}`);
-  
+
   const openai = new OpenAI({
     baseURL: `${baseUrl}/v1`,
     apiKey: "ollama", // Ollama doesn't need real API key
-    timeout: 30000, // 30s timeout
+    timeout: API_TIMEOUTS.ollama,
   });
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Ollama (${model}) em ${baseUrl}...`);
@@ -178,23 +185,26 @@ IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
 
   logger.debug("[DEBUG] Criando stream com Ollama...");
-  
-  const stream = await openai.chat.completions.create({
-    model,
-    messages: [
-      { role: "system", content: systemMessage },
-      { role: "user", content: linuxAdminPrompt(task) }
-    ],
-    stream: true,
-    temperature: 0,
-  });
+
+  const stream = await withRetry(
+    () => openai.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: linuxAdminPrompt(task) }
+      ],
+      stream: true,
+      temperature: 0,
+    }),
+    { provider: "ollama" }
+  );
 
   logger.debug("[DEBUG] Stream criado, iniciando parse...");
 
   // Use unified streaming parser
   const { parseStreamingJSON, iterateOpenAIStream } = await import("./streaming-parser");
   yield* parseStreamingJSON(iterateOpenAIStream(stream), "ollama");
-  
+
   logger.debug("[DEBUG] Parse concluído!");
 }
 
@@ -204,14 +214,17 @@ async function* getLinuxCommandsFromGemini(
   model: string
 ): LinuxCommandGenerator {
   const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
-  
+
   if (!apiKey) {
     throw new Error("GOOGLE_API_KEY ou GEMINI_API_KEY não configurada. Configure no /etc/fazai/fazai.conf");
   }
 
   const { GoogleGenerativeAI } = await import("@google/generative-ai");
   const genAI = new GoogleGenerativeAI(apiKey);
-  const geminiModel = genAI.getGenerativeModel({ model });
+  const geminiModel = genAI.getGenerativeModel({
+    model,
+    // Google SDK doesn't support timeout config directly, handled by withRetry
+  });
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Gemini (${model})...`);
 
@@ -224,7 +237,10 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
 
   const prompt = `${systemMessage}\n\n${linuxAdminPrompt(task)}`;
 
-  const result = await geminiModel.generateContentStream(prompt);
+  const result = await withRetry(
+    () => geminiModel.generateContentStream(prompt),
+    { provider: "google" }
+  );
 
   // Use unified streaming parser
   const { parseStreamingJSON, iterateGoogleStream } = await import("./streaming-parser");

@@ -92,13 +92,30 @@ export class ResearchCoordinator {
   private async performResearch(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {
     this.refreshClient();
 
-    const context7 = await this.tryContext7(query, reason, trigger);
+    // Run both Context7 and Web search in parallel for faster results
+    const [context7Result, webResult] = await Promise.allSettled([
+      this.tryContext7(query, reason, trigger),
+      this.tryWebSearch(query, reason, trigger),
+    ]);
+
+    // Extract successful results
+    const context7 = context7Result.status === "fulfilled" ? context7Result.value : null;
+    const web = webResult.status === "fulfilled" ? webResult.value : null;
+
+    // Log any errors (non-blocking)
+    if (context7Result.status === "rejected") {
+      logger.debug(`Context7 search error: ${context7Result.reason}`);
+    }
+    if (webResult.status === "rejected") {
+      logger.debug(`Web search error: ${webResult.reason}`);
+    }
+
+    // Prefer Context7 if available (higher quality), fallback to web
     if (context7) {
       this.logResearch(context7);
       return context7;
     }
 
-    const web = await this.tryWebSearch(query, reason, trigger);
     if (web) {
       this.logResearch(web);
       return web;
