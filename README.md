@@ -236,6 +236,21 @@ fazai import --source claude.db --min-messages 5 --before 2024-01-01
 - ✅ Melhora respostas contextuais futuras
 - ✅ Preserva histórico operacional
 
+### Importação de Personalidade
+
+Para extrair e importar traços de personalidade de conversas Claude Desktop:
+
+```bash
+# Importar personalidade do conversations.json
+npx tsx scripts/import-personality.ts ./conversations.json
+```
+
+O script:
+- ✅ Analisa padrões de comunicação e expertise técnica
+- ✅ Gera embeddings REAIS via Ollama (nomic-embed-text)
+- ✅ Popula `fazai_personality` com traços categorizados
+- ✅ Detecta: expertise (linux, docker, security), estilos (metódico, prático), abordagens (sequencial, flexível)
+
 ### Sistema de Aliases Global (fzalias)
 
 O FazAI inclui o **fzalias**, um gerenciador de aliases global para todos os usuários:

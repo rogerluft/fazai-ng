@@ -328,11 +328,12 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
   // Try Ollama first (local, free)
   const ollamaBaseUrl =
     getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
+  const preferredOllamaModel = "mxbai-embed-large";
 
   try {
     logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
 
-    // Quick health check
+    // Check Ollama availability AND model presence
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 5000);
 
@@ -343,8 +344,32 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
     clearTimeout(timeoutId);
 
     if (response && response.ok) {
-      logger.info("✓ Using Ollama for embeddings (mxbai-embed-large, 1024 dim)");
-      return new OllamaEmbeddingService(ollamaBaseUrl, "mxbai-embed-large", 1024);
+      const data = await response.json();
+      const models = data.models || [];
+      const modelNames = models.map((m: any) => m.name?.split(':')[0] || m.name);
+
+      // Check if preferred embedding model is available
+      const hasPreferredModel = modelNames.some((name: string) =>
+        name === preferredOllamaModel || name.startsWith(preferredOllamaModel)
+      );
+
+      if (hasPreferredModel) {
+        logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1024 dim)`);
+        return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 1024);
+      }
+
+      // Try alternative embedding model: nomic-embed-text (768 dim)
+      const alternativeModel = "nomic-embed-text";
+      const hasAlternativeModel = modelNames.some((name: string) =>
+        name === alternativeModel || name.startsWith(alternativeModel)
+      );
+
+      if (hasAlternativeModel) {
+        logger.info(`✓ Using Ollama for embeddings (${alternativeModel}, 768 dim)`);
+        return new OllamaEmbeddingService(ollamaBaseUrl, alternativeModel, 768);
+      }
+
+      logger.debug(`Ollama available but no embedding models found. Available: ${modelNames.join(', ')}`);
     }
   } catch (error: any) {
     logger.debug(`Ollama not available: ${error.message}`);

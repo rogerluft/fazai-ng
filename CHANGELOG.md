@@ -1,5 +1,34 @@
 # FazAI Changelog
 
+## [3.4.1-beta] - 2025-12-04
+
+### Added
+- **Personality Import Script** (`scripts/import-personality.ts`)
+  - Extrai traços de personalidade de conversas Claude Desktop (`conversations.json`)
+  - Gera embeddings REAIS usando Ollama local (não mais vetores zero)
+  - Popula collection `fazai_personality` com metadados estruturados
+  - Detecta expertise técnica (linux, networking, docker, security, monitoring)
+  - Identifica estilos de comunicação (metódico, prático, técnico)
+  - Extrai abordagens de resolução de problemas (sequencial, flexível)
+  - Uso: `npx tsx scripts/import-personality.ts ./conversations.json`
+
+### Changed
+- **Embeddings Service** (`src/services/embeddings.ts`)
+  - Smart Ollama model detection: verifica se modelo existe antes de usar
+  - Fallback automático: `mxbai-embed-large` (1024 dim) → `nomic-embed-text` (768 dim) → OpenAI
+  - Evita erros silenciosos quando modelo preferido não está disponível
+  - Log informativo mostrando qual modelo e dimensão estão sendo usados
+
+### Fixed
+- **Dimension Mismatch**: Corrigido problema onde serviço de embeddings selecionava Ollama
+  mesmo sem o modelo `mxbai-embed-large`, causando erros de dimensão no Qdrant
+- **Zero Vectors**: Personality data agora usa embeddings reais em vez de `Array(1536).fill(0)`
+
+### Technical
+- Collection `fazai_personality` recriada com 768 dimensões (nomic-embed-text)
+- 13 traços de personalidade importados de 113 conversas históricas
+- Embeddings gerados via Ollama local (sem dependência de OpenAI)
+
 ## [3.4.0-beta] - 2025-11-29
 
 ### Added
