@@ -36,8 +36,22 @@ function isProviderAvailable(provider: Provider): boolean {
   }
 }
 
-// Get default model for a provider
+// Get default model for a provider (reads from config if available)
 function getDefaultModel(provider: Provider): string {
+  // Try to get from environment/config first
+  const configModels: Record<string, string | undefined> = {
+    ollama: process.env.MODELS_OLLAMA?.split(",")[0],
+    openrouter: process.env.MODELS_OPENROUTER?.split(",")[0],
+    anthropic: process.env.MODELS_ANTHROPIC?.split(",")[0],
+    openai: process.env.MODELS_OPENAI?.split(",")[0],
+    google: process.env.MODELS_GOOGLE?.split(",")[0],
+  };
+
+  if (configModels[provider]) {
+    return configModels[provider]!;
+  }
+
+  // Fallback defaults
   switch (provider) {
     case "ollama":
       return "llama3.2:latest";
@@ -53,6 +67,7 @@ function getDefaultModel(provider: Provider): string {
       return "";
   }
 }
+
 
 // Check if error is recoverable (should try fallback)
 function isRecoverableError(error: any): boolean {
