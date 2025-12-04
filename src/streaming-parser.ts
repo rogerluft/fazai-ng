@@ -39,7 +39,7 @@ export async function* parseStreamingJSON(
   sourceType: StreamSourceType = "openai"
 ): AsyncGenerator<StreamResult> {
   // Create Node.js streams for oboe
-  const tokenStream = new Readable({ read() {} });
+  const tokenStream = new Readable({ read() { } });
   const jsonStream = new Transform({
     transform(chunk: Buffer, _encoding, callback) {
       this.push(chunk);
@@ -134,14 +134,30 @@ export async function* parseStreamingJSON(
         case "ollama":
         default:
           // OpenAI/Ollama/OpenRouter may have markdown or text prefix
+          // Clean markdown code blocks that wrap JSON (e.g., ```json\n{...}\n```)
+          let cleanedChunk = chunk;
+
+          // Strip opening markdown code blocks
+          if (!jsonStarted && cleanedChunk.includes("```")) {
+            // Remove ```json or ``` prefix
+            cleanedChunk = cleanedChunk.replace(/```(?:json|JSON)?\s*\n?/g, "");
+          }
+
+          // Strip closing markdown code blocks
+          if (cleanedChunk.includes("```")) {
+            cleanedChunk = cleanedChunk.replace(/\n?```\s*$/g, "");
+          }
+
           if (!jsonStarted) {
-            const jsonStart = chunk.search(/[{[]/);
+            const jsonStart = cleanedChunk.search(/[{[]/);
             if (jsonStart !== -1) {
               jsonStarted = true;
-              tokenStream.push(Buffer.from(chunk.substring(jsonStart), "utf-8"));
+              tokenStream.push(Buffer.from(cleanedChunk.substring(jsonStart), "utf-8"));
             }
           } else {
-            tokenStream.push(Buffer.from(chunk, "utf-8"));
+            // Also clean any stray closing backticks in subsequent chunks
+            cleanedChunk = cleanedChunk.replace(/```\s*$/g, "");
+            tokenStream.push(Buffer.from(cleanedChunk, "utf-8"));
           }
           break;
       }
@@ -211,11 +227,11 @@ export async function* iterateAnthropicStream(stream: AsyncIterable<any>): Async
 export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIterable<string> {
   logger.debug("[DEBUG] iterateOpenAIStream: Starting stream iteration");
   let chunkCount = 0;
-  
+
   for await (const chunk of stream) {
     chunkCount++;
     logger.debug(`[DEBUG] Chunk #${chunkCount} received:`, JSON.stringify(chunk).substring(0, 200));
-    
+
     // Handle OpenAI-style streaming (choices array with delta)
     const delta = chunk.choices?.[0]?.delta;
     if (delta) {
@@ -227,7 +243,7 @@ export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIte
       }
       continue;
     }
-    
+
     // Handle Ollama-style streaming (direct response/thinking fields)
     // Ollama returns NDJSON with "response" or "thinking" fields
     const ollamaContent = chunk.response || chunk.thinking;
@@ -236,7 +252,7 @@ export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIte
       yield ollamaContent;
     }
   }
-  
+
   logger.debug(`[DEBUG] Stream iteration complete. Total chunks: ${chunkCount}`);
 }
 
