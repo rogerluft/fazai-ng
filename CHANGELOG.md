@@ -1,6 +1,36 @@
 # FazAI Changelog
 
+## [3.4.2-beta] - 2025-12-04
+
+### Added
+- **Intelligent Provider Fallback System**
+  - Auto-fallback chain: ollama → openrouter → anthropic → openai → google
+  - Detects recoverable errors: memory, rate limits, timeouts, connection refused
+  - Only uses providers with configured API keys
+  - Shows user-friendly messages: "⚠️ ollama falhou... 🔄 Tentando fallback: openrouter"
+
+- **Native Ollama API with JSON Mode**
+  - Uses `/api/generate` endpoint with `format: "json"` parameter
+  - Guaranteed clean JSON output from ALL Ollama models
+  - No more markdown backtick parsing failures
+  - Non-streaming mode for reliability (streaming can be re-enabled later)
+
+### Changed
+- **Config-Driven Model Selection**
+  - `getDefaultModel()` now reads from `MODELS_*` in fazai.conf
+  - First model in list = default for that provider
+  - Example: `MODELS_OLLAMA=qwen3:8b,llama3.2:latest` → qwen3:8b is default
+
+- **Streaming Parser Improvements**
+  - Added markdown backtick stripping (`\`\`\`json` wrappers)
+  - Handles models that wrap JSON in code blocks
+
+### Fixed
+- Default Ollama model now respects config order (was hardcoded llama3.2)
+- fazai.conf.example updated with working model order (qwen3:8b first)
+
 ## [3.4.1-beta] - 2025-12-04
+
 
 ### Added
 - **Personality Import Script** (`scripts/import-personality.ts`)
