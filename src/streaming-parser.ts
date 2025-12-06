@@ -1,7 +1,7 @@
 /**
  * Unified JSON Streaming Parser using oboe
  * Professional implementation for parsing streaming JSON from AI providers
- * Author: Roger Luft (Roginho)
+ * Author: Roger Luft
  * License: MIT
  */
 
