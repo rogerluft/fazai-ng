@@ -5,6 +5,7 @@ import { Readable } from "stream";
 import { models } from "./models";
 import { withRetry } from "./utils/retry";
 import { API_TIMEOUTS } from "./config/timeouts";
+import { perplexityProvider } from "./providers/perplexity-provider";
 
 export async function* askAI(
   fileContent: string,
@@ -122,6 +123,16 @@ export async function* askAI(
 
     for await (const chunk of stream) {
       yield chunk.choices[0]?.delta?.content || "";
+    }
+  } else if (provider === "perplexity") {
+    const systemMessage = isGeneralQuestion
+      ? "You are a helpful and knowledgeable AI assistant. Answer questions clearly and concisely."
+      : `CODE:\n${fileContent}\n`;
+
+    const stream = perplexityProvider(prompt, model, systemMessage);
+
+    for await (const chunk of stream) {
+      yield chunk;
     }
   }
 }

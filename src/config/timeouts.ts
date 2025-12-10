@@ -48,6 +48,11 @@ export const API_TIMEOUTS = {
   google: 90000, // 90 seconds
 
   /**
+   * Perplexity API
+   */
+  perplexity: 90000, // 90 seconds
+
+  /**
    * Qdrant vector database
    * Lower timeout as it's local/fast network
    */

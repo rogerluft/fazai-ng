@@ -3,7 +3,13 @@ import { logger } from "./logger";
 
 export interface Model {
   name: string;
-  provider: "anthropic" | "openai" | "openrouter" | "ollama" | "google";
+  provider:
+    | "anthropic"
+    | "openai"
+    | "openrouter"
+    | "ollama"
+    | "google"
+    | "perplexity";
   nickName: string;
   description?: string;
 }
@@ -34,6 +40,7 @@ function loadModelsFromConfig(): Model[] {
       { key: "MODELS_OPENAI", provider: "openai", limit: 3 },
       { key: "MODELS_ANTHROPIC", provider: "anthropic", limit: 3 },
       { key: "MODELS_GOOGLE", provider: "google", limit: 3 },
+      { key: "MODELS_PERPLEXITY", provider: "perplexity", limit: 3 },
     ];
 
     for (const { key, provider, limit } of providers) {
@@ -75,6 +82,12 @@ function loadModelsFromConfig(): Model[] {
             nickName = modelName.includes("haiku") ? "haiku" : "sonnet";
           } else if (modelName.includes("gpt-4o")) {
             nickName = modelName.includes("mini") ? "gpt4mini" : "gpt4o";
+          } else if (modelName.includes("llama-3-sonar-large")) {
+            nickName = "sonar-pro";
+          } else if (modelName.includes("llama-3-sonar-small")) {
+            nickName = "sonar";
+          } else if (modelName.includes("sonar-reasoning")) {
+            nickName = "sonar-reasoning";
           }
 
           models.push({
@@ -200,6 +213,19 @@ function getBuiltInModels(): Model[] {
       provider: "anthropic",
       nickName: "haiku",
       description: "Claude 3 Haiku (fast)",
+    },
+    // Perplexity (optional, max 3)
+    {
+      name: "llama-3-sonar-small-32k-online",
+      provider: "perplexity",
+      nickName: "sonar",
+      description: "Perplexity Sonar Small",
+    },
+    {
+      name: "llama-3-sonar-large-32k-online",
+      provider: "perplexity",
+      nickName: "sonar-pro",
+      description: "Perplexity Sonar Large",
     },
   ];
 }

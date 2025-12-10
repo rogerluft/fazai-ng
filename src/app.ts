@@ -76,6 +76,11 @@ Available Models:
     gptoss-20b  - GPT-OSS 20B (local no servidor)
     llama32     - Llama 3.2
     mistral     - Mistral
+
+  Perplexity (requer API key):
+    sonar       - Perplexity Sonar Small
+    sonar-pro   - Perplexity Sonar Large
+    sonar-reasoning - Perplexity Sonar Reasoning
 `;
 
   const helpText = `

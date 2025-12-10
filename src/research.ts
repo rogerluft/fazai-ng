@@ -4,6 +4,7 @@ import { Context7Result } from "./mcp/context7";
 import { getConfigValue } from "./config";
 import { LinuxCommand } from "./types-linux";
 import { logger } from "./logger";
+import { askAI } from "./askAI";
 
 export interface ResearchFinding {
   title: string;
@@ -92,17 +93,19 @@ export class ResearchCoordinator {
   private async performResearch(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {
     this.refreshClient();
 
-    // Run both Context7 and Web search in parallel for faster results
-    const [context7Result, webResult] = await Promise.allSettled([
+    const [perplexityResult, context7Result, webResult] = await Promise.allSettled([
+      this.tryPerplexity(query, reason, trigger),
       this.tryContext7(query, reason, trigger),
       this.tryWebSearch(query, reason, trigger),
     ]);
 
-    // Extract successful results
+    const perplexity = perplexityResult.status === "fulfilled" ? perplexityResult.value : null;
     const context7 = context7Result.status === "fulfilled" ? context7Result.value : null;
     const web = webResult.status === "fulfilled" ? webResult.value : null;
 
-    // Log any errors (non-blocking)
+    if (perplexityResult.status === "rejected") {
+      logger.debug(`Perplexity search error: ${perplexityResult.reason}`);
+    }
     if (context7Result.status === "rejected") {
       logger.debug(`Context7 search error: ${context7Result.reason}`);
     }
@@ -110,7 +113,11 @@ export class ResearchCoordinator {
       logger.debug(`Web search error: ${webResult.reason}`);
     }
 
-    // Prefer Context7 if available (higher quality), fallback to web
+    if (perplexity) {
+      this.logResearch(perplexity);
+      return perplexity;
+    }
+
     if (context7) {
       this.logResearch(context7);
       return context7;
@@ -123,6 +130,34 @@ export class ResearchCoordinator {
 
     logger.info(chalk.gray(`\n🤷  Nenhum resultado de pesquisa encontrado para "${query}" (${reason}).`));
     return null;
+  }
+
+  private async tryPerplexity(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {
+    const provider = "perplexity";
+    const model = "llama-3-sonar-large-32k-online";
+
+    try {
+      const stream = askAI("", query, model, provider, true);
+      let summary = "";
+      for await (const chunk of stream) {
+        summary += chunk;
+      }
+
+      if (!summary.trim()) {
+        return null;
+      }
+
+      return {
+        provider,
+        query,
+        reason: this.decorateReason(reason, trigger, provider),
+        findings: [],
+        summary: summary.trim(),
+      };
+    } catch (error) {
+      logger.debug(`Perplexity API error: ${error}`);
+      return null;
+    }
   }
 
   private async tryContext7(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {

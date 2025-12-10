@@ -598,6 +598,20 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx
 ```bash
 # MODELS_GOOGLE=gemini-2.0-flash-exp,gemini-1.5-pro
 # GEMINI_API_KEY=xxxxx (opcional, use OpenRouter para free tier)
+
+### Perplexity (Cloud)
+```bash
+# MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
+# PERPLEXITY_API_KEY=pplx-xxxxx
+```
+| Nickname    | Modelo                             | Velocidade | Custo | Quando Usar                   |
+|-------------|------------------------------------|------------|-------|-------------------------------|
+| `sonar`     | llama-3-sonar-small-32k-online     | Muito Rápido | Baixo | Tarefas rápidas com pesquisa   |
+| `sonar-pro` | llama-3-sonar-large-32k-online     | Rápido     | Médio | Tarefas complexas com pesquisa|
+| `sonar-reasoning` | llama-3-sonar-large-32k-reasoning | Rápido     | Médio | Tarefas com raciocínio        |
+| `sonar-reasoning` | llama-3-sonar-large-32k-reasoning | Rápido     | Médio | Tarefas com raciocínio        |
+
+**API Key**: https://www.perplexity.ai/settings/api
 ```
 
 ### Como Configurar Modelos
@@ -701,6 +715,13 @@ fazai
 3. Cole no `fazai.conf`: `OPENAI_API_KEY=sk-xxxxx`
 
 **Modelos:** GPT-4o, GPT-4 Turbo, GPT-4 Mini
+
+#### Perplexity
+1. Acesse [perplexity.ai/settings/api](https://www.perplexity.ai/settings/api)
+2. Crie uma conta e gere uma API key
+3. Cole no `fazai.conf`: `PERPLEXITY_API_KEY=pplx-xxxxx`
+
+**Modelos:** Sonar (pesquisa), Sonar Pro (pesquisa avançada), Sonar Reasoning (raciocínio)
 
 #### Ollama (Local/Gratuito)
 1. Instale Ollama: [ollama.com](https://ollama.com)

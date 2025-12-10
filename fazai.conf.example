@@ -49,6 +49,11 @@ OPENROUTER_API_KEY=your_openrouter_key_here
 # MODELS_GOOGLE=gemini-2.0-flash-exp,gemini-1.5-pro
 # GEMINI_API_KEY=your_gemini_api_key
 
+# Perplexity models (cloud, max 3, requires API key)
+# Get API key: https://www.perplexity.ai/settings/api
+MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online,llama-3-sonar-large-32k-reasoning
+PERPLEXITY_API_KEY=your_perplexity_api_key
+
 # =============================================================================
 # CLOUDFLARE GEMINI INTEGRATION
 # =============================================================================
