@@ -33,7 +33,7 @@ Git history favours short, imperative subjects (`Add safety prompt parser`, `ver
 
 ### 2. Configuration Hierarchy
 - **System-wide**: `/etc/fazai/fazai.conf` (root installs)
-- **User-local**: `~/.config/fazai/fazai.conf` (normal users)
+- **User-local**: `~/.config/fazai/fazai.conf` (normal users) # REMOVER DEIXAR APENAS GLOBAL E /OPT/FAZAI
 - **Template**: `fazai.conf.example` (git-tracked, no secrets)
 - **Priority**: User config overrides system config
 
@@ -99,3 +99,7 @@ When adding **any** new feature:
 ---
 
 **Remember: These protocols exist because we were persistent, didn't use placeholders, and earned respect through consistency. Keep it that way.**
+
+## YOU NEED DO UNDERSTAND AND ADAPT/ TRANSLATING TO PORTUGUESE BRAZIL.
+
+## FOLLOW CHANGES IN TODO.md THEN APPLY CHANGES IN ALL DOCUMENTATION FILES INCLUDING AGENTS.md    

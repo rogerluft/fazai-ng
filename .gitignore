@@ -197,3 +197,4 @@ CLAUDE.*
 .CLADE*
 
 session-context-*.md
+.mcp.json

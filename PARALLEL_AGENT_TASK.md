@@ -1,3 +1,6 @@
+
+## CORECOES NO ARQUIVO TODO.MD EM SEGUIDA AJUSTAR AQUI E NO CHANGE LOG #
+
 # TAREFA PARA AGENTE PARALELO - Terminal FazAI v3.1-beta
 
 **ATENÇÃO:** Esta tarefa deve ser executada SEM placeholders, mocks ou simulações. Apenas código real e funcional.
