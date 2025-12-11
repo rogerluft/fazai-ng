@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.3-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.5.0-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 

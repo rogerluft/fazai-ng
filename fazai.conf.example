@@ -1,58 +1,139 @@
+# ============================================================================
 # FazAI Configuration File
-# Copy this file to /etc/fazai/fazai.conf (system-wide) or ~/.config/fazai/fazai.conf (user)
-# System config takes precedence, then user config
+# ============================================================================
+#
+# LOCATION: /etc/fazai/fazai.conf (ONLY)
+#
+# IMPORTANT: Previous versions (< v3.5) supported ~/.config/fazai/fazai.conf
+#            This is NO LONGER SUPPORTED to prevent config conflicts.
+#            All configuration MUST be in /etc/fazai/fazai.conf
+#
+# INSTALLATION:
+#   sudo cp fazai.conf.example /etc/fazai/fazai.conf
+#   sudo nano /etc/fazai/fazai.conf  # Edit with your API keys
+#   sudo chmod 644 /etc/fazai/fazai.conf
+#
+# PERMISSIONS:
+#   Owner: root:root (or your user for development)
+#   Permissions: 644 (readable by all, writable by owner)
+#
+# MIGRATION FROM OLD VERSION:
+#   If you have ~/.config/fazai/fazai.conf, move it:
+#   sudo cp ~/.config/fazai/fazai.conf /etc/fazai/fazai.conf
+#   rm -rf ~/.config/fazai/
+#
+# ============================================================================
 
 # =============================================================================
-# MODEL CONFIGURATION (Config-Driven, Max 3 Per Provider)
+# MODEL CONFIGURATION (Config-Driven Architecture)
 # =============================================================================
 #
-# Models are now loaded from this config file!
-# Each provider can have UP TO 3 MODELS (comma-separated, no spaces around commas)
+# IMPORTANT RULES:
+# 1. Use EXACT model names (no nicknames, no aliases)
+# 2. Order matters: First model in list = default for that provider
+# 3. Maximum 3 models per provider (organization constraint)
+# 4. Models are loaded in the order you specify
 #
 # Format: MODELS_PROVIDER=model1,model2,model3
 #
-# OLLAMA: Local models running on OLLAMA_BASE_URL
-# OPENROUTER: Via OpenRouter API (200+ models, free tier available)
-# OPENAI: OpenAI's GPT models
-# ANTHROPIC: Anthropic's Claude models
-# GOOGLE: Google's Gemini models (native API, requires GEMINI_API_KEY)
+# WHY NO NICKNAMES?
+# - Eliminates ambiguity (one model = one name)
+# - Easier to debug (name in config = name in logs)
+# - Follows provider documentation exactly
+# - Simplifies maintenance and updates
 #
-# Examples:
-#   MODELS_OLLAMA=qwen3:8b,llama3.2:latest,llama3.1:latest
-#   MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b,google/gemini-2.0-flash-exp:free
-#   MODELS_OPENAI=gpt-4o,gpt-4o-mini
-#   MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# OLLAMA (Local Models - Recommended for Privacy & Speed)
+# -----------------------------------------------------------------------------
+# These models run locally on your OLLAMA_BASE_URL instance
+# Recommended: 1 small model (fast) + 1 medium model (capable)
 #
+# Popular choices:
+#   - tinyllama:1b      → Ultra-fast, minimal resources (1GB VRAM)
+#   - qwen2.5:7b        → Best balance (8GB VRAM)
+#   - llama3.2:latest   → Meta's latest (8GB VRAM)
+#
+# MODELS_OLLAMA=tinyllama:1b,qwen2.5:7b
+MODELS_OLLAMA=qwen2.5:7b,tinyllama:1b
 
-# Ollama models (local, max 3)
-# These must be available on your OLLAMA_BASE_URL instance
-MODELS_OLLAMA=qwen3:8b,llama3.2:latest,llama3.1:latest
-
-# OpenRouter models (cloud, max 3)
-# Free tier: qwen/qwen3-coder:free
+# -----------------------------------------------------------------------------
+# OPENROUTER (Cloud Models - Free Tier Available)
+# -----------------------------------------------------------------------------
+# Access 200+ models through one API key
+# Free models include: qwen/qwen3-coder:free, google/gemini-2.0-flash-exp:free
+#
 # Get API key: https://openrouter.ai/keys
-MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b,google/gemini-2.0-flash-exp:free
-OPENROUTER_API_KEY=your_openrouter_key_here
+#
+# Popular free choices:
+#   - qwen/qwen3-coder:free           → Excellent for coding (FREE)
+#   - google/gemini-2.0-flash-exp:free → Fast general purpose (FREE)
+#   - meta-llama/llama-3.3-70b         → Powerful reasoning (paid)
+#
+MODELS_OPENROUTER=qwen/qwen3-coder:free,google/gemini-2.0-flash-exp:free
+# OPENROUTER_API_KEY=sk-or-v1-xxxxx
 
-# OpenAI models (cloud, max 3, requires API key)
-# Get API key: https://platform.openai.com/api-keys
-# MODELS_OPENAI=gpt-4o,gpt-4o-mini
-# OPENAI_API_KEY=your_openai_api_key
-
-# Anthropic Claude models (cloud, max 3, requires API key)
-# Get API key: https://console.anthropic.com/
-# MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
-# ANTHROPIC_API_KEY=your_anthropic_api_key
-
-# Google Gemini models (cloud, max 3, requires API key)
-# Get API key: https://makersuite.google.com/app/apikey
-# MODELS_GOOGLE=gemini-2.0-flash-exp,gemini-1.5-pro
-# GEMINI_API_KEY=your_gemini_api_key
-
-# Perplexity models (cloud, max 3, requires API key)
+# -----------------------------------------------------------------------------
+# PERPLEXITY (Search-Enabled AI - Online Research)
+# -----------------------------------------------------------------------------
+# Sonar models combine real-time web search with LLM reasoning
+# Perfect for: troubleshooting, research, up-to-date information
+#
 # Get API key: https://www.perplexity.ai/settings/api
-MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online,llama-3-sonar-large-32k-reasoning
-PERPLEXITY_API_KEY=your_perplexity_api_key
+#
+# Available models:
+#   - llama-3-sonar-small-32k-online  → Fast, cost-effective (DEFAULT)
+#   - llama-3-sonar-large-32k-online  → Higher quality reasoning
+#   - llama-3-sonar-large-32k-reasoning → Advanced reasoning
+#
+MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
+# PERPLEXITY_API_KEY=pplx-xxxxx
+
+# -----------------------------------------------------------------------------
+# GOOGLE GEMINI (Google's AI Models)
+# -----------------------------------------------------------------------------
+# Native Google Gemini API (not via OpenRouter)
+# Free tier: 15 requests/min, 1500 requests/day
+#
+# Get API key: https://makersuite.google.com/app/apikey
+#
+# Available models:
+#   - gemini-2.5-flash      → Fast & balanced (DEFAULT)
+#   - gemini-2.5-pro        → Deep reasoning (slower)
+#   - gemini-2.5-flash-lite → Quick tasks (fastest)
+#
+# MODELS_GOOGLE=gemini-2.5-flash,gemini-2.5-pro
+# GEMINI_API_KEY=AIzaSyxxxxx
+
+# -----------------------------------------------------------------------------
+# OPENAI (GPT Models - Optional, Requires API Key)
+# -----------------------------------------------------------------------------
+# OpenAI's GPT models (commercial service)
+#
+# Get API key: https://platform.openai.com/api-keys
+#
+# Available models:
+#   - gpt-4o-mini → Fast & cheap (best value)
+#   - gpt-4o      → Most capable (expensive)
+#   - gpt-4-turbo → Previous generation
+#
+# MODELS_OPENAI=gpt-4o-mini,gpt-4o
+# OPENAI_API_KEY=sk-xxxxx
+
+# -----------------------------------------------------------------------------
+# ANTHROPIC CLAUDE (Optional, Requires API Key)
+# -----------------------------------------------------------------------------
+# Anthropic's Claude models (commercial service)
+#
+# Get API key: https://console.anthropic.com/
+#
+# Available models:
+#   - claude-3-5-sonnet-latest  → Most capable (expensive)
+#   - claude-3-haiku-20240307   → Fast & efficient (cheaper)
+#
+# MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+# ANTHROPIC_API_KEY=sk-ant-xxxxx
 
 # =============================================================================
 # CLOUDFLARE GEMINI INTEGRATION

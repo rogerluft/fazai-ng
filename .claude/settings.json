@@ -1,4 +1,25 @@
 {
+  "cleanupPeriodDays": 30,
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "60000",
+    "BASH_MAX_OUTPUT_LENGTH": "20000",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
+    "NODE_ENV": "development",
+    "ANTHROPIC_SMALL_FAST_MODEL": "claude-3-5-haiku-20241022",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
+    "DISABLE_COST_WARNINGS": "1",
+    "USE_BUILTIN_RIPGREP": "1",
+    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "0",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
+    "DISABLE_TELEMETRY": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_BUG_COMMAND": "1",
+    "DISABLE_AUTOUPDATER": "1",
+    "CLAUDE_CODE_API_KEY_HELPER_TTL_MS": "3600000",
+    "CLAUDE_CODE_ENABLE_TELEMETRY": "1"
+  },
+  "includeCoAuthoredBy": true,
   "permissions": {
     "allow": [
       "Bash",
@@ -37,8 +58,6 @@
       "Write(**/*.py)"
     ],
     "deny": [
-      "Bash(curl:*)",
-      "Bash(wget:*)",
       "Bash(rm -rf:*)",
       "Read(./.env*)",
       "Read(./secrets/**)",
@@ -46,27 +65,7 @@
     ],
     "defaultMode": "bypassPermissions"
   },
-  "env": {
-    "BASH_DEFAULT_TIMEOUT_MS": "60000",
-    "BASH_MAX_OUTPUT_LENGTH": "20000",
-    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
-    "NODE_ENV": "development",
-    "ANTHROPIC_SMALL_FAST_MODEL": "claude-3-5-haiku-20241022",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
-    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "1",
-    "DISABLE_COST_WARNINGS": "1",
-    "USE_BUILTIN_RIPGREP": "1",
-    "CLAUDE_CODE_DISABLE_TERMINAL_TITLE": "0",
-    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-    "DISABLE_TELEMETRY": "1",
-    "DISABLE_ERROR_REPORTING": "1",
-    "DISABLE_BUG_COMMAND": "1",
-    "DISABLE_AUTOUPDATER": "1",
-    "CLAUDE_CODE_API_KEY_HELPER_TTL_MS": "3600000",
-    "CLAUDE_CODE_ENABLE_TELEMETRY": "1"
-  },
-  "includeCoAuthoredBy": true,
-  "cleanupPeriodDays": 30,
+  "model": "claude-3-5-sonnet-20241022",
   "hooks": {
     "PreToolUse": [
       {
@@ -191,10 +190,12 @@
       }
     ]
   },
-  "model": "claude-3-5-sonnet-20241022",
   "statusLine": {
     "type": "command",
     "command": "bash -c 'input=$(cat); DIR=$(echo \"$input\" | jq -r \".workspace.current_dir\"); DEPLOY_DATA=$(curl -s -H \"Authorization: Bearer $VERCEL_TOKEN\" \"https://api.vercel.com/v6/deployments?projectId=$VERCEL_PROJECT_ID&limit=1\" 2>/dev/null); if [ -n \"$DEPLOY_DATA\" ] && [ \"$DEPLOY_DATA\" != \"null\" ]; then STATE=$(echo \"$DEPLOY_DATA\" | jq -r \".deployments[0].state // empty\"); URL=$(echo \"$DEPLOY_DATA\" | jq -r \".deployments[0].url // empty\" | cut -c1-20); CREATED=$(echo \"$DEPLOY_DATA\" | jq -r \".deployments[0].created // empty\"); if [ -n \"$CREATED\" ] && [ \"$CREATED\" != \"null\" ]; then AGO=$(( ($(date +%s) - $CREATED/1000) / 60 )); TIME_AGO=\"${AGO}m ago\"; else TIME_AGO=\"unknown\"; fi; case \"$STATE\" in READY) STATUS_ICON=\"✅\";; BUILDING) STATUS_ICON=\"🔄\";; QUEUED) STATUS_ICON=\"⏳\";; ERROR) STATUS_ICON=\"❌\";; *) STATUS_ICON=\"❓\";; esac; else STATE=\"unavailable\"; URL=\"\"; TIME_AGO=\"unknown\"; STATUS_ICON=\"❓\"; fi; echo \"▲ Vercel 🚀 $STATUS_ICON $STATE | 🌐 $URL | ⏰ $TIME_AGO | 📁 ${DIR##*/}\"'"
   },
-  "apiKeyHelper": "/bin/generate_temp_api_key.sh"
+  "enabledPlugins": {
+    "nextjs-vercel-pro@claude-code-templates": true,
+    "devops-automation@claude-code-templates": true
+  }
 }

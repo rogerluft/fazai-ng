@@ -1,3 +1,7 @@
+
+
+ ### ALTERACOES A FAZER n ONFORME ARQUIVO TODO.md e EM SEGUIDA CORRIGIR AQUI ####
+
 # Terminal FazAI: Administrador Linux Senior + Redes com Genkit + RAG
 
 ## 🖥️ Terminal FazAI - Agente Autônomo para Infraestrutura

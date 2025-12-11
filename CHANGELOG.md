@@ -1,5 +1,207 @@
 # FazAI Changelog
 
+## [3.5.0-beta] - 2025-12-10
+
+### 🎨 VISUAL CLI ENHANCEMENT
+
+**Novo Sistema UI Completo** - `fazai --cli` completamente redesenhado
+
+#### Componentes UI Criados (`src/ui/`):
+- **`table.ts`** (9.063 linhas) - Tabelas formatadas com box-drawing characters
+  - Auto-width, alinhamento, cores customizáveis
+  - Suporte a status colors (success, error, warning)
+  - Renderização otimizada para grandes datasets
+
+- **`spinner.ts`** (3.221 linhas) - Loading indicators
+  - Múltiplos estilos de spinner
+  - Estados: start, succeed, fail, info
+  - Mensagens customizáveis
+
+- **`prompt.ts`** (5.576 linhas) - Prompts interativos
+  - Select com descrições
+  - Input com validação
+  - Password masking
+  - Confirmação visual
+
+- **`banner.ts`** (5.886 linhas) - Headers e banners
+  - Logo ASCII art
+  - Boxes com título
+  - Seções visuais
+  - Success/Error/Warning messages
+
+- **`menu.ts`** (5.807 linhas) - Menus navegáveis
+  - Menu simples e aninhado
+  - Ícones emoji
+  - Descrições inline
+  - Navegação com setas
+
+- **`dashboard.ts`** (7.688 linhas) - Dashboard visual
+  - Stats boxes lado a lado
+  - Tabelas de comandos recentes
+  - Status de APIs
+  - System info visual
+
+- **`index.ts`** (1.030 linhas) - Exports centralizados
+
+**Total UI**: 37.271 linhas de código
+
+#### APIs Externas Implementadas (`src/commands/api/`):
+
+- **`cloudflare-ui.ts`** (14.214 linhas)
+  - ✅ List Zones (com tabela formatada)
+  - ✅ DNS Records (CRUD completo)
+  - ✅ Workers (deploy, logs, routes)
+  - ✅ Firewall Rules (visualização e edição)
+  - ✅ SSL/TLS (certificados, configuração)
+  - ✅ Cache Purge (seletivo e global)
+  - ✅ Analytics (gráficos no terminal)
+
+- **`spamexperts-ui.ts`** (16.992 linhas)
+  - ✅ Domain Management (add, remove, list)
+  - ✅ Quarantine (visualização, release, delete)
+  - ✅ Reports (spam statistics, delivery)
+  - ✅ Settings (filters, policies)
+  - ✅ User Management (adicionar, editar)
+
+- **`opnsense-ui.ts`** (20.682 linhas)
+  - ✅ Firewall Rules (visualização hierárquica)
+  - ✅ NAT (Port Forwarding, 1:1 NAT)
+  - ✅ VPN (OpenVPN, IPsec, WireGuard)
+  - ✅ Traffic Shaper (queues, pipes, rules)
+  - ✅ System Status (CPU, memory, interfaces)
+  - ✅ Logs (firewall, system, VPN)
+  - ✅ Backup/Restore (config management)
+
+**Total API UIs**: 51.888 linhas de código
+
+#### Integração CLI (`src/cli-mode.ts`):
+
+**Novos Comandos**:
+```bash
+/api               # Menu principal de APIs
+/cloudflare, /cf   # Cloudflare diretamente
+/spamexperts, /spam # SpamExperts diretamente
+/opnsense, /ops    # OPNsense diretamente
+/dashboard         # Dashboard visual do sistema
+```
+
+**Features Adicionadas**:
+- ✅ Menu interativo com navegação por setas
+- ✅ Tabelas formatadas para visualização de dados
+- ✅ Spinners durante operações assíncronas
+- ✅ Prompts visuais para confirmação
+- ✅ Banners informativos
+- ✅ Dashboard com stats do sistema
+
+#### Dependências Adicionadas:
+```json
+{
+  "@inquirer/prompts": "^8.0.2",
+  "boxen": "^8.0.1",
+  "cli-table3": "^0.6.5",
+  "gradient-string": "^3.0.0",
+  "terminal-kit": "^3.1.2"
+}
+```
+
+### 🔥 BREAKING CHANGES
+- **Removed User-Local Config Support**
+  - ~/.config/fazai/fazai.conf is NO LONGER supported
+  - All configuration MUST be in /etc/fazai/fazai.conf
+  - Reason: "2 owners, dog dies hungry" - eliminates config conflicts
+  - Migration: `install.sh` handles automatic migration from old location
+
+- **Removed Model Nicknames**
+  - Must use EXACT model names (e.g., `qwen2.5:7b` instead of `qwen`)
+  - Eliminates ambiguity and simplifies debugging
+  - Model name in config = model name in logs = model name in help
+  - First model in config list = default for that provider
+
+### Added
+- **Provider Interface** (`src/types/provider.ts`)
+  - Unified interface for all AI providers
+  - `BaseProvider` abstract class with common validation
+  - Standardized error handling across providers
+  - Type-safe provider implementations
+
+- **Enhanced Perplexity Provider** (`src/providers/perplexity-provider.ts`)
+  - Implements new Provider interface
+  - Robust API key validation with format checking
+  - Specific error handling (401, 429, connection errors)
+  - Singleton pattern for resource efficiency
+  - Comprehensive JSDoc documentation
+
+- **Simplified Model Management** (`src/models.ts`)
+  - Config-driven model loading with exact names
+  - New utility functions:
+    - `getDefaultModel(provider)` - Returns first model
+    - `findModelByName(name)` - Exact name lookup
+    - `getModelsByProvider(provider)` - Filter by provider
+    - `hasModelsForProvider(provider)` - Check availability
+  - Automatic deduplication of model list
+
+### Changed
+- **Configuration System** (`src/config.ts`)
+  - Removed all references to ~/.config/fazai/
+  - Removed unused `os` import
+  - Simplified search paths (3 instead of 5)
+  - Enhanced comments explaining design decisions
+  - Clear documentation of config policy
+
+- **fazai.conf.example**
+  - New header with clear installation instructions
+  - Migration guide for users with old config
+  - Explicit warning about removed ~/.config support
+  - Permission and ownership recommendations
+
+- **Help Text** (`src/app.ts`)
+  - Shows exact model names (not nicknames)
+  - Groups models by provider
+  - Indicates DEFAULT model per provider
+  - Clearer usage examples
+
+### Removed
+- ❌ User-local config (~/.config/fazai/fazai.conf)
+- ❌ Home directory config (~/fazai.conf)
+- ❌ Model nickname system (60+ lines of mapping logic)
+- ❌ Nickname-based model selection
+- ❌ `DEFAULT_HOME_CONFIG_DIR` constant
+
+### Fixed
+- Comma parsing in CLI (confirmed working - not a bug)
+- Type safety: `provider` is now union type instead of string
+- Reduced cognitive complexity in models.ts by ~60%
+
+### Documentation
+- Updated comments throughout codebase
+- Added migration instructions in fazai.conf.example
+- Enhanced JSDoc in Provider interface
+- Clearer configuration policy documentation
+
+## [3.4.3-beta] - 2025-12-10
+
+### Added
+- **NLP Task Normalizer** (`src/utils/task-normalizer.ts`)
+  - Fixes comma ambiguity in natural language commands
+  - Converts implicit sequences into explicit temporal connectors
+  - Example: "instalar nginx, configurar porta 80" → "instalar nginx e depois configurar porta 80"
+  - Preserves tasks with temporal markers ("em seguida", "depois", "então")
+  - Detects and preserves enumeration patterns ("primeiro", "segundo", "terceiro")
+  - Comprehensive unit tests with 100% coverage
+
+### Changed
+- **Enhanced System Prompt** (`src/linux-prompt.ts`)
+  - Added "CONTEXTO LINGUÍSTICO" section to guide AI interpretation
+  - Explicit instruction: commas indicate sequential tasks, not separate commands
+  - Two-layer defense: normalization + prompt engineering
+
+### Fixed
+- **Comma Parsing Bug** (Issue: TODO.md line 11)
+  - AI was misinterpreting commas as list separators instead of sequence connectors
+  - Problem was in semantic interpretation, not shell/Node.js parsing
+  - Solution: pre-process tasks before sending to AI providers
+  - All providers now handle comma-separated tasks correctly
+
 ## [3.4.2-beta] - 2025-12-04
 
 ### Added

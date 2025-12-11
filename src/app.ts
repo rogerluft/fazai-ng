@@ -18,87 +18,67 @@ import { DAGExecutor } from "./agentic/dag-executor";
 import { handleGitHubCommand } from "./commands/github";
 
 import { getConfigValue } from "./config";
+import { normalizeTask } from "./utils/task-normalizer";
 
 function displayHelp() {
   const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
 
-  let modelsHelpText = `
-Available Models:
-  Google Gemini (requer GOOGLE_API_KEY):`;
-  
-  if (previewEnabled) {
-    modelsHelpText = `
-  ┌───────────────────────────────────────────────────────────────────────────┐
-  │                                                                           │
-  │ Gemini 3 is now available.                                                │
-  │ To use Gemini 3, enable "Preview features" in /etc/fazai/fazai.conf.      │
-  │ Learn more at https://goo.gle/enable-preview-features                     │
-  │                                                                           │
-  └───────────────────────────────────────────────────────────────────────────┘
+  // Group models by provider for better organization
+  const modelsByProvider: Record<string, Model[]> = {};
+  for (const model of models) {
+    if (!modelsByProvider[model.provider]) {
+      modelsByProvider[model.provider] = [];
+    }
+    modelsByProvider[model.provider].push(model);
+  }
 
-  Select Model:
-  ● 1. Auto (default)
-       Let the system choose the best model for your task.
-    2. Pro (pro)
-       For complex tasks that require deep reasoning and creativity
-    3. Flash (flash)
-       For tasks that need a balance of speed and reasoning
-    4. Flash-Lite (flash-lite)
-       For simple tasks that need to be done quickly
+  let modelsHelpText = '\nAvailable Models (use exact model names):\n';
 
-  To use a specific Gemini model on startup, use the --model flag.
-`;
-  } else {
-    modelsHelpText += `
-    gemini2flash   - Gemini 2.0 Flash Exp (rápido e gratuito)
-    gemini15pro    - Gemini 1.5 Pro (mais capaz)
-    gemini15flash  - Gemini 1.5 Flash (balanceado)
-    `;
+  // Display models grouped by provider
+  const providerOrder: Array<{ key: string; name: string }> = [
+    { key: 'ollama', name: 'Ollama (local models)' },
+    { key: 'openrouter', name: 'OpenRouter (free tier available)' },
+    { key: 'perplexity', name: 'Perplexity (search-enabled AI)' },
+    { key: 'google', name: 'Google Gemini' },
+    { key: 'openai', name: 'OpenAI' },
+    { key: 'anthropic', name: 'Anthropic Claude' },
+  ];
+
+  for (const { key, name } of providerOrder) {
+    const providerModels = modelsByProvider[key];
+    if (providerModels && providerModels.length > 0) {
+      modelsHelpText += `\n  ${name}:\n`;
+      for (const model of providerModels) {
+        const isDefault = model === models[0] ? ' (DEFAULT)' : '';
+        modelsHelpText += `    ${model.name}${isDefault}\n`;
+        if (model.description) {
+          modelsHelpText += `      ${model.description}\n`;
+        }
+      }
+    }
   }
 
   modelsHelpText += `
-  OpenRouter (requer API key - modelos gratuitos disponíveis):
-    qwen           - Qwen 3 Coder Free (DEFAULT)
-    gemini-or      - Gemini 2.0 Flash via OpenRouter
-    llama33        - Llama 3.3 70B Free
-    deepseek       - DeepSeek R1T2 Chimera Free
-
-  OpenAI (requer API key):
-    gpt4mini    - GPT-4o-mini (rápido e barato)
-    gpt4o       - GPT-4o (mais recente e inteligente)
-    gpt4turbo   - GPT-4 Turbo
-
-  Claude (Anthropic - requer API key):
-    sonnet35    - Claude 3.5 Sonnet (mais inteligente)
-    haiku       - Claude 3 Haiku (rápido e barato)
-
-  Ollama (local - configure OLLAMA_BASE_URL no fazai.conf):
-    gptoss-20b  - GPT-OSS 20B (local no servidor)
-    llama32     - Llama 3.2
-    mistral     - Mistral
-
-  Perplexity (requer API key):
-    sonar       - Perplexity Sonar Small
-    sonar-pro   - Perplexity Sonar Large
-    sonar-reasoning - Perplexity Sonar Reasoning
+  Note: First model in your fazai.conf = default for that provider
+  Configure models in /etc/fazai/fazai.conf (MODELS_PROVIDER=model1,model2,model3)
 `;
 
   const helpText = `
 🖥️  FAZAI - Administrador Linux Inteligente com IA
 
 Usage:
-  fazai [options] [model-nickname]           # Linux Admin Mode (default)
-  fazai ask "Your question here"             # General AI questions
-  fazai config                               # List configured API keys
-  fazai completion                           # Print available CLI completions
-  fazai search "query"                       # Manual research via Context7/Web
-  fazai vector [validate|recreate]           # Valida collections vetoriais (Qdrant)
-  fazai import <file> --source=<claude|chatgpt>  # Importa conversas para Qdrant
-  fazai sync                                 # Sync repository changes to /opt/fazai
-  fazai cloudflare <action>                  # Manage Cloudflare (zones, dns, workers)
-  fazai cf zones                             # Cloudflare: list zones
-  fazai cf dns list <zoneId>                 # Cloudflare: manage DNS
-  fazai github <action>                      # GitHub integration (auth, repos, issues, etc)
+  fazai [options] ["task description"] [model-name]  # Linux Admin Mode (default)
+  fazai ask "Your question here" [model-name]        # General AI questions
+  fazai config                                       # List configured API keys
+  fazai completion                                   # Print available CLI completions
+  fazai search "query"                               # Manual research via Context7/Web
+  fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
+  fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
+  fazai sync                                         # Sync repository changes to /opt/fazai
+  fazai cloudflare <action>                          # Manage Cloudflare (zones, dns, workers)
+  fazai cf zones                                     # Cloudflare: list zones
+  fazai cf dns list <zoneId>                         # Cloudflare: manage DNS
+  fazai github <action>                              # GitHub integration (auth, repos, issues, etc)
 
 Options:
   --dry-run                Simulate commands without executing
@@ -113,8 +93,9 @@ Options:
 Examples:
   # Admin mode (default)
   fazai
-  fazai --dry-run           # Safe simulation mode
-  fazai haiku               # Use Claude Haiku (faster/cheaper)
+  fazai --dry-run                                    # Safe simulation mode
+  fazai "install nginx" qwen2.5:7b                   # Use specific model
+  fazai "configure firewall" llama-3-sonar-small-32k-online  # Use Perplexity Sonar
 
   # General questions
   fazai ask "Como configurar nginx como proxy reverso?"
@@ -415,6 +396,11 @@ async function handleImportCommand(rawArgs: string[]): Promise<void> {
 async function main() {
   const rawArgs = process.argv.slice(2);
   const debugFlag = rawArgs.includes("--debug") || rawArgs.includes("--verbose");
+  
+  if (debugFlag) {
+    console.log("DEBUG: Raw Args:", rawArgs);
+    console.log("DEBUG: Loaded Models Nicknames:", models.map(m => m.nickName));
+  }
   const verboseFlag = rawArgs.includes("--verbose");
 
   let logFileOverride: string | undefined;
@@ -492,6 +478,7 @@ async function main() {
       "sync",
       "cf",
       "cloudflare",
+      "github",
       "--debug",
       "--verbose",
       "--log-file",
@@ -500,7 +487,8 @@ async function main() {
       "--cli",
       "--auto-research",
       "--yolo",
-      ...models.map((model) => model.nickName),
+      // Add model names for completion (exact names, no nicknames)
+      ...models.map((model) => model.name),
     ];
     logger.info(suggestions.join("\n"));
     return;
@@ -569,10 +557,10 @@ async function main() {
 
   // Ask mode (general questions)
   if (inputs[0] === "ask") {
-    // Check if last arg is a model nickname
+    // Check if last arg is a model name (exact match)
     const lastArg = inputs[inputs.length - 1];
-    let selectedModel = models.find((model) => model.nickName === lastArg);
-    
+    let selectedModel = models.find((model) => model.name === lastArg);
+
     let questionParts: string[];
     if (selectedModel) {
       // Model specified, question is everything except first (ask) and last (model)
@@ -586,13 +574,16 @@ async function main() {
     const question = questionParts.join(" ");
 
     if (!question) {
-      logger.error('Usage: fazai ask "Your question here" [model]');
+      logger.error('Usage: fazai ask "Your question here" [model-name]');
+      logger.info('Example: fazai ask "How to configure nginx?" gpt-4o');
+      logger.info('         fazai ask "Best practices for SSH?" llama-3-sonar-small-32k-online');
       process.exit(1);
     }
 
     await checkAndSetAPIKey(selectedModel);
 
     logger.info(chalk.blue("🤔 Fazendo pergunta..."));
+    logger.info(chalk.gray(`Modelo: ${selectedModel.name} (${selectedModel.provider})`));
 
     const answerStream = askAI(
       "",
@@ -613,17 +604,17 @@ async function main() {
   logger.info(chalk.cyan("\n🖥️  FAZAI - MODO ADMINISTRADOR LINUX"));
   logger.info(chalk.gray("Administração inteligente de sistemas Linux\n"));
 
-  // Check if direct command mode (first arg is not a model nickname and not a flag)
+  // Check if direct command mode (first arg is not a model name and not a flag)
   let directCommand: string | null = null;
   let selectedModel: typeof models[number] | undefined;
 
   // Try to find model in inputs (can be last or second-to-last)
   if (inputs.length > 0) {
-    // Check if last arg is a model
+    // Check if last arg is a model name (exact match)
     const lastArg = inputs[inputs.length - 1];
     logger.debug(`Parsing model: inputs=${JSON.stringify(inputs)}, lastArg=${lastArg}`);
-    selectedModel = models.find((model) => model.nickName === lastArg);
-    logger.debug(`Found model: ${selectedModel ? selectedModel.nickName : 'none'}`);
+    selectedModel = models.find((model) => model.name === lastArg);
+    logger.debug(`Found model: ${selectedModel ? selectedModel.name : 'none'}`);
 
     if (selectedModel && inputs.length > 1) {
       // Model found at end, everything before is the command
@@ -631,7 +622,7 @@ async function main() {
     } else if (inputs.length > 1) {
       // Check if second-to-last is a model (task might be last)
       const secondLast = inputs[inputs.length - 2];
-      const modelAtSecondLast = models.find((model) => model.nickName === secondLast);
+      const modelAtSecondLast = models.find((model) => model.name === secondLast);
 
       if (modelAtSecondLast) {
         selectedModel = modelAtSecondLast;
@@ -651,8 +642,8 @@ async function main() {
   if (!selectedModel) {
     const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
     if (previewEnabled) {
-      selectedModel = models.find(m => m.nickName === 'gemini3');
-      logger.info('🤖 Auto-selecting preview model: Gemini 3');
+      selectedModel = models.find(m => m.name === 'gemini-3.0-pro-latest');
+      logger.info('🤖 Auto-selecting preview model: Gemini 3.0 Pro');
     }
     // If preview not enabled or gemini3 not found, fallback to the absolute default
     if (!selectedModel) {
@@ -660,7 +651,7 @@ async function main() {
     }
   }
 
-  logger.info(`Modelo: ${selectedModel ? selectedModel.nickName : models[0].nickName} (${selectedModel ? selectedModel.name : models[0].name})\n`);
+  logger.info(`Modelo: ${selectedModel.name} (${selectedModel.provider})\n`);
   if (!selectedModel) selectedModel = models[0];
 
   await checkAndSetAPIKey(selectedModel);
@@ -685,10 +676,16 @@ async function main() {
     validate: (input: string) => input.trim() !== "" || "Tarefa não pode estar vazia",
   });
 
+  // Normalize task to avoid comma ambiguity (NLP fix)
+  const normalizedTask = normalizeTask(task);
+  if (normalizedTask !== task) {
+    logger.debug(`Task normalized: "${task}" → "${normalizedTask}"`);
+  }
+
   // MODO NORMAL: Execução tradicional
   const commandStream = getLinuxCommandsFromAI(
     systemInfo,
-    task,
+    normalizedTask,
     selectedModel.name,
     selectedModel.provider
   );

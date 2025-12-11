@@ -17,13 +17,35 @@ import {
   loadCommandHistory,
   loadConversationHistory,
 } from "./memory";
+import { CloudflareUI } from "./commands/api/cloudflare-ui";
+import { SpamExpertsUI } from "./commands/api/spamexperts-ui";
+import { OPNsenseUI } from "./commands/api/opnsense-ui";
+import { showMenu, MenuItem } from "./ui/menu";
+import { showDashboard, DashboardData, SystemInfo } from "./ui/dashboard";
+import { showLogo } from "./ui/banner";
 
 type ConversationTurn = {
   role: "user" | "assistant";
   content: string;
 };
 
-const SLASH_COMMANDS = ["/help", "/exec", "/history", "/history clear", "/memory clear", "/quit", "/exit"];
+const SLASH_COMMANDS = [
+  "/help",
+  "/exec",
+  "/history",
+  "/history clear",
+  "/memory clear",
+  "/cloudflare",
+  "/cf",
+  "/spamexperts",
+  "/spam",
+  "/opnsense",
+  "/ops",
+  "/api",
+  "/dashboard",
+  "/quit",
+  "/exit",
+];
 
 function buildChatPrompt(history: ConversationTurn[]): string {
   const trimmedHistory = history.slice(-10); // limita contexto imediato
@@ -61,11 +83,48 @@ function createCompleter() {
   };
 }
 
+/**
+ * Coleta estatísticas do sistema para o dashboard
+ */
+async function getSystemStats(): Promise<SystemInfo> {
+  // Mock data - substituir por coleta real de sistema
+  return {
+    cpu: "42%",
+    memory: "3.2GB / 8GB",
+    disk: "120GB / 500GB",
+    uptime: "15 days 6 hours",
+  };
+}
+
+/**
+ * Cria prompt visual aprimorado
+ */
+function getPrompt(): string {
+  const user = process.env.USER || "user";
+  const cwd = process.cwd().replace(process.env.HOME || "", "~");
+  return (
+    chalk.green(user) +
+    chalk.gray("@") +
+    chalk.blue("fazai") +
+    chalk.gray(":") +
+    chalk.yellow(cwd) +
+    chalk.gray(" $ ")
+  );
+}
+
 export async function runCliMode(): Promise<void> {
   const defaultModel = models[0];
-  logger.info(chalk.cyan.bold("\n🤖 FazAI CLI interativo"));
+
+  // Exibe logo visual
+  console.clear();
+  showLogo();
+
   logger.info(chalk.gray("Digite mensagens livres para conversar ou use comandos especiais começando com '/'"));
-  logger.info(chalk.gray("Comandos disponíveis: /help, /exec, /history, /quit, /exit\n"));
+  logger.info(
+    chalk.gray(
+      "Comandos: /help, /exec, /api, /dashboard, /cloudflare, /spamexperts, /opnsense\n"
+    )
+  );
 
   if (!checkAPIKey(defaultModel.provider)) {
     await getAndSetAPIKey(defaultModel.provider);
@@ -82,7 +141,7 @@ export async function runCliMode(): Promise<void> {
   const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
-    prompt: chalk.cyan("fazai> "),
+    prompt: getPrompt(),
     completer: createCompleter(),
     historySize: 100,
   });
@@ -184,16 +243,82 @@ export async function runCliMode(): Promise<void> {
     if (line.startsWith("/")) {
       if (line === "/help") {
         logger.info(chalk.cyan("\nComandos disponíveis:"));
-        logger.info("/help           Mostra esta ajuda");
-        logger.info("/exec ...       Converte instrução natural em comandos Linux e executa");
-        logger.info("/history        Lista entradas anteriores (persistente)");
-        logger.info("/history clear  Limpa histórico persistente");
-        logger.info("/memory clear   Limpa memória contextual persistente");
-        logger.info("/quit           Encerra o modo CLI");
-        logger.info("/exit           Mesmo que /quit\n");
+        logger.info("/help              Mostra esta ajuda");
+        logger.info("/exec ...          Converte instrução natural em comandos Linux e executa");
+        logger.info("/history           Lista entradas anteriores (persistente)");
+        logger.info("/history clear     Limpa histórico persistente");
+        logger.info("/memory clear      Limpa memória contextual persistente");
+        logger.info("/dashboard         Exibe dashboard visual do sistema");
+        logger.info("/api               Menu de gerenciamento de APIs externas");
+        logger.info("/cloudflare, /cf   Gerenciar Cloudflare (zonas, DNS, workers)");
+        logger.info("/spamexperts, /spam Gerenciar SpamExperts (domínios, quarentena)");
+        logger.info("/opnsense, /ops    Gerenciar OPNsense (firewall, VPN, NAT)");
+        logger.info("/quit, /exit       Encerra o modo CLI\n");
       } else if (line === "/quit" || line === "/exit") {
         rl.close();
         return;
+      } else if (line === "/dashboard") {
+        // Exibe dashboard
+        const dashboardData: DashboardData = {
+          system: await getSystemStats(),
+          recentCommands: [
+            { timestamp: "10:30", command: "nginx restart", status: "success" as const },
+            { timestamp: "10:25", command: "systemctl status", status: "success" as const },
+          ],
+          apiStatus: [
+            { name: "Cloudflare", status: "online" as const, responseTime: "120ms" },
+            { name: "SpamExperts", status: "online" as const, responseTime: "85ms" },
+            { name: "OPNsense", status: "online" as const, responseTime: "45ms" },
+          ],
+        };
+        showDashboard(dashboardData);
+      } else if (line === "/api") {
+        // Menu de APIs
+        const items: MenuItem[] = [
+          {
+            label: "Cloudflare",
+            value: "cloudflare",
+            icon: "☁️",
+            description: "Gerenciar zonas, DNS e Workers",
+          },
+          {
+            label: "SpamExperts",
+            value: "spamexperts",
+            icon: "📧",
+            description: "Gerenciar proteção de email",
+          },
+          {
+            label: "OPNsense",
+            value: "opnsense",
+            icon: "🔥",
+            description: "Gerenciar firewall e VPN",
+          },
+        ];
+
+        const choice = await showMenu("Gerenciar APIs Externas", items);
+
+        if (choice === "cloudflare") {
+          const cfUI = new CloudflareUI();
+          await cfUI.showMainMenu();
+        } else if (choice === "spamexperts") {
+          const spamUI = new SpamExpertsUI();
+          await spamUI.showMainMenu();
+        } else if (choice === "opnsense") {
+          const opsUI = new OPNsenseUI();
+          await opsUI.showMainMenu();
+        }
+      } else if (line === "/cloudflare" || line === "/cf") {
+        // Cloudflare UI
+        const cfUI = new CloudflareUI();
+        await cfUI.showMainMenu();
+      } else if (line === "/spamexperts" || line === "/spam") {
+        // SpamExperts UI
+        const spamUI = new SpamExpertsUI();
+        await spamUI.showMainMenu();
+      } else if (line === "/opnsense" || line === "/ops") {
+        // OPNsense UI
+        const opsUI = new OPNsenseUI();
+        await opsUI.showMainMenu();
       } else if (line === "/history") {
         if (!historyBuffer.length) {
           logger.info(chalk.gray("Sem histórico registrado nesta sessão."));

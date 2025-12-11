@@ -1,38 +1,53 @@
 import { getConfigValue } from "./config";
 import { logger } from "./logger";
+import type { ProviderType } from "./types/provider";
 
+/**
+ * Model definition - Simplified, NO nicknames
+ *
+ * Models are now referenced by their EXACT names as configured in fazai.conf
+ * Order in config = order of priority (first model = default for provider)
+ *
+ * @example
+ * MODELS_OLLAMA=qwen2.5:7b,tinyllama:1b
+ * First model (qwen2.5:7b) becomes the default for Ollama provider
+ */
 export interface Model {
+  /** Exact model name as specified by provider (e.g., "gpt-4o", "llama-3-sonar-small-32k-online") */
   name: string;
-  provider:
-    | "anthropic"
-    | "openai"
-    | "openrouter"
-    | "ollama"
-    | "google"
-    | "perplexity";
-  nickName: string;
+
+  /** Provider type */
+  provider: ProviderType;
+
+  /** Optional description for help text */
   description?: string;
 }
 
 /**
- * Load models from configuration file (/etc/fazai/fazai.conf)
- * Fallback to built-in defaults if config not available
+ * Load models from configuration file (fazai.conf)
  *
- * Format in config:
- * MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b,google/gemini-2.0-flash-exp:free
- * MODELS_OLLAMA=gptoss-20b,llama3.2,llama3.1
- * MODELS_OPENAI=gpt-4o,gpt-4o-mini
- * MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+ * Configuration format:
+ * MODELS_PROVIDER=model1,model2,model3
+ *
+ * @example
+ * MODELS_OLLAMA=qwen2.5:7b,tinyllama:1b
+ * MODELS_OPENROUTER=qwen/qwen3-coder:free,google/gemini-2.0-flash-exp:free
+ * MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
+ *
+ * Rules:
+ * 1. Order matters: First model in list = default for that provider
+ * 2. Maximum 3 models per provider (organization constraint)
+ * 3. Use EXACT model names (no aliases, no nicknames)
+ * 4. Fallback to built-in defaults if config not found
  */
-
 function loadModelsFromConfig(): Model[] {
   const models: Model[] = [];
 
   try {
-    // Load by provider (max 3 per provider)
+    // Provider configurations (max 3 models each)
     const providers: Array<{
       key: string;
-      provider: Model["provider"];
+      provider: ProviderType;
       limit: number;
     }> = [
       { key: "MODELS_OLLAMA", provider: "ollama", limit: 3 },
@@ -49,186 +64,204 @@ function loadModelsFromConfig(): Model[] {
         const modelList = modelStr
           .split(",")
           .map((m) => m.trim())
-          .filter((m) => m)
-          .slice(0, limit); // Limit to N per provider
+          .filter((m) => m.length > 0)
+          .slice(0, limit); // Enforce limit
 
         for (const modelName of modelList) {
-          // Generate nickName from model name
-          let nickName = modelName
-            .toLowerCase()
-            .replace(/[/:.-]/g, "")
-            .substring(0, 20); // Limit length
-
-          // Special handling for common models
-          if (modelName.includes("gpt-oss")) {
-            nickName = "gptoss";
-          } else if (modelName.includes("qwen")) {
-            nickName = "qwen";
-          } else if (modelName.includes("llama3.2")) {
-            nickName = "llama32";
-          } else if (modelName.includes("llama3.1")) {
-            nickName = "llama31";
-          } else if (modelName.includes("gemini-3.0")) {
-            nickName = "gemini3";
-          } else if (modelName.includes("gemini-2.5-pro")) {
-            nickName = "pro";
-          } else if (modelName.includes("gemini-2.5-flash-lite")) {
-            nickName = "flash-lite";
-          } else if (modelName.includes("gemini-2.5-flash")) {
-            nickName = "flash";
-          } else if (modelName.includes("gemini")) {
-            nickName = "gemini-or"; // Generic fallback for other gemini, e.g. from OpenRouter
-          } else if (modelName.includes("claude")) {
-            nickName = modelName.includes("haiku") ? "haiku" : "sonnet";
-          } else if (modelName.includes("gpt-4o")) {
-            nickName = modelName.includes("mini") ? "gpt4mini" : "gpt4o";
-          } else if (modelName.includes("llama-3-sonar-large")) {
-            nickName = "sonar-pro";
-          } else if (modelName.includes("llama-3-sonar-small")) {
-            nickName = "sonar";
-          } else if (modelName.includes("sonar-reasoning")) {
-            nickName = "sonar-reasoning";
-          }
-
           models.push({
             name: modelName,
             provider,
-            nickName,
             description: `${provider.toUpperCase()} - ${modelName}`,
           });
+
+          logger.debug(`Loaded model: ${modelName} (${provider})`);
         }
       }
     }
 
     if (models.length > 0) {
-      logger.debug(`Loaded ${models.length} models from config`);
+      logger.debug(`Successfully loaded ${models.length} models from config`);
       return models;
     }
   } catch (error) {
-    logger.debug(`Config-based models loading failed: ${error}`);
+    logger.debug(`Config-based model loading failed: ${error}`);
   }
 
-  // Fallback to built-in defaults
+  // Fallback to built-in defaults if config is empty or invalid
+  logger.debug("Falling back to built-in default models");
   return getBuiltInModels();
 }
 
+/**
+ * Built-in default models (fallback when config is not available)
+ *
+ * These are conservative defaults that work out-of-the-box.
+ * Users should configure their own models in fazai.conf for optimal experience.
+ */
 function getBuiltInModels(): Model[] {
-  const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
+  const previewEnabled = getConfigValue("ENABLE_PREVIEW_FEATURES") === "true";
 
-  const googleModels: Model[] = [
+  const models: Model[] = [];
+
+  // Google Gemini (preview feature)
+  if (previewEnabled) {
+    models.push({
+      name: "gemini-3.0-pro-latest",
+      provider: "google",
+      description: "Gemini 3 Pro (Preview)",
+    });
+  }
+
+  // Google Gemini (stable)
+  models.push(
     {
       name: "gemini-2.5-pro",
       provider: "google",
-      nickName: "pro",
       description: "Gemini 2.5 Pro (deep reasoning)",
     },
     {
       name: "gemini-2.5-flash",
       provider: "google",
-      nickName: "flash",
       description: "Gemini 2.5 Flash (fast & balanced)",
     },
     {
       name: "gemini-2.5-flash-lite",
       provider: "google",
-      nickName: "flash-lite",
       description: "Gemini 2.5 Flash Lite (quick tasks)",
-    },
-  ];
+    }
+  );
 
-  if (previewEnabled) {
-    googleModels.unshift({
-      name: "gemini-3.0-pro-latest", // Hypothetical latest model
-      provider: "google",
-      nickName: "gemini3",
-      description: "Gemini 3 (Preview)",
-    });
-  }
-
-  return [
-    ...googleModels,
-    // Ollama (local, max 3)
+  // Ollama (local models - require Ollama server)
+  models.push(
     {
-      name: "gpt-oss:20b",
+      name: "qwen2.5:7b",
       provider: "ollama",
-      nickName: "gptoss",
-      description: "Local GPT-OSS 20B (RTX 3050 8GB friendly)",
+      description: "Qwen 2.5 7B (local, efficient)",
     },
     {
-      name: "llama3.2:latest",
+      name: "tinyllama:1b",
       provider: "ollama",
-      nickName: "llama32",
-      description: "Local Llama 3.2",
-    },
-    {
-      name: "llama3.1:latest",
-      provider: "ollama",
-      nickName: "llama31",
-      description: "Local Llama 3.1",
-    },
+      description: "TinyLlama 1B (local, fast)",
+    }
+  );
 
-    // OpenRouter (cloud, max 3)
+  // OpenRouter (cloud, free tier available)
+  models.push(
     {
       name: "qwen/qwen3-coder:free",
       provider: "openrouter",
-      nickName: "qwen",
-      description: "Qwen3 Coder 480B (free tier)",
-    },
-    {
-      name: "meta-llama/llama-3.3-70b-instruct",
-      provider: "openrouter",
-      nickName: "llama33",
-      description: "Llama 3.3 70B via OpenRouter",
+      description: "Qwen3 Coder (free tier)",
     },
     {
       name: "google/gemini-2.0-flash-exp:free",
       provider: "openrouter",
-      nickName: "gemini-or",
-      description: "Google Gemini 2.0 Flash via OpenRouter",
-    },
+      description: "Gemini 2.0 Flash via OpenRouter (free)",
+    }
+  );
 
-    // OpenAI (optional, max 3)
-    {
-      name: "gpt-4o",
-      provider: "openai",
-      nickName: "gpt4o",
-      description: "GPT-4o",
-    },
-    {
-      name: "gpt-4o-mini",
-      provider: "openai",
-      nickName: "gpt4mini",
-      description: "GPT-4o Mini (fast/cheap)",
-    },
-
-    // Anthropic Claude (optional, max 3)
-    {
-      name: "claude-3-5-sonnet-latest",
-      provider: "anthropic",
-      nickName: "sonnet",
-      description: "Claude 3.5 Sonnet",
-    },
-    {
-      name: "claude-3-haiku-20240307",
-      provider: "anthropic",
-      nickName: "haiku",
-      description: "Claude 3 Haiku (fast)",
-    },
-    // Perplexity (optional, max 3)
+  // Perplexity (online search + AI)
+  models.push(
     {
       name: "llama-3-sonar-small-32k-online",
       provider: "perplexity",
-      nickName: "sonar",
-      description: "Perplexity Sonar Small",
+      description: "Perplexity Sonar Small (search-enabled)",
     },
     {
       name: "llama-3-sonar-large-32k-online",
       provider: "perplexity",
-      nickName: "sonar-pro",
-      description: "Perplexity Sonar Large",
+      description: "Perplexity Sonar Large (search-enabled)",
+    }
+  );
+
+  // OpenAI (optional, requires API key)
+  models.push(
+    {
+      name: "gpt-4o-mini",
+      provider: "openai",
+      description: "GPT-4o Mini (fast & cheap)",
     },
-  ];
+    {
+      name: "gpt-4o",
+      provider: "openai",
+      description: "GPT-4o (most capable)",
+    }
+  );
+
+  // Anthropic Claude (optional, requires API key)
+  models.push(
+    {
+      name: "claude-3-5-sonnet-latest",
+      provider: "anthropic",
+      description: "Claude 3.5 Sonnet (most capable)",
+    },
+    {
+      name: "claude-3-haiku-20240307",
+      provider: "anthropic",
+      description: "Claude 3 Haiku (fast & efficient)",
+    }
+  );
+
+  return models;
 }
 
-// Load models from config or fallback to built-in
+/**
+ * Get default model for a specific provider
+ *
+ * Rules:
+ * 1. First model in provider's config list = default
+ * 2. If provider has no models configured, return first built-in for that provider
+ * 3. If provider has no built-in defaults, return overall first model
+ *
+ * @param provider Provider type to get default for
+ * @returns Default model for the provider
+ */
+export function getDefaultModel(provider?: ProviderType): Model {
+  if (provider) {
+    const providerModels = models.filter((m) => m.provider === provider);
+    if (providerModels.length > 0) {
+      return providerModels[0];
+    }
+  }
+
+  // Fallback: first model overall (usually Gemini or first in config)
+  return models[0];
+}
+
+/**
+ * Find model by exact name
+ *
+ * @param name Exact model name (case-sensitive)
+ * @returns Model if found, undefined otherwise
+ */
+export function findModelByName(name: string): Model | undefined {
+  return models.find((m) => m.name === name);
+}
+
+/**
+ * Get all models for a specific provider
+ *
+ * @param provider Provider type
+ * @returns Array of models for that provider (order preserved from config)
+ */
+export function getModelsByProvider(provider: ProviderType): Model[] {
+  return models.filter((m) => m.provider === provider);
+}
+
+/**
+ * Check if a provider has any models configured
+ *
+ * @param provider Provider type
+ * @returns True if provider has at least one model
+ */
+export function hasModelsForProvider(provider: ProviderType): boolean {
+  return models.some((m) => m.provider === provider);
+}
+
+// Load models on module initialization
 export const models: Model[] = loadModelsFromConfig();
+
+// Log loaded models for debugging
+logger.debug("Available models:");
+for (const model of models) {
+  logger.debug(`  - ${model.name} (${model.provider})`);
+}

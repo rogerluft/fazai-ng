@@ -4,6 +4,12 @@ export const linuxAdminPrompt = (task: string) => `Task: ${task}
 
 Você é um administrador de sistemas Linux experiente. Analise a tarefa solicitada e gere comandos Linux apropriados para executá-la.
 
+CONTEXTO LINGUÍSTICO:
+- Se a tarefa contém vírgulas (,), interprete como UMA ÚNICA TAREFA SEQUENCIAL
+- Exemplo: "instalar nginx, configurar porta 80" = 1 tarefa com 2 etapas sequenciais
+- NÃO separe em comandos distintos ou tarefas independentes
+- Conectores como "e depois", "em seguida" indicam sequência temporal
+
 IMPORTANTE:
 1. Sempre considere a segurança - use comandos não-destrutivos quando possível
 2. Inclua verificações de segurança antes de comandos perigosos

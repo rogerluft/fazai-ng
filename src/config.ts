@@ -1,18 +1,39 @@
 import fs from "fs";
-import os from "os";
 import path from "path";
 
 export const CONFIG_FILE_NAME = "fazai.conf";
 const CONFIG_ENV_PATH = "FAZAI_CONFIG_PATH";
 
-const HOME_DIR = os.homedir() || "";
-const DEFAULT_HOME_CONFIG_DIR = HOME_DIR ? path.join(HOME_DIR, ".config", "fazai") : "";
+// ============================================================================
+// CONFIGURATION POLICY (v3.4.3-beta)
+// ============================================================================
+//
+// CENTRALIZED CONFIG: /etc/fazai/fazai.conf ONLY
+//
+// Previous versions supported ~/.config/fazai/fazai.conf (user-local config)
+// This has been REMOVED to prevent "2 owners, dog dies hungry" syndrome:
+//   - Eliminates config conflicts and confusion
+//   - Single source of truth for all users
+//   - Simpler troubleshooting and maintenance
+//
+// Migration: install.sh handles automatic migration from old location
+//
+// Why /etc/fazai/ instead of ~/.config/?
+//   1. FazAI is a system administration tool (needs root context)
+//   2. Configuration should be global (all users share same providers/keys)
+//   3. Professional deployment standard (/etc for system services)
+//   4. Easier backup and version control
+//
+// Permissions: chmod 644 /etc/fazai/fazai.conf (readable by all, writable by root)
+// Owner: root:root (or your user for development environments)
+// ============================================================================
+
+// System-wide configuration directory (standard Linux location)
 const SYSTEM_CONFIG_DIR = "/etc/fazai";
 const SYSTEM_CONFIG_PATH = path.join(SYSTEM_CONFIG_DIR, CONFIG_FILE_NAME);
 
-const DEFAULT_WRITE_PATH = DEFAULT_HOME_CONFIG_DIR
-  ? path.join(DEFAULT_HOME_CONFIG_DIR, CONFIG_FILE_NAME)
-  : path.join(process.cwd(), CONFIG_FILE_NAME);
+// Fallback apenas para desenvolvimento (se /etc/fazai não existir)
+const DEFAULT_WRITE_PATH = path.join(process.cwd(), CONFIG_FILE_NAME);
 
 function getExplicitPath(): string | undefined {
   const explicitPath = process.env[CONFIG_ENV_PATH];
@@ -22,32 +43,36 @@ function getExplicitPath(): string | undefined {
   return undefined;
 }
 
+/**
+ * Get search paths for configuration file
+ *
+ * Search order (priority descending):
+ * 1. /etc/fazai/fazai.conf (SYSTEM - primary location)
+ * 2. ./fazai.conf (CURRENT DIRECTORY - local development override)
+ * 3. <script-dir>/fazai.conf (SCRIPT DIRECTORY - development)
+ *
+ * REMOVED: ~/.config/fazai/fazai.conf (eliminated to prevent conflicts)
+ * REMOVED: ~/fazai.conf (eliminated to prevent conflicts)
+ */
 function getSearchPaths(): string[] {
   const paths: string[] = [];
 
-  // Prioridade 1: System-wide config (administrador pode definir padrões globais)
+  // Prioridade 1: System-wide config (/etc/fazai/fazai.conf)
+  // Este é o local oficial para produção
   paths.push(SYSTEM_CONFIG_PATH);
 
-  // Prioridade 2: Current working directory (override local)
+  // Prioridade 2: Current working directory (./fazai.conf)
+  // Útil para desenvolvimento e testes locais
   const cwdPath = path.resolve(process.cwd(), CONFIG_FILE_NAME);
   paths.push(cwdPath);
 
-  // Prioridade 3: Script directory (desenvolvimento)
+  // Prioridade 3: Script directory (desenvolvimento com npm link)
+  // Permite testar durante desenvolvimento antes de instalar
   if (process.argv[1]) {
     const scriptPath = path.resolve(process.argv[1]);
     const scriptDir = path.dirname(scriptPath);
     paths.push(path.join(scriptDir, CONFIG_FILE_NAME));
     paths.push(path.join(path.resolve(scriptDir, ".."), CONFIG_FILE_NAME));
-  }
-
-  // Prioridade 4: User config directory (preferido para usuário)
-  if (DEFAULT_HOME_CONFIG_DIR) {
-    paths.push(path.join(DEFAULT_HOME_CONFIG_DIR, CONFIG_FILE_NAME));
-  }
-
-  // Prioridade 5: Home directory (fallback legacy)
-  if (HOME_DIR) {
-    paths.push(path.join(HOME_DIR, CONFIG_FILE_NAME));
   }
 
   // Deduplicate preserving order

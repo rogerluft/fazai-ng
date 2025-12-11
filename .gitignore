@@ -198,3 +198,6 @@ CLAUDE.*
 
 session-context-*.md
 .mcp.json
+.claude/savebkpapi.json
+.claude/*.json
+.claude/*.bak
