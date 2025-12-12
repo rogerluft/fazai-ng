@@ -1,7 +1,7 @@
 import chalk from "chalk";
 import { showBanner, showSection } from "./banner";
 import { renderTable, TableColumn, statusColor } from "./table";
-import boxen from "boxen";
+import { boxen } from "./boxen-compat";
 
 /**
  * Estatística para exibição em boxes lado a lado
