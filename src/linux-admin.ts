@@ -9,6 +9,7 @@ import chalk from "chalk";
 import { neuralQuery } from "./rag/neural-flow";
 import { captureLearning } from "./rag/auto-learning";
 import { createEmbeddingService } from "./services/embeddings";
+import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google";
 
@@ -163,8 +164,9 @@ export async function captureLearningFromCommands(
     });
 
     logger.info(chalk.green(`✅ Aprendizado capturado: ${learningId}`));
-  } catch (error: any) {
-    logger.debug(`Erro ao capturar learning: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.debug(`Erro ao capturar learning: ${err.message}`);
     // Falha graceful - não deve interromper o fluxo
   }
 }
@@ -211,6 +213,111 @@ function extractTags(task: string, commands: LinuxCommand[]): string[] {
 }
 
 /**
+ * Enriquece o prompt da IA com contexto RAG de KB e Learning
+ *
+ * Não retorna comandos prontos, apenas contexto textual para a IA considerar.
+ *
+ * @param task - Tarefa do usuário
+ * @param systemInfo - Informações do sistema
+ * @returns Contexto RAG formatado ou string vazia em caso de falha
+ */
+async function enrichContextWithRAG(
+  task: string,
+  systemInfo: string
+): Promise<string> {
+  const startTime = Date.now();
+
+  try {
+    logger.debug("🧠 Buscando contexto RAG para enriquecer prompt...");
+
+    // 1. Gera embedding (trunca systemInfo para economizar tokens)
+    const embeddingService = await createEmbeddingService();
+    const queryText = `${task}\n${systemInfo.substring(0, 500)}`;
+    const embedding = await embeddingService.generate(queryText);
+
+    // 2. Busca neural (KB + Learning)
+    const result = await neuralQuery(queryText, embedding, {
+      topK: 5,
+      minScore: 0.5,
+      collections: ["fazai_kb", "fazai_learning"],
+      weights: {
+        kb: 0.6,
+        learning: 0.4,
+        personality: 0,
+        memory: 0,
+        inference: 0,
+      },
+    });
+
+    // 3. Log da interação
+    await logQuerySuccess(
+      "admin",
+      task,
+      result.results.map((r) => r.collection),
+      result.fusedResults.length,
+      result.stats.averageScore,
+      result.totalTime
+    );
+
+    const elapsed = Date.now() - startTime;
+    logger.debug(`⏱️ RAG context enrichment completed in ${elapsed}ms`);
+
+    // 4. Se não encontrou resultados, retorna vazio
+    if (result.fusedResults.length === 0) {
+      logger.debug("Nenhum contexto RAG relevante encontrado");
+      return "";
+    }
+
+    // 5. Formata contexto para adicionar ao prompt (limita para economizar tokens)
+    let contextText = "\n--- CONTEXTO TÉCNICO RELEVANTE (RAG) ---\n";
+
+    // Agrupa por collection
+    const kbResults = result.fusedResults.filter(r => r.collection === "fazai_kb");
+    const learningResults = result.fusedResults.filter(r => r.collection === "fazai_learning");
+
+    if (kbResults.length > 0) {
+      contextText += "\n📚 Base de Conhecimento:\n";
+      for (const r of kbResults.slice(0, 3)) { // Máximo 3 resultados
+        contextText += `  • [Score: ${r.score.toFixed(2)}] ${r.content.substring(0, 200)}...\n`;
+      }
+    }
+
+    if (learningResults.length > 0) {
+      contextText += "\n🎓 Padrões Aprendidos:\n";
+      for (const r of learningResults.slice(0, 2)) { // Máximo 2 resultados
+        contextText += `  • [Score: ${r.score.toFixed(2)}] ${r.content.substring(0, 200)}...\n`;
+      }
+    }
+
+    contextText += "--- FIM DO CONTEXTO RAG ---\n";
+
+    logger.info(chalk.cyan(
+      `✨ Contexto RAG enriquecido: ${result.fusedResults.length} resultados ` +
+      `(avg score: ${result.stats.averageScore.toFixed(3)})`
+    ));
+
+    return contextText;
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const elapsed = Date.now() - startTime;
+
+    logger.debug(`Erro ao enriquecer contexto RAG: ${err.message}`);
+
+    await logQueryFailure(
+      "admin",
+      task,
+      ["fazai_kb", "fazai_learning"],
+      0,
+      0,
+      elapsed,
+      err.message
+    );
+
+    return ""; // Falha graceful - continua sem contexto
+  }
+}
+
+/**
  * Consulta neural flow para padrões aprendidos similares
  * @returns Comandos aprendidos se encontrados, null caso contrário
  */
@@ -218,20 +325,42 @@ async function consultNeuralFlow(
   task: string,
   systemInfo: string
 ): Promise<LinuxCommand[] | null> {
+  const startTime = Date.now();
+
   try {
     logger.debug("🧠 Consultando neural flow para padrões aprendidos...");
 
-    // Gera embedding da task
+    // Gera embedding da task (trunca systemInfo para economizar tokens)
     const embeddingService = await createEmbeddingService();
-    const queryText = `${task}\n${systemInfo}`;
+    const queryText = `${task}\n${systemInfo.substring(0, 500)}`;
     const embedding = await embeddingService.generate(queryText);
 
     // Busca neural em collections relevantes (kb e learning têm maior peso)
     const result = await neuralQuery(queryText, embedding, {
-      topK: 3,
-      minScore: 0.75, // Alta confiança necessária para comandos Linux
-      collections: ["fazai_learning", "fazai_kb"], // Apenas learning e kb
+      topK: 5,
+      minScore: 0.5,
+      collections: ["fazai_learning", "fazai_kb"],
+      weights: {
+        kb: 0.6,
+        learning: 0.4,
+        personality: 0,
+        memory: 0,
+        inference: 0,
+      },
     });
+
+    // Log da interação
+    await logQuerySuccess(
+      "admin",
+      task,
+      result.results.map((r) => r.collection),
+      result.fusedResults.length,
+      result.stats.averageScore,
+      result.totalTime
+    );
+
+    const elapsed = Date.now() - startTime;
+    logger.debug(`⏱️ Neural flow query completed in ${elapsed}ms`);
 
     // Se encontrou resultados relevantes
     if (result.fusedResults.length > 0) {
@@ -265,8 +394,22 @@ async function consultNeuralFlow(
 
     logger.debug("Nenhum padrão similar encontrado no neural flow");
     return null;
-  } catch (error: any) {
-    logger.debug(`Erro ao consultar neural flow: ${error.message}`);
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    const elapsed = Date.now() - startTime;
+
+    logger.debug(`Erro ao consultar neural flow: ${err.message}`);
+
+    await logQueryFailure(
+      "admin",
+      task,
+      ["fazai_learning", "fazai_kb"],
+      0,
+      0,
+      elapsed,
+      err.message
+    );
+
     return null; // Falha graceful - continua com IA normal
   }
 }
@@ -292,6 +435,12 @@ export async function* getLinuxCommandsFromAI(
     return; // Early return - não precisa chamar IA
   }
 
+  // 🧠 RAG ENRICHMENT: Se não encontrou comandos, enriquece prompt com contexto
+  const ragContext = await enrichContextWithRAG(task, systemInfo);
+  const enhancedSystemInfo = ragContext
+    ? `${systemInfo}\n\n${ragContext}`
+    : systemInfo;
+
   // Build provider chain: primary + fallbacks
   const providerChain: { provider: Provider; model: string }[] = [
     { provider, model },
@@ -306,7 +455,7 @@ export async function* getLinuxCommandsFromAI(
     triedProviders.push(currentProvider);
 
     try {
-      const generator = getGeneratorForProvider(currentProvider, systemInfo, task, currentModel);
+      const generator = getGeneratorForProvider(currentProvider, enhancedSystemInfo, task, currentModel);
 
       for await (const result of generator) {
         if (result.type === "command" || result.type === "allcommands") {
@@ -322,13 +471,14 @@ export async function* getLinuxCommandsFromAI(
 
       break; // Success, exit loop
 
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
       const isLast = triedProviders.length === providerChain.length;
 
-      if (isRecoverableError(error) && !isLast) {
+      if (isRecoverableError(err) && !isLast) {
         const nextProvider = providerChain[triedProviders.length];
         logger.warn(chalk.yellow(
-          `\n⚠️  ${currentProvider} falhou: ${error.message?.substring(0, 50) || "erro desconhecido"}`
+          `\n⚠️  ${currentProvider} falhou: ${err.message.substring(0, 50)}`
         ));
         logger.info(chalk.cyan(
           `🔄 Tentando fallback: ${nextProvider.provider} (${nextProvider.model})`
@@ -337,7 +487,8 @@ export async function* getLinuxCommandsFromAI(
       }
 
       // Final error - throw
-      if (error?.status === 429 || error?.code === 429) {
+      const errWithStatus = err as Error & { status?: number; code?: number };
+      if (errWithStatus.status === 429 || errWithStatus.code === 429) {
         const suggestion = currentProvider === "openrouter"
           ? "Tente: fazai llama32 ou aguarde alguns minutos"
           : "Aguarde alguns minutos ou use outro modelo";
