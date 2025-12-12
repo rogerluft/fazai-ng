@@ -562,7 +562,7 @@ async function main() {
 
     const researchCoordinator = new ResearchCoordinator();
     await researchCoordinator.research(query, { reason: "Pesquisa manual", trigger: "pre-execution" });
-    return;
+    process.exit(0);
   }
 
   // Ask mode (general questions)

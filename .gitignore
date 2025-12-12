@@ -201,3 +201,10 @@ session-context-*.md
 .claude/savebkpapi.json
 .claude/*.json
 .claude/*.bak
+
+# Backup files (prevent pollution)
+*.backup
+*.backup-*
+*.bak
+*.bak-*
+.claude.backup-*
