@@ -427,7 +427,7 @@ async function main() {
 
   if (inputs.includes("--cli")) {
     await runCliMode();
-    return;
+    process.exit(0);
   }
 
   // Show help if no arguments or help flag is present
@@ -437,43 +437,43 @@ async function main() {
     inputs.includes("-h")
   ) {
     displayHelp();
-    return;
+    process.exit(0);
   }
 
   // Config command
   if (inputs[0] === "config") {
     listConfiguredKeys();
-    return;
+    process.exit(0);
   }
 
   // Sync command
   if (inputs[0] === "sync") {
     const { syncCommand } = await import("./commands/sync");
-    await syncCommand({ 
+    await syncCommand({
       verbose: debugFlag || verboseFlag,
       dryRun: inputs.includes("--dry-run")
     });
-    return;
+    process.exit(0);
   }
 
   // Cloudflare command
   if (inputs[0] === "cf" || inputs[0] === "cloudflare") {
     const { handleCloudflare } = await import("./commands/cloudflare");
     await handleCloudflare(inputs.slice(1));
-    return;
+    process.exit(0);
   }
 
   // GitHub command
   if (inputs[0] === "github") {
     await handleGitHubCommand(inputs.slice(1));
-    return;
+    process.exit(0);
   }
 
   // Alias command
   if (inputs[0] === "alias") {
     const { handleAliasCommand } = await import("./commands/alias");
     await handleAliasCommand(inputs.slice(1));
-    return;
+    process.exit(0);
   }
 
   if (inputs[0] === "completion") {
@@ -501,17 +501,17 @@ async function main() {
       ...models.map((model) => model.name),
     ];
     logger.info(suggestions.join("\n"));
-    return;
+    process.exit(0);
   }
 
   if (inputs[0] === "vector") {
     await handleVectorCommand(inputs.slice(1));
-    return;
+    process.exit(0);
   }
 
   if (inputs[0] === "import") {
     await handleImportCommand(inputs.slice(1));
-    return;
+    process.exit(0);
   }
 
   let dryRun = false;
@@ -607,7 +607,7 @@ async function main() {
       process.stdout.write(chunk);
     }
     logger.info("");
-    return;
+    process.exit(0);
   }
 
   // Admin Mode (DEFAULT!)
