@@ -17,12 +17,16 @@ _fazai_completion() {
     # Options/flags
     opts="--help -h --dry-run --cli --debug --verbose --log-file --auto-research --yolo -y"
 
-    # AI models (from config: max 3 per provider)
-    # Ollama: gptoss, llama32, llama31
-    # OpenRouter: qwen, llama33, gemini
-    # OpenAI: gpt4o, gpt4mini
-    # Anthropic: sonnet, haiku
-    models="gptoss llama32 llama31 qwen llama33 gemini-or gpt4o gpt4mini sonnet haiku gemini3 pro flash flash-lite"
+    # AI models - dynamically loaded from fazai config
+    if command -v fazai &> /dev/null; then
+        # Extract model names from fazai --help or config
+        models=$(fazai config 2>/dev/null | grep -oP '(?<=MODELS_)[A-Z]+' | xargs -I {} fazai config 2>/dev/null | grep "MODELS_{}" | cut -d'=' -f2 | tr ',' ' ')
+    fi
+
+    # Fallback models if config not available
+    if [ -z "$models" ]; then
+        models="gemini-3.0-pro-latest gemini-1.5-flash gemini-1.5-flash-lite gemini-1.5-pro claude-3-5-sonnet-latest claude-3-5-haiku-latest gpt-4o gpt-4o-mini llama3.2:latest qwen/qwen3-coder:free"
+    fi
 
     # Vector subcommands
     vector_opts="validate recreate reset"
@@ -172,14 +176,15 @@ _fazai_completion() {
             esac
             ;;
 
-        # Model selected (admin mode)
-        gemini3|pro|flash|flash-lite|gemini-or|gpt4mini|gpt4o|gpt4turbo|sonnet35|haiku|llama32|qwen|mistral)
-            # Complete with options
-            COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
-            return 0
-            ;;
-
         *)
+            # Check if current word matches a model name
+            for model in $models; do
+                if [[ "${COMP_WORDS[1]}" == "$model" ]]; then
+                    # Model selected - complete with options
+                    COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
+                    return 0
+                fi
+            done
             # Default: options
             COMPREPLY=( $(compgen -W "${opts}" -- ${cur}) )
             return 0

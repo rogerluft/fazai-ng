@@ -24,6 +24,10 @@ import { showMenu, MenuItem } from "./ui/menu";
 import { showDashboard, DashboardData, SystemInfo } from "./ui/dashboard";
 import { showLogo } from "./ui/banner";
 import { SemanticCache } from "./services/semantic-cache";
+import { exec } from "child_process";
+import { promisify } from "util";
+
+const execAsync = promisify(exec);
 
 type ConversationTurn = {
   role: "user" | "assistant";
@@ -90,16 +94,114 @@ function createCompleter() {
 }
 
 /**
- * Coleta estatísticas do sistema para o dashboard
+ * Busca comandos recentes do histórico
+ */
+async function getRecentCommands(): Promise<Array<{ timestamp: string; command: string; status: "success" | "error" | "pending" }>> {
+  try {
+    const history = loadCommandHistory();
+    const recent = history.slice(-5).reverse(); // Últimos 5 comandos
+
+    return recent.map((cmd) => {
+      const now = new Date();
+      const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+      return {
+        timestamp,
+        command: cmd.substring(0, 50), // Limita tamanho
+        status: "success" as const, // Assume sucesso (não temos log de erros ainda)
+      };
+    });
+  } catch (error: unknown) {
+    logger.debug("Erro ao carregar comandos recentes");
+    return [];
+  }
+}
+
+/**
+ * Verifica status de APIs externas
+ */
+async function getAPIStatus(): Promise<Array<{ name: string; status: "online" | "offline" | "degraded"; responseTime?: string }>> {
+  const apis = [
+    { name: "Cloudflare", url: "https://api.cloudflare.com/client/v4/user/tokens/verify" },
+    { name: "OpenAI", url: "https://api.openai.com/v1/models" },
+    { name: "Anthropic", url: "https://api.anthropic.com/v1/messages" },
+  ];
+
+  const results = await Promise.all(
+    apis.map(async (api) => {
+      try {
+        const start = Date.now();
+        const response = await fetch(api.url, {
+          method: "HEAD",
+          headers: { "User-Agent": "FazAI/3.5.4" },
+          signal: AbortSignal.timeout(3000),
+        });
+        const elapsed = Date.now() - start;
+
+        const status = response.ok ? "online" : "degraded";
+        return {
+          name: api.name,
+          status: status as "online" | "offline" | "degraded",
+          responseTime: `${elapsed}ms`,
+        };
+      } catch (error: unknown) {
+        return {
+          name: api.name,
+          status: "offline" as const,
+        };
+      }
+    })
+  );
+
+  return results;
+}
+
+/**
+ * Coleta estatísticas reais do sistema para o dashboard
  */
 async function getSystemStats(): Promise<SystemInfo> {
-  // Mock data - substituir por coleta real de sistema
-  return {
-    cpu: "42%",
-    memory: "3.2GB / 8GB",
-    disk: "120GB / 500GB",
-    uptime: "15 days 6 hours",
-  };
+  try {
+    // CPU: usa top para pegar uso médio
+    const { stdout: cpuOut } = await execAsync(
+      "top -bn1 | grep 'Cpu(s)' | awk '{print $2}' | cut -d'%' -f1"
+    );
+    const cpuUsage = parseFloat(cpuOut.trim());
+    const cpu = `${cpuUsage.toFixed(1)}%`;
+
+    // Memória: usa free
+    const { stdout: memOut } = await execAsync(
+      "free -h | awk '/^Mem:/ {print $3 \" / \" $2}'"
+    );
+    const memory = memOut.trim();
+
+    // Disco: usa df para o /
+    const { stdout: diskOut } = await execAsync(
+      "df -h / | awk 'NR==2 {print $3 \" / \" $2}'"
+    );
+    const disk = diskOut.trim();
+
+    // Uptime: usa uptime -p
+    const { stdout: uptimeOut } = await execAsync("uptime -p");
+    const uptime = uptimeOut.trim().replace("up ", "");
+
+    return {
+      cpu,
+      memory,
+      disk,
+      uptime,
+    };
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.debug(`Erro ao coletar stats do sistema: ${err.message}`);
+
+    // Fallback: retorna valores indicando erro
+    return {
+      cpu: "N/A",
+      memory: "N/A",
+      disk: "N/A",
+      uptime: "N/A",
+    };
+  }
 }
 
 /**
@@ -268,19 +370,21 @@ export async function runCliMode(): Promise<void> {
         rl.close();
         return;
       } else if (line === "/dashboard") {
-        // Exibe dashboard
+        // Exibe dashboard com dados reais do sistema
+        logger.info(chalk.gray("Coletando dados do sistema..."));
+
+        const [systemStats, recentCommands, apiStatus] = await Promise.all([
+          getSystemStats(),
+          getRecentCommands(),
+          getAPIStatus(),
+        ]);
+
         const dashboardData: DashboardData = {
-          system: await getSystemStats(),
-          recentCommands: [
-            { timestamp: "10:30", command: "nginx restart", status: "success" as const },
-            { timestamp: "10:25", command: "systemctl status", status: "success" as const },
-          ],
-          apiStatus: [
-            { name: "Cloudflare", status: "online" as const, responseTime: "120ms" },
-            { name: "SpamExperts", status: "online" as const, responseTime: "85ms" },
-            { name: "OPNsense", status: "online" as const, responseTime: "45ms" },
-          ],
+          system: systemStats,
+          recentCommands,
+          apiStatus,
         };
+
         showDashboard(dashboardData);
       } else if (line === "/api") {
         // Menu de APIs
