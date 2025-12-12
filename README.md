@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.5.0-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.5.1-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
@@ -14,12 +14,13 @@
 ## 🌟 Features
 
 ### 🧠 Inteligência e Memória
-- **5 Collections Qdrant Especializadas** para RAG e memória operacional
+- **6 Collections Qdrant Especializadas** para RAG e memória operacional
   - `fazai_personality` - Expertise técnica e estilo de troubleshooting
   - `fazai_memory` - Histórico operacional e contexto de infraestrutura
   - `fazai_learning` - Aprendizado técnico (erros, soluções, padrões)
   - `fazai_kb` - Base de conhecimento Linux/Redes validada
   - `fazai_inference` - Políticas de segurança, SLAs e regras operacionais
+  - `fazai_semantic_cache` - **NOVO**: Cache semântico com similarity search
 
 ### 🤖 IA Multi-Modelo
 - **Claude** (Anthropic): Sonnet 3.5, Haiku - Tarefas complexas e rápidas
@@ -40,9 +41,18 @@
 
 ### 💬 Modo CLI Interativo
 - **Chat persistente** com memória contextual entre sessões
-- **Comandos especiais**: `/exec`, `/history`, `/memory`, `/help`
+- **Comandos especiais**: `/exec`, `/history`, `/memory`, `/cache`, `/help`
+- **Cache Semântico**: Reutiliza respostas de queries similares (não apenas idênticas)
 - **Histórico navegável**: Setas ↑/↓ e auto-complete
 - **Bash completion**: Instalação automática para Bash e Zsh
+
+### ⚡ Cache Semântico Inteligente (NEW v3.5.1)
+- **Similarity Search**: Encontra respostas de queries similares, não só idênticas
+- **Hit Rate Tracking**: Monitora eficiência do cache (hits vs misses)
+- **Automatic Eviction**: LRU + TTL para gerenciamento automático
+- **Performance**: Cache HIT ~50ms vs Provider ~2-5s
+- **CLI Commands**: `/cache` (stats), `/cache clear`
+- **Zero Config**: Funciona automaticamente com Qdrant + embeddings existentes
 
 ## 🚀 Instalação
 

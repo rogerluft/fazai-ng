@@ -12,7 +12,7 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    commands="ask config completion search vector import sync cloudflare github"
+    commands="ask alias config completion search vector import sync cloudflare github"
 
     # Options/flags
     opts="--help -h --dry-run --cli --debug --verbose --log-file --auto-research --yolo -y"
@@ -47,6 +47,39 @@ _fazai_completion() {
         config)
             # No arguments for config
             return 0
+            ;;
+
+        alias)
+            alias_cmds="list ls show remove rm delete"
+            case "${prev}" in
+                alias)
+                    # Suggest existing aliases or subcommands
+                    if [[ -f /etc/fazai/fzalias ]]; then
+                        local aliases=$(grep "^alias " /etc/fazai/fzalias 2>/dev/null | sed "s/^alias \([^=]*\)=.*/\1/")
+                        COMPREPLY=( $(compgen -W "${alias_cmds} ${aliases}" -- ${cur}) )
+                    else
+                        COMPREPLY=( $(compgen -W "${alias_cmds}" -- ${cur}) )
+                    fi
+                    return 0
+                    ;;
+                list|ls|show)
+                    # No additional completion needed
+                    return 0
+                    ;;
+                remove|rm|delete)
+                    # Suggest existing alias names for removal
+                    if [[ -f /etc/fazai/fzalias ]]; then
+                        local aliases=$(grep "^alias " /etc/fazai/fzalias 2>/dev/null | sed "s/^alias \([^=]*\)=.*/\1/")
+                        COMPREPLY=( $(compgen -W "${aliases}" -- ${cur}) )
+                    fi
+                    return 0
+                    ;;
+                *)
+                    # Default to subcommands
+                    COMPREPLY=( $(compgen -W "${alias_cmds}" -- ${cur}) )
+                    return 0
+                    ;;
+            esac
             ;;
 
         completion)

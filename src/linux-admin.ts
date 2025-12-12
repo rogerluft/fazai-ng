@@ -6,6 +6,9 @@ import { logger } from "./logger";
 import { withRetry } from "./utils/retry";
 import { API_TIMEOUTS } from "./config/timeouts";
 import chalk from "chalk";
+import { neuralQuery } from "./rag/neural-flow";
+import { captureLearning } from "./rag/auto-learning";
+import { createEmbeddingService } from "./services/embeddings";
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google";
 
@@ -99,6 +102,175 @@ function isRecoverableError(error: any): boolean {
   return false;
 }
 
+/**
+ * Captura padrão de sucesso para aprendizado futuro
+ *
+ * Deve ser chamado após comandos executados com sucesso
+ * @param task Tarefa original
+ * @param commands Comandos que foram bem-sucedidos
+ * @param systemInfo Informações do sistema
+ */
+export async function captureLearningFromCommands(
+  task: string,
+  commands: LinuxCommand[],
+  systemInfo: string
+): Promise<void> {
+  try {
+    logger.debug("📚 Capturando aprendizado de comandos bem-sucedidos...");
+
+    // Extrai categoria da tarefa (nginx, docker, network, etc.)
+    const category = extractCategory(task);
+
+    // Monta descrição do aprendizado
+    const commandList = commands.map(c => c.command).join("; ");
+    const description = `Comandos executados para: ${task}\n${commandList}`;
+
+    // Gera embedding
+    const embeddingService = await createEmbeddingService();
+    const textToEmbed = `${task}\n${description}\n${systemInfo}`;
+    const embedding = await embeddingService.generate(textToEmbed);
+
+    // Captura no sistema de learning
+    const learningId = await captureLearning(
+      {
+        type: "acerto",
+        title: `Linux: ${task.substring(0, 80)}`,
+        description,
+        context: `Sistema: ${systemInfo.substring(0, 200)}`,
+        actionTaken: commandList,
+        outcome: "sucesso",
+        category,
+        tags: extractTags(task, commands),
+        initialConfidence: 0.85, // Alta confiança para comandos validados
+      },
+      embedding
+    );
+
+    // Armazena também os comandos no metadata para recuperação futura
+    const { getQdrantClient } = await import("./database/qdrant-pool");
+    const client = await getQdrantClient();
+
+    await client.setPayload("fazai_learning", {
+      points: [learningId],
+      payload: {
+        commands: commands.map(c => ({
+          explain: c.explain,
+          command: c.command,
+          riskLevel: c.riskLevel,
+          requiresConfirmation: c.requiresConfirmation,
+        })),
+      },
+    });
+
+    logger.info(chalk.green(`✅ Aprendizado capturado: ${learningId}`));
+  } catch (error: any) {
+    logger.debug(`Erro ao capturar learning: ${error.message}`);
+    // Falha graceful - não deve interromper o fluxo
+  }
+}
+
+/**
+ * Extrai categoria da tarefa
+ */
+function extractCategory(task: string): string {
+  const lower = task.toLowerCase();
+
+  if (lower.includes("nginx") || lower.includes("apache")) return "webserver";
+  if (lower.includes("docker") || lower.includes("container")) return "docker";
+  if (lower.includes("firewall") || lower.includes("ufw") || lower.includes("iptables")) return "security";
+  if (lower.includes("network") || lower.includes("ip") || lower.includes("route")) return "network";
+  if (lower.includes("disk") || lower.includes("mount") || lower.includes("filesystem")) return "storage";
+  if (lower.includes("user") || lower.includes("permission") || lower.includes("chmod")) return "permissions";
+  if (lower.includes("service") || lower.includes("systemctl")) return "services";
+  if (lower.includes("backup") || lower.includes("restore")) return "backup";
+
+  return "general";
+}
+
+/**
+ * Extrai tags relevantes da tarefa e comandos
+ */
+function extractTags(task: string, commands: LinuxCommand[]): string[] {
+  const tags = new Set<string>();
+
+  // Tags da tarefa
+  const taskWords = task.toLowerCase().split(/\s+/);
+  for (const word of taskWords) {
+    if (word.length > 3 && !["como", "fazer", "configurar", "instalar"].includes(word)) {
+      tags.add(word);
+    }
+  }
+
+  // Tags dos comandos
+  for (const cmd of commands) {
+    const cmdWords = cmd.command.toLowerCase().split(/\s+/);
+    if (cmdWords[0]) tags.add(cmdWords[0]); // Primeiro comando (apt, systemctl, etc.)
+  }
+
+  return Array.from(tags).slice(0, 10); // Limita a 10 tags
+}
+
+/**
+ * Consulta neural flow para padrões aprendidos similares
+ * @returns Comandos aprendidos se encontrados, null caso contrário
+ */
+async function consultNeuralFlow(
+  task: string,
+  systemInfo: string
+): Promise<LinuxCommand[] | null> {
+  try {
+    logger.debug("🧠 Consultando neural flow para padrões aprendidos...");
+
+    // Gera embedding da task
+    const embeddingService = await createEmbeddingService();
+    const queryText = `${task}\n${systemInfo}`;
+    const embedding = await embeddingService.generate(queryText);
+
+    // Busca neural em collections relevantes (kb e learning têm maior peso)
+    const result = await neuralQuery(queryText, embedding, {
+      topK: 3,
+      minScore: 0.75, // Alta confiança necessária para comandos Linux
+      collections: ["fazai_learning", "fazai_kb"], // Apenas learning e kb
+    });
+
+    // Se encontrou resultados relevantes
+    if (result.fusedResults.length > 0) {
+      const topResult = result.fusedResults[0];
+
+      logger.info(chalk.green(
+        `✨ Padrão similar encontrado: score=${topResult.score.toFixed(3)} ` +
+        `(${topResult.collection})`
+      ));
+
+      // Extrai comandos do metadata se disponível
+      if (topResult.metadata.commands && Array.isArray(topResult.metadata.commands)) {
+        const { LinuxCommandSchema } = await import("./types-linux");
+        const validCommands: LinuxCommand[] = [];
+
+        for (const cmd of topResult.metadata.commands) {
+          try {
+            const validated = LinuxCommandSchema.parse(cmd);
+            validCommands.push(validated);
+          } catch (e) {
+            logger.debug("Comando do learning inválido, ignorando");
+          }
+        }
+
+        if (validCommands.length > 0) {
+          logger.info(chalk.cyan(`📚 Usando ${validCommands.length} comando(s) do aprendizado`));
+          return validCommands;
+        }
+      }
+    }
+
+    logger.debug("Nenhum padrão similar encontrado no neural flow");
+    return null;
+  } catch (error: any) {
+    logger.debug(`Erro ao consultar neural flow: ${error.message}`);
+    return null; // Falha graceful - continua com IA normal
+  }
+}
+
 export async function* getLinuxCommandsFromAI(
   systemInfo: string,
   task: string,
@@ -107,6 +279,18 @@ export async function* getLinuxCommandsFromAI(
 ): LinuxCommandGenerator {
   let commandsYielded = false;
   const triedProviders: Provider[] = [];
+
+  // 🧠 NEURAL FLOW: Tenta buscar padrão aprendido primeiro
+  const learnedCommands = await consultNeuralFlow(task, systemInfo);
+
+  if (learnedCommands && learnedCommands.length > 0) {
+    // Usa comandos do learning
+    for (const cmd of learnedCommands) {
+      yield { type: "command", command: cmd };
+    }
+    yield { type: "allcommands", commands: learnedCommands };
+    return; // Early return - não precisa chamar IA
+  }
 
   // Build provider chain: primary + fallbacks
   const providerChain: { provider: Provider; model: string }[] = [

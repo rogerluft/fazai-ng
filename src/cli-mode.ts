@@ -23,6 +23,7 @@ import { OPNsenseUI } from "./commands/api/opnsense-ui";
 import { showMenu, MenuItem } from "./ui/menu";
 import { showDashboard, DashboardData, SystemInfo } from "./ui/dashboard";
 import { showLogo } from "./ui/banner";
+import { SemanticCache } from "./services/semantic-cache";
 
 type ConversationTurn = {
   role: "user" | "assistant";
@@ -35,6 +36,11 @@ const SLASH_COMMANDS = [
   "/history",
   "/history clear",
   "/memory clear",
+  "/cache",
+  "/cache stats",
+  "/cache clear",
+  "/rag",
+  "/metrics",
   "/cloudflare",
   "/cf",
   "/spamexperts",
@@ -248,6 +254,10 @@ export async function runCliMode(): Promise<void> {
         logger.info("/history           Lista entradas anteriores (persistente)");
         logger.info("/history clear     Limpa histórico persistente");
         logger.info("/memory clear      Limpa memória contextual persistente");
+        logger.info("/cache             Exibe estatísticas do cache semântico");
+        logger.info("/cache stats       Exibe estatísticas detalhadas do cache");
+        logger.info("/cache clear       Limpa o cache semântico completamente");
+        logger.info("/rag, /metrics     Exibe métricas completas do sistema RAG");
         logger.info("/dashboard         Exibe dashboard visual do sistema");
         logger.info("/api               Menu de gerenciamento de APIs externas");
         logger.info("/cloudflare, /cf   Gerenciar Cloudflare (zonas, DNS, workers)");
@@ -337,6 +347,32 @@ export async function runCliMode(): Promise<void> {
         clearPersistentMemory();
         conversationHistory.length = 0;
         logger.info(chalk.green("✅ Memória contextual limpa."));
+      } else if (line === "/cache" || line === "/cache stats") {
+        try {
+          const cache = await SemanticCache.getInstance();
+          const statsString = await cache.getStatsString();
+          logger.info(chalk.cyan("\n" + statsString));
+        } catch (error: any) {
+          logger.error(chalk.red(`Erro ao obter estatísticas do cache: ${error.message}`));
+        }
+      } else if (line === "/cache clear") {
+        try {
+          const cache = await SemanticCache.getInstance();
+          await cache.clear();
+          logger.info(chalk.green("✅ Cache semântico limpo completamente."));
+        } catch (error: any) {
+          logger.error(chalk.red(`Erro ao limpar cache: ${error.message}`));
+        }
+      } else if (line === "/rag" || line === "/metrics") {
+        try {
+          const { collectRAGMetrics, formatRAGMetrics } = await import("./rag/metrics");
+          logger.info(chalk.cyan("\n⏳ Coletando métricas do sistema RAG..."));
+          const metrics = await collectRAGMetrics();
+          const formatted = formatRAGMetrics(metrics);
+          logger.info(formatted);
+        } catch (error: any) {
+          logger.error(chalk.red(`Erro ao coletar métricas: ${error.message}`));
+        }
       } else if (line.startsWith("/exec")) {
         const task = parseExecPayload(line);
         await handleExec(task ?? "");

@@ -6,6 +6,8 @@ import { models } from "./models";
 import { withRetry } from "./utils/retry";
 import { API_TIMEOUTS } from "./config/timeouts";
 import { perplexityProvider } from "./providers/perplexity-provider";
+import { SemanticCache } from "./services/semantic-cache";
+import { logger } from "./logger";
 
 export async function* askAI(
   fileContent: string,
@@ -15,6 +17,24 @@ export async function* askAI(
   isGeneralQuestion: boolean = false
 ): AsyncGenerator<string, void, undefined> {
   const prompt = isGeneralQuestion ? generalAskPrompt(question) : askPrompt(question);
+
+  // Try semantic cache first
+  try {
+    const cache = await SemanticCache.getInstance();
+    const cachedResponse = await cache.lookup(prompt, model, provider);
+
+    if (cachedResponse) {
+      logger.info("🎯 Using cached response (semantic match)");
+      yield cachedResponse;
+      return;
+    }
+  } catch (error: any) {
+    logger.debug(`Cache lookup failed: ${error.message}`);
+    // Continue with provider call on cache error
+  }
+
+  // Cache miss - call provider and store response
+  let fullResponse = "";
 
   if (provider === "anthropic") {
     const anthropic = new Anthropic({
@@ -40,6 +60,7 @@ export async function* askAI(
         chunk.type === "content_block_delta" &&
         chunk.delta?.type === "text_delta"
       ) {
+        fullResponse += chunk.delta.text;
         yield chunk.delta.text;
       }
     }
@@ -64,7 +85,9 @@ export async function* askAI(
     );
 
     for await (const chunk of stream) {
-      yield chunk.choices[0]?.delta?.content || "";
+      const content = chunk.choices[0]?.delta?.content || "";
+      fullResponse += content;
+      yield content;
     }
   } else if (provider === "openrouter") {
     const openai = new OpenAI({
@@ -94,7 +117,9 @@ export async function* askAI(
     );
 
     for await (const chunk of stream) {
-      yield chunk.choices[0]?.delta?.content || "";
+      const content = chunk.choices[0]?.delta?.content || "";
+      fullResponse += content;
+      yield content;
     }
   } else if (provider === "ollama") {
     const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
@@ -122,7 +147,9 @@ export async function* askAI(
     );
 
     for await (const chunk of stream) {
-      yield chunk.choices[0]?.delta?.content || "";
+      const content = chunk.choices[0]?.delta?.content || "";
+      fullResponse += content;
+      yield content;
     }
   } else if (provider === "perplexity") {
     const systemMessage = isGeneralQuestion
@@ -132,7 +159,18 @@ export async function* askAI(
     const stream = perplexityProvider(prompt, model, systemMessage);
 
     for await (const chunk of stream) {
+      fullResponse += chunk;
       yield chunk;
+    }
+  }
+
+  // Store response in semantic cache
+  if (fullResponse) {
+    try {
+      const cache = await SemanticCache.getInstance();
+      await cache.store(prompt, fullResponse, model, provider);
+    } catch (error: any) {
+      logger.debug(`Failed to store in cache: ${error.message}`);
     }
   }
 }

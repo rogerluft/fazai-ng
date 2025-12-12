@@ -1,0 +1,27 @@
+#!/usr/bin/env bash
+# =============================================================================
+# fzalias - Atalho para 'fazai alias'
+# =============================================================================
+# Wrapper para manter compatibilidade com uso standalone de fzalias
+# Redireciona todos os comandos para 'fazai alias'
+#
+# Uso:
+#   fzalias ll 'ls -lah --color=auto'     # Cria alias
+#   fzalias list                          # Lista aliases
+#   fzalias remove ll                     # Remove alias
+#
+# Equivale a:
+#   fazai alias ll 'ls -lah --color=auto'
+#   fazai alias list
+#   fazai alias remove ll
+# =============================================================================
+
+# Verifica se fazai está instalado
+if ! command -v fazai >/dev/null 2>&1; then
+    echo "✗ Error: 'fazai' command not found in PATH" >&2
+    echo "Please install FazAI first: https://github.com/rogerluft/fazai-ng" >&2
+    exit 1
+fi
+
+# Redireciona para fazai alias
+exec fazai alias "$@"

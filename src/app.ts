@@ -71,6 +71,8 @@ Usage:
   fazai ask "Your question here" [model-name]        # General AI questions
   fazai config                                       # List configured API keys
   fazai completion                                   # Print available CLI completions
+  fazai alias <name> <command>                       # Create/manage global bash aliases
+  fazai alias list                                   # List all aliases
   fazai search "query"                               # Manual research via Context7/Web
   fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
@@ -467,9 +469,17 @@ async function main() {
     return;
   }
 
+  // Alias command
+  if (inputs[0] === "alias") {
+    const { handleAliasCommand } = await import("./commands/alias");
+    await handleAliasCommand(inputs.slice(1));
+    return;
+  }
+
   if (inputs[0] === "completion") {
     const suggestions = [
       "ask",
+      "alias",
       "config",
       "completion",
       "search",

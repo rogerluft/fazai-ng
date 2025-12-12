@@ -1,6 +1,5 @@
 import chalk from "chalk";
 import boxen from "boxen";
-import gradient from "gradient-string";
 
 /**
  * Opções para exibição de banner
@@ -61,23 +60,17 @@ export function showBanner(
     content += "\n" + chalk.gray(subtitle);
   }
 
-  // Aplica gradiente se solicitado
-  if (useGradient && gradientColors.length >= 2) {
+  // Aplica cor (gradient option deprecated due to ESM/CJS compatibility)
+  const selectedColor = useGradient && gradientColors.length > 0
+    ? gradientColors[0]
+    : color;
+
+  const chalkColor = chalk[selectedColor as keyof typeof chalk] as any;
+  if (typeof chalkColor === "function") {
     const lines = content.split("\n");
-    const titleLine = gradient(gradientColors)(lines[0]);
-    content = titleLine;
+    content = chalkColor.bold(lines[0]);
     if (lines.length > 1) {
       content += "\n" + chalk.gray(lines.slice(1).join("\n"));
-    }
-  } else {
-    // Aplica cor sólida
-    const chalkColor = chalk[color as keyof typeof chalk] as any;
-    if (typeof chalkColor === "function") {
-      const lines = content.split("\n");
-      content = chalkColor.bold(lines[0]);
-      if (lines.length > 1) {
-        content += "\n" + chalk.gray(lines.slice(1).join("\n"));
-      }
     }
   }
 
@@ -218,6 +211,6 @@ export function showLogo(): void {
   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝
   `;
 
-  console.log(gradient(["cyan", "blue"])(logo));
+  console.log(chalk.cyan(logo));
   console.log(chalk.gray("  Administrador Linux Inteligente com IA\n"));
 }
