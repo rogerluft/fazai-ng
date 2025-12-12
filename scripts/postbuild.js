@@ -58,25 +58,3 @@ function ensureFile(target) {
 function isPermissionError(error) {
   return !!error && typeof error === "object" && "code" in error && error.code === "EACCES";
 }
-
-// Install bash completion
-const COMPLETION_SOURCE = path.join(process.cwd(), "completion/fazai-completion.bash");
-const COMPLETION_TARGET = "/etc/bash_completion.d/fazai";
-
-try {
-  if (fs.existsSync(COMPLETION_SOURCE)) {
-    // Try to copy completion file
-    fs.copyFileSync(COMPLETION_SOURCE, COMPLETION_TARGET);
-    fs.chmodSync(COMPLETION_TARGET, 0o644);
-    console.log(`[fazai] ✅ Bash completion instalado em ${COMPLETION_TARGET}`);
-  } else {
-    console.warn(`[fazai] ⚠️  Arquivo de completion não encontrado: ${COMPLETION_SOURCE}`);
-  }
-} catch (error) {
-  if (isPermissionError(error)) {
-    console.warn(`[fazai] ⚠️  Não foi possível instalar completion: permissão negada`);
-    console.warn(`[fazai]     Execute manualmente: sudo cp ${COMPLETION_SOURCE} ${COMPLETION_TARGET}`);
-  } else {
-    console.warn(`[fazai] ⚠️  Erro ao instalar completion: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
