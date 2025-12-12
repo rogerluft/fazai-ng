@@ -427,7 +427,8 @@ async function main() {
 
   if (inputs.includes("--cli")) {
     await runCliMode();
-    process.exit(0);
+    // runCliMode() handles its own exit (interactive mode)
+    return;
   }
 
   // Show help if no arguments or help flag is present
