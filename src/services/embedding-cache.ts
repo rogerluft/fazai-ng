@@ -18,8 +18,7 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import { logger } from "../logger";
-import path from "path";
-import os from "os";
+import { FAZAI_PATHS, ensureFazaiDirectories } from "../utils/paths";
 
 export interface CacheEntry {
   /**
@@ -89,7 +88,7 @@ export class EmbeddingCache {
    * Create embedding cache
    *
    * @param maxSize Maximum number of embeddings to cache (default: 10000)
-   * @param persistPath Optional file path to persist cache (default: ~/.fazai/embedding-cache.json)
+   * @param persistPath Optional file path to persist cache (default: /opt/fazai/data/embedding-cache.json)
    * @param autoLoad Automatically load persisted cache on creation (default: true)
    */
   constructor(
@@ -99,10 +98,10 @@ export class EmbeddingCache {
   ) {
     this.maxSize = maxSize;
 
-    // Default persist path: ~/.fazai/embedding-cache.json
+    // Default persist path: /opt/fazai/data/embedding-cache.json
     if (persistPath === undefined) {
-      const fazaiDir = path.join(os.homedir(), ".fazai");
-      this.persistPath = path.join(fazaiDir, "embedding-cache.json");
+      ensureFazaiDirectories();
+      this.persistPath = FAZAI_PATHS.EMBEDDING_CACHE_FILE;
     } else {
       this.persistPath = persistPath;
     }

@@ -1,8 +1,7 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
 import { logger } from "../logger";
-import path from "path";
-import os from "os";
+import { FAZAI_PATHS, ensureFazaiDirectories } from "../utils/paths";
 
 interface CacheEntry {
   response: string;
@@ -22,8 +21,8 @@ export class ApiCache {
     this.maxSize = maxSize;
 
     if (persistPath === undefined) {
-      const fazaiDir = path.join(os.homedir(), ".fazai");
-      this.persistPath = path.join(fazaiDir, "api-cache.json");
+      ensureFazaiDirectories();
+      this.persistPath = FAZAI_PATHS.API_CACHE_FILE;
     } else {
       this.persistPath = persistPath;
     }

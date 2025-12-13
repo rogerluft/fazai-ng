@@ -19,6 +19,7 @@
     "@qdrant/js-client-rest": "^1.15.1",
     "boxen": "^8.0.1",
     "chalk": "4.1.2",
+    "cheerio": "^1.1.2",
     "claude-code-plugins": "^1.0.3",
     "cli-table3": "^0.6.5",
     "gradient-string": "^3.0.0",
@@ -26,6 +27,8 @@
     "oboe": "^2.1.7",
     "openai": "^6.3.0",
     "ora": "5.4.1",
+    "p-queue": "^9.0.1",
+    "robots-parser": "^3.0.1",
     "terminal-kit": "^3.1.2",
     "zod": "^4.1.12"
   },

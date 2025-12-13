@@ -139,9 +139,10 @@ setup_directories() {
 
   # Diretórios do usuário
   mkdir -p "$INSTALL_DIR"
+  mkdir -p "$INSTALL_DIR/data"  # Dados centralizados (memory, cache, etc)
   mkdir -p "$BIN_DIR"
   mkdir -p "$HOME/.config/fazai"
-  
+
   # Limpar instalações antigas em $HOME
   if [ -d "$HOME/.fazai" ] && [ "$HOME/.fazai" != "$INSTALL_DIR" ]; then
     warning "Removendo instalação antiga em $HOME/.fazai..."

@@ -1,7 +1,7 @@
 import fs from "fs";
-import os from "os";
 import path from "path";
 import { logger } from "./logger";
+import { FAZAI_PATHS, ensureFazaiDirectories } from "./utils/paths";
 
 type ChatRole = "user" | "assistant";
 
@@ -11,14 +11,12 @@ export interface ConversationEntry {
   content: string;
 }
 
-const DATA_DIR = path.join(os.homedir(), ".fazai");
-const MEMORY_FILE = path.join(DATA_DIR, "memory.json");
-const COMMAND_HISTORY_FILE = path.join(DATA_DIR, "history.log");
+const DATA_DIR = FAZAI_PATHS.DATA;
+const MEMORY_FILE = FAZAI_PATHS.MEMORY_FILE;
+const COMMAND_HISTORY_FILE = FAZAI_PATHS.HISTORY_FILE;
 
 function ensureDataDir(): void {
-  if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-  }
+  ensureFazaiDirectories();
 }
 
 function readJsonFile<T>(file: string, fallback: T): T {
