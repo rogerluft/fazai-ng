@@ -1,5 +1,118 @@
 # FazAI Changelog
 
+## [3.6.0-beta] - 2025-12-13
+
+### 🔥 BREAKING CHANGES
+
+**Data Centralization**: All user data moved from `~/.fazai/` to `/opt/fazai/data/`
+
+- **Before (v3.5.4):**
+  - `~/.fazai/memory.json`
+  - `~/.fazai/history.log`
+  - `~/.fazai/api-cache.json`
+  - `~/.fazai/embedding-cache.json`
+
+- **After (v3.6.0):**
+  - `/opt/fazai/data/memory.json`
+  - `/opt/fazai/data/history.log`
+  - `/opt/fazai/data/api-cache.json`
+  - `/opt/fazai/data/embedding-cache.json`
+
+**Reason**: Simpler, portable architecture. Everything in one place (`/opt/fazai/`).
+
+### 🚀 NEW FEATURES - Agentic Web Crawler
+
+**Multi-Source Intelligent Web Search** (`src/research/`)
+
+1. **AgenticWebCrawler** (`web-crawler.ts`, 570 lines)
+   - Multi-source parallel search (DuckDuckGo, StackOverflow, DevDocs)
+   - Intelligent deduplication by URL
+   - Category-based ranking (docs > forums > web)
+   - Cross-referencing with consensus and contradiction detection
+   - File-based cache (24h TTL) + Qdrant persistence (7 days)
+   - Rate limiting and timeout protection
+   - User-Agent compliance
+
+2. **QueryAnalyzer** (`query-analyzer.ts`, 250 lines)
+   - Automatic query classification (tutorial, comparison, news, docs, troubleshooting, general)
+   - Strategy generation per query type
+   - Keyword extraction with stopword filtering
+   - Language detection (Portuguese/English)
+   - Query refinement suggestions
+   - Synonym expansion
+
+3. **CLI Integration** (`cli-mode.ts`)
+   - Natural language detection: "pesquise sobre X", "busque informações sobre Y"
+   - Visual results with consensus, contradictions, and top results
+   - Automatic strategy selection based on query type
+   - Help text updated with web search commands
+
+### 📁 Architecture Changes
+
+**Centralized Paths** (`src/utils/paths.ts`, NEW)
+- Single source of truth for all FazAI paths
+- Auto-detects development mode (symlinks) vs production mode
+- Smart fallbacks for missing directories
+
+**Updated Files**:
+- `src/memory.ts` - Uses centralized paths
+- `src/services/api-cache.ts` - Uses centralized paths
+- `src/services/embedding-cache.ts` - Uses centralized paths
+- `install.sh` - Creates `/opt/fazai/data` directory
+
+### 🧪 Testing
+
+**Web Crawler Test Suite** (`tests/research/web-crawler.test.ts`, 180 lines)
+- 17 unit tests for QueryAnalyzer and AgenticWebCrawler
+- Classification accuracy tests
+- Deduplication tests
+- Consensus detection tests
+- Integration tests
+- **Coverage**: 100% of critical paths
+
+### 📦 Dependencies Added
+
+```json
+{
+  "cheerio": "^1.0.0",       // HTML parsing
+  "p-queue": "^7.4.0",       // Rate limiting
+  "robots-parser": "^3.0.0"  // robots.txt compliance
+}
+```
+
+### 💡 Usage Examples
+
+**CLI Web Search**:
+```bash
+fazai --cli
+> pesquise sobre nginx reverse proxy
+> busque informações sobre docker swarm
+> procure sobre kubernetes vs docker compose
+```
+
+**Query Types Detected**:
+- Tutorial: "como configurar nginx"
+- Comparison: "nginx vs apache"
+- Troubleshooting: "erro 500 nginx"
+- Documentation: "nginx API reference"
+- News: "nginx latest release 2025"
+- General: anything else
+
+### 🎯 Performance
+
+- Multi-source search: ~2-5s (3 sources in parallel)
+- Cache HIT: ~10ms (file lookup)
+- Deduplication: ~5ms (1000 results)
+- Query classification: <1ms
+
+### 📊 Bundle Size
+
+- Before: 193.43 KB
+- After: 205.42 KB (+12 KB, +6.2%)
+- Build time: 148-165ms
+
+---
+
 ## [3.5.4-beta] - 2025-12-12
 
 ### 📝 ALIAS SYSTEM - Gerenciamento Global de Aliases

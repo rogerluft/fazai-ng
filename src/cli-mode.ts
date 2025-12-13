@@ -7,6 +7,8 @@ import { collectSystemInfo } from "./system-info";
 import { LinuxCommand } from "./types-linux";
 import { LinuxCommandExecutor } from "./linux-executor";
 import { ResearchCoordinator } from "./research";
+import { AgenticWebCrawler } from "./research/web-crawler";
+import { QueryAnalyzer } from "./research/query-analyzer";
 import { checkAPIKey, getAndSetAPIKey } from "./apiKeyUtils-fazai";
 import { logger } from "./logger";
 import {
@@ -228,6 +230,7 @@ export async function runCliMode(): Promise<void> {
   showLogo();
 
   logger.info(chalk.gray("Digite mensagens livres para conversar ou use comandos especiais começando com '/'"));
+  logger.info(chalk.gray("💡 Busca na web: 'pesquise sobre <tema>', 'busque informações sobre <assunto>'"));
   logger.info(
     chalk.gray(
       "Comandos: /help, /exec, /api, /dashboard, /cloudflare, /spamexperts, /opnsense\n"
@@ -348,6 +351,107 @@ export async function runCliMode(): Promise<void> {
       return;
     }
 
+    // Detecta intenção de busca na web ANTES dos comandos slash
+    const searchIntents = [
+      /^pesquis(e|a|ar) (sobre|na internet|web)?/i,
+      /^busqu(e|a|ar) (informações sobre|sobre|na internet)?/i,
+      /^o que (há de novo|tem de novo) (sobre|em)/i,
+      /^procur(e|a|ar) (sobre|informações sobre|na web)?/i,
+      /^encontr(e|a|ar) (informações sobre|sobre)?/i,
+    ];
+
+    const isWebSearch = searchIntents.some((pattern) => pattern.test(line));
+
+    if (isWebSearch) {
+      // Extrai query removendo o prefixo de intenção
+      const query = line
+        .replace(/^(pesquis|busqu|procur|encontr)(e|a|ar)( sobre| na internet| web| informações sobre)?/i, "")
+        .replace(/^o que (há de novo|tem de novo) (sobre|em)/i, "")
+        .trim();
+
+      if (!query) {
+        logger.error(chalk.red("Por favor, especifique o que deseja pesquisar."));
+        logger.info(chalk.gray('Exemplo: pesquise sobre "nginx reverse proxy"'));
+        rl.prompt();
+        return;
+      }
+
+      logger.info(chalk.cyan(`\n🔍 Iniciando busca multi-fonte: "${query}"\n`));
+
+      try {
+        const crawler = new AgenticWebCrawler();
+        const analyzer = new QueryAnalyzer();
+
+        // Classifica a query
+        const classification = analyzer.classifyQuery(query);
+        const { type, strategy } = classification;
+
+        logger.info(chalk.gray(`📊 Tipo detectado: ${type}`));
+        logger.info(chalk.gray(`📚 Estratégia: ${strategy.description}`));
+        logger.info(chalk.gray(`🎯 Fontes: ${strategy.sources.join(", ")}\n`));
+
+        // Busca multi-fonte
+        const results = await crawler.searchMultiSource(query, {
+          sources: strategy.sources,
+          maxResults: strategy.maxResults,
+        });
+
+        if (results.length === 0) {
+          logger.warn(chalk.yellow("⚠️  Nenhum resultado encontrado."));
+          logger.info(chalk.gray("\nTente refinar sua busca ou use termos diferentes."));
+          rl.prompt();
+          return;
+        }
+
+        // Cruza dados
+        const consolidated = await crawler.crossReference(results);
+
+        // Exibe resultados
+        logger.info(chalk.green(`\n✅ Encontrados ${results.length} resultados de ${consolidated.sources.join(", ")}\n`));
+
+        if (consolidated.consensus.length > 0) {
+          logger.info(chalk.bold("📊 CONSENSO:"));
+          for (const point of consolidated.consensus) {
+            logger.info(chalk.cyan(`  • ${point}`));
+          }
+          logger.info("");
+        }
+
+        if (consolidated.contradictions.length > 0) {
+          logger.info(chalk.yellow("⚠️  CONTRADIÇÕES:"));
+          for (const conflict of consolidated.contradictions) {
+            logger.info(chalk.yellow(`  • ${conflict}`));
+          }
+          logger.info("");
+        }
+
+        logger.info(chalk.bold("📝 TOP RESULTADOS:"));
+        for (const result of results.slice(0, 5)) {
+          logger.info(chalk.bold(`\n  ${result.title}`));
+          logger.info(chalk.gray(`  ${result.link}`));
+          if (result.snippet) {
+            logger.info(chalk.dim(`  ${result.snippet.substring(0, 150)}...`));
+          }
+          logger.info(chalk.gray(`  [${result.source} - ${result.category}]`));
+        }
+
+        logger.info("");
+        logger.info(chalk.bold("💡 RESUMO:"));
+        logger.info(chalk.cyan(`  ${consolidated.summary}`));
+        logger.info("");
+
+        // Cache em Qdrant
+        await crawler.cacheInQdrant(query, results);
+
+      } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        logger.error(chalk.red(`\n❌ Erro na busca: ${err.message}`));
+      }
+
+      rl.prompt();
+      return;
+    }
+
     if (line.startsWith("/")) {
       if (line === "/help") {
         logger.info(chalk.cyan("\nComandos disponíveis:"));
@@ -365,7 +469,13 @@ export async function runCliMode(): Promise<void> {
         logger.info("/cloudflare, /cf   Gerenciar Cloudflare (zonas, DNS, workers)");
         logger.info("/spamexperts, /spam Gerenciar SpamExperts (domínios, quarentena)");
         logger.info("/opnsense, /ops    Gerenciar OPNsense (firewall, VPN, NAT)");
-        logger.info("/quit, /exit       Encerra o modo CLI\n");
+        logger.info("/quit, /exit       Encerra o modo CLI");
+        logger.info("");
+        logger.info(chalk.cyan("Busca na Web:"));
+        logger.info('pesquise sobre "tema"      Busca multi-fonte com análise agêntica');
+        logger.info('busque informações sobre   Detecta tipo de query e estratégia ideal');
+        logger.info('procure sobre              Cruza dados de web, forums e docs');
+        logger.info("");
       } else if (line === "/quit" || line === "/exit") {
         rl.close();
         return;
