@@ -1,6 +1,8 @@
 /**
- * Copilot Client - Comunicação com GitHub Copilot CLI
- * Copilot é um assistente de comandos shell/git, não executa tarefas autônomas
+ * @file Copilot Client - Comunicação com GitHub Copilot CLI
+ * @description Este arquivo implementa um cliente para interagir com o GitHub Copilot via CLI (`gh copilot`).
+ * É especializado em obter sugestões e explicações para comandos de shell, git e GitHub CLI.
+ * @module src/orchestrator/copilot-client
  */
 
 import { exec } from 'child_process';
@@ -8,14 +10,32 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+/**
+ * @interface CopilotShellRequest
+ * @description Define a estrutura para uma solicitação de comando shell ao Copilot.
+ * @property {string} description - A descrição em linguagem natural do que o comando shell deve fazer.
+ */
 export interface CopilotShellRequest {
-  description: string; // Ex: "Find all TypeScript files modified in last week"
+  description: string;
 }
 
+/**
+ * @interface CopilotGitRequest
+ * @description Define a estrutura para uma solicitação de comando git ao Copilot.
+ * @property {string} description - A descrição em linguagem natural do que o comando git deve fazer.
+ */
 export interface CopilotGitRequest {
-  description: string; // Ex: "Rebase current branch on main and resolve conflicts"
+  description: string;
 }
 
+/**
+ * @interface CopilotResponse
+ * @description Define a estrutura da resposta retornada pelo Copilot CLI.
+ * @property {boolean} success - Indica se a operação foi bem-sucedida.
+ * @property {string} [command] - O comando sugerido pelo Copilot.
+ * @property {string} [explanation] - A explicação do comando fornecida pelo Copilot.
+ * @property {string} [error] - Uma mensagem de erro, se a operação falhou.
+ */
 export interface CopilotResponse {
   success: boolean;
   command?: string;
@@ -24,8 +44,9 @@ export interface CopilotResponse {
 }
 
 /**
- * Pede sugestão de comando shell para Copilot
- * Copilot CLI retorna comando + explicação
+ * Pede ao Copilot CLI uma sugestão de comando shell com base em uma descrição.
+ * @param {CopilotShellRequest} request - O objeto da solicitação.
+ * @returns {Promise<CopilotResponse>} Uma promessa que resolve com a sugestão do Copilot.
  */
 export async function askCopilotForShellCommand(
   request: CopilotShellRequest,
@@ -45,7 +66,9 @@ export async function askCopilotForShellCommand(
 }
 
 /**
- * Pede sugestão de comando git para Copilot
+ * Pede ao Copilot CLI uma sugestão de comando git com base em uma descrição.
+ * @param {CopilotGitRequest} request - O objeto da solicitação.
+ * @returns {Promise<CopilotResponse>} Uma promessa que resolve com a sugestão do Copilot.
  */
 export async function askCopilotForGitCommand(
   request: CopilotGitRequest,
@@ -65,7 +88,9 @@ export async function askCopilotForGitCommand(
 }
 
 /**
- * Pede sugestão de comando gh (GitHub CLI) para Copilot
+ * Pede ao Copilot CLI uma sugestão de comando `gh` (GitHub CLI) com base em uma descrição.
+ * @param {string} description - A descrição em linguagem natural do que o comando `gh` deve fazer.
+ * @returns {Promise<CopilotResponse>} Uma promessa que resolve com a sugestão do Copilot.
  */
 export async function askCopilotForGhCommand(description: string): Promise<CopilotResponse> {
   try {
@@ -83,7 +108,9 @@ export async function askCopilotForGhCommand(description: string): Promise<Copil
 }
 
 /**
- * Pede explicação de comando para Copilot
+ * Pede ao Copilot CLI para explicar um comando de shell.
+ * @param {string} command - O comando a ser explicado.
+ * @returns {Promise<CopilotResponse>} Uma promessa que resolve com a explicação do Copilot.
  */
 export async function askCopilotToExplainCommand(command: string): Promise<CopilotResponse> {
   try {
@@ -104,8 +131,10 @@ export async function askCopilotToExplainCommand(command: string): Promise<Copil
 }
 
 /**
- * Parse resposta de Copilot CLI
- * Formato típico: "Command: ...\n\nExplanation: ..."
+ * Analisa a saída de texto do `gh copilot` e a converte em um objeto `CopilotResponse` estruturado.
+ * @private
+ * @param {string} output - A saída padrão (stdout) do comando do Copilot.
+ * @returns {CopilotResponse} O objeto de resposta estruturado.
  */
 function parseCopilotResponse(output: string): CopilotResponse {
   const lines = output.split('\n');
@@ -141,9 +170,11 @@ function parseCopilotResponse(output: string): CopilotResponse {
 }
 
 /**
- * Helpers para casos de uso comuns
+ * Função auxiliar para obter um comando `find` complexo do Copilot.
+ * @param {string} filePattern - O padrão dos arquivos a serem procurados (ex: "*.ts").
+ * @param {string} criteria - Os critérios de busca (ex: "modificados na última semana").
+ * @returns {Promise<string | null>} O comando sugerido ou `null` em caso de falha.
  */
-
 export async function getCopilotFindCommand(
   filePattern: string,
   criteria: string,
@@ -155,6 +186,11 @@ export async function getCopilotFindCommand(
   return response.command || null;
 }
 
+/**
+ * Função auxiliar para obter um workflow de git complexo do Copilot.
+ * @param {string} workflow - A descrição do workflow desejado (ex: "Rebasear branch atual na main e resolver conflitos").
+ * @returns {Promise<string | null>} O comando sugerido ou `null` em caso de falha.
+ */
 export async function getCopilotGitWorkflow(workflow: string): Promise<string | null> {
   const response = await askCopilotForGitCommand({
     description: workflow,

@@ -1,10 +1,28 @@
 /**
- * Task Router - Orquestração Multi-Agente
- * Distribui tarefas para agentes especializados (Jules, Gemini, Copilot)
+ * @file Task Router - Orquestração Multi-Agente
+ * @description Este arquivo contém a lógica principal para distribuir tarefas para agentes especializados (Jules, Gemini, Copilot).
+ * @module src/orchestrator/task-router
  */
 
+/**
+ * @typedef {'claude' | 'jules' | 'gemini' | 'copilot'} AgentType
+ * @description Define os tipos de agentes disponíveis no sistema de orquestração.
+ */
 export type AgentType = 'claude' | 'jules' | 'gemini' | 'copilot';
 
+/**
+ * @interface Task
+ * @description Representa uma tarefa genérica a ser executada por um agente.
+ * @property {string} title - Título curto e descritivo da tarefa.
+ * @property {string} objective - O resultado esperado que define o sucesso da tarefa.
+ * @property {object} context - O contexto técnico da tarefa.
+ * @property {string[]} [context.files] - Lista de arquivos relevantes para a tarefa.
+ * @property {string[]} [context.errors] - Logs de erro ou stack traces, se aplicável.
+ * @property {string} [context.currentBehavior] - Descrição do comportamento atual do sistema.
+ * @property {string} [context.expectedBehavior] - Descrição do comportamento esperado após a conclusão da tarefa.
+ * @property {string[]} [context.resources] - Links para documentação ou outros recursos externos.
+ * @property {string[]} acceptanceCriteria - Lista de critérios mensuráveis para que a tarefa seja considerada concluída.
+ */
 export interface Task {
   title: string;
   objective: string;
@@ -18,11 +36,24 @@ export interface Task {
   acceptanceCriteria: string[];
 }
 
+/**
+ * @interface JulesTask
+ * @extends Task
+ * @description Representa uma tarefa específica para o agente Jules, que requer contexto técnico adicional.
+ * @property {string} technicalContext - String com detalhes técnicos adicionais que o Jules pode precisar.
+ */
 export interface JulesTask extends Task {
   /** Jules precisa de contexto técnico completo */
   technicalContext: string;
 }
 
+/**
+ * @interface RoutingDecision
+ * @description Representa a decisão de roteamento tomada pelo orquestrador.
+ * @property {AgentType} agent - O agente selecionado para executar a tarefa.
+ * @property {string} reason - A justificativa para a escolha do agente.
+ * @property {number} confidence - Um valor de 0 a 1 que representa a confiança na decisão de roteamento.
+ */
 export interface RoutingDecision {
   agent: AgentType;
   reason: string;
@@ -30,7 +61,9 @@ export interface RoutingDecision {
 }
 
 /**
- * Decide qual agente deve executar a tarefa
+ * Decide qual agente é mais adequado para executar uma determinada tarefa com base em palavras-chave.
+ * @param {Task} task - O objeto da tarefa a ser analisado.
+ * @returns {RoutingDecision} A decisão de qual agente deve lidar com a tarefa.
  */
 export function routeTask(task: Task): RoutingDecision {
   // Análise de keywords para decisão
@@ -101,7 +134,9 @@ export function routeTask(task: Task): RoutingDecision {
 }
 
 /**
- * Formata tarefa no template que Jules espera
+ * Formata um objeto de tarefa no template de prompt específico que o agente Jules espera.
+ * @param {JulesTask} task - O objeto da tarefa a ser formatado.
+ * @returns {string} O prompt formatado como uma string, pronto para ser enviado ao Jules.
  */
 export function formatJulesPrompt(task: JulesTask): string {
   const files = task.context.files?.map(f => `\`${f}\``).join(', ') || 'Não especificado';
@@ -129,7 +164,10 @@ Por favor, analise o cenário e me apresente seu plano de ação.`;
 }
 
 /**
- * Valida se tarefa é adequada para delegação
+ * Valida se uma tarefa é adequada para ser delegada a um agente específico, com base em regras de segurança e governança.
+ * @param {Task} task - A tarefa a ser validada.
+ * @param {AgentType} toAgent - O agente para o qual a tarefa seria delegada.
+ * @returns {boolean} Retorna `true` se a delegação for segura, e `false` caso contrário.
  */
 export function canDelegate(task: Task, toAgent: AgentType): boolean {
   // Nunca delegar decisões críticas

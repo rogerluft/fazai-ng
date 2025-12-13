@@ -1,6 +1,8 @@
 /**
- * Gemini Client - Comunicação com Gemini 3 (Google)
- * Gemini é um modelo de linguagem multimodal com contexto 2M tokens
+ * @file Gemini Client - Comunicação com Gemini 3 (Google)
+ * @description Este arquivo implementa o cliente para interagir com o modelo de linguagem Gemini.
+ * Ele é otimizado para tarefas que exigem grande janela de contexto, raciocínio complexo e pesquisa web.
+ * @module src/orchestrator/gemini-client
  */
 
 import { exec } from 'child_process';
@@ -8,14 +10,31 @@ import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
+/**
+ * @interface GeminiTask
+ * @description Define a estrutura de uma tarefa a ser delegada para o Gemini, seguindo a estratégia "Contexto, Intenção, Formato".
+ * @property {string} role - O "papel" ou persona que o Gemini deve assumir (ex: "Engenheiro de Software Sênior").
+ * @property {string} context - Todo o contexto necessário para a tarefa (código, logs, descrições).
+ * @property {string} intention - O objetivo claro e direto da tarefa.
+ * @property {string[]} requirements - Uma lista de requisitos específicos que a resposta deve cumprir.
+ * @property {'code-only' | 'explanation-code' | 'multiple-approaches'} format - O formato desejado para a resposta do Gemini.
+ */
 export interface GeminiTask {
-  role: string; // Ex: "Engenheiro de Software Sênior, especialista em TypeScript"
-  context: string; // Código, arquitetura, dependências
-  intention: string; // O que queremos
-  requirements: string[]; // Lista de requisitos
+  role: string;
+  context: string;
+  intention: string;
+  requirements: string[];
   format: 'code-only' | 'explanation-code' | 'multiple-approaches';
 }
 
+/**
+ * @interface GeminiResponse
+ * @description Define a estrutura da resposta retornada pelo Gemini.
+ * @property {boolean} success - Indica se a operação foi bem-sucedida.
+ * @property {string} [content] - O conteúdo principal da resposta do Gemini.
+ * @property {string} [error] - Uma mensagem de erro, se a operação falhou.
+ * @property {object[]} [approaches] - Um array de abordagens diferentes, se solicitado no formato 'multiple-approaches'.
+ */
 export interface GeminiResponse {
   success: boolean;
   content?: string;
@@ -29,8 +48,9 @@ export interface GeminiResponse {
 }
 
 /**
- * Delega tarefa para Gemini via CLI
- * Usa estratégia: Contexto, Intenção, Formato
+ * Delega uma tarefa para o Gemini via sua própria CLI (`gemini-cli`).
+ * @param {GeminiTask} task - O objeto da tarefa a ser delegada.
+ * @returns {Promise<GeminiResponse>} Uma promessa que resolve com a resposta do Gemini.
  */
 export async function delegateToGemini(task: GeminiTask): Promise<GeminiResponse> {
   try {
@@ -62,8 +82,9 @@ export async function delegateToGemini(task: GeminiTask): Promise<GeminiResponse
 }
 
 /**
- * Usa Gemini via Jules (já integrado)
- * Jules pode chamar Gemini internamente
+ * Delega uma tarefa para o Gemini através do agente Jules, que pode atuar como um proxy.
+ * @param {GeminiTask} task - O objeto da tarefa a ser delegada.
+ * @returns {Promise<GeminiResponse>} Uma promessa que resolve com a resposta do Gemini.
  */
 export async function delegateToGeminiViaJules(task: GeminiTask): Promise<GeminiResponse> {
   try {
@@ -88,8 +109,10 @@ export async function delegateToGeminiViaJules(task: GeminiTask): Promise<Gemini
 }
 
 /**
- * Formata prompt no template que Gemini espera
- * Estratégia: Contexto, Intenção, Formato
+ * Formata um objeto de tarefa no template de prompt específico que o Gemini espera.
+ * @private
+ * @param {GeminiTask} task - O objeto da tarefa a ser formatado.
+ * @returns {string} O prompt formatado como uma string.
  */
 function formatGeminiPrompt(task: GeminiTask): string {
   const formatInstructions = {
@@ -117,7 +140,10 @@ ${formatInstructions[task.format]}`;
 }
 
 /**
- * Pede para Gemini comparar múltiplas abordagens
+ * Cria e delega uma tarefa para o Gemini comparar múltiplas abordagens para resolver um problema.
+ * @param {string} problem - A descrição do problema a ser resolvido.
+ * @param {string} context - O contexto técnico do problema.
+ * @returns {Promise<GeminiResponse>} A resposta do Gemini com as diferentes abordagens.
  */
 export async function askGeminiForApproaches(
   problem: string,
@@ -139,7 +165,9 @@ export async function askGeminiForApproaches(
 }
 
 /**
- * Pede para Gemini analisar código massivo (usa contexto 2M)
+ * Pede para o Gemini analisar um grande volume de código de múltiplos arquivos, aproveitando sua grande janela de contexto.
+ * @param {string[]} files - Um array de caminhos para os arquivos a serem analisados.
+ * @returns {Promise<GeminiResponse>} A resposta do Gemini com a análise do código.
  */
 export async function askGeminiToAnalyzeBulk(files: string[]): Promise<GeminiResponse> {
   const fs = await import('fs/promises');
@@ -168,7 +196,9 @@ export async function askGeminiToAnalyzeBulk(files: string[]): Promise<GeminiRes
 }
 
 /**
- * Pede para Gemini fazer pesquisa web com grounding
+ * Pede para o Gemini realizar uma pesquisa web sobre um determinado tópico usando sua capacidade de "grounding".
+ * @param {string} query - O tópico ou pergunta a ser pesquisado.
+ * @returns {Promise<GeminiResponse>} A resposta do Gemini com o resumo da pesquisa.
  */
 export async function askGeminiToResearchWeb(query: string): Promise<GeminiResponse> {
   const task: GeminiTask = {
@@ -188,7 +218,10 @@ export async function askGeminiToResearchWeb(query: string): Promise<GeminiRespo
 }
 
 /**
- * Escape prompt para shell
+ * Escapa uma string para uso seguro em comandos shell.
+ * @private
+ * @param {string} prompt - A string a ser escapada.
+ * @returns {string} A string escapada.
  */
 function escapePrompt(prompt: string): string {
   return prompt
