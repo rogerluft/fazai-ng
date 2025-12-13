@@ -1,7 +1,7 @@
 {
-  "name": "jarvis-web",
-  "version": "1.0.0",
-  "description": "Terminal Jarvis - Web Interface for Autonomous Linux Agent",
+  "name": "fazai-web",
+  "version": "3.6.0",
+  "description": "FazAI - Web Interface for Autonomous Linux Agent",
   "private": true,
   "scripts": {
     "dev": "next dev",

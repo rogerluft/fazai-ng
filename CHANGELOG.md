@@ -1,5 +1,69 @@
 # FazAI Changelog
 
+## [3.6.1-beta] - 2025-12-13
+
+### 🔧 IMPROVEMENTS - Provider Fallback System
+
+**Automatic Provider Fallback with Correct Chain Order**
+
+#### Features
+
+1. **Correct Fallback Chain** (`src/linux-admin.ts`)
+   - Fixed order: ollama → openrouter → anthropic → openai → google
+   - Auto-detection of recoverable errors (ECONNREFUSED, timeout, rate limit)
+   - Skips providers without API keys
+   - Transparent logging of fallback attempts
+
+2. **Provider Fallback Utility** (`src/utils/provider-fallback.ts`, NEW, 280 lines)
+   - Reusable fallback system for any provider chain
+   - Model equivalence mapping (e.g., gpt-4 → claude-3-5-sonnet)
+   - Intelligent error detection (network, memory, quota, rate limit)
+   - Best-effort model matching when switching providers
+
+#### Web Interface Updates
+
+**FazAI Rebranding** (`web/`)
+- Updated all "jarvis" references to "fazai"
+- Collections: jarvis_* → fazai_*
+- Types renamed: `web/types/jarvis.ts` → `web/types/fazai.ts`
+- Package name: jarvis-web → fazai-web v3.6.0
+- README updated with correct collection names
+
+#### Technical Details
+
+**Error Detection**:
+- Network: ECONNREFUSED, ETIMEDOUT, ENOTFOUND, ECONNRESET
+- Service: 429 (rate limit), 503/504 (unavailable)
+- Resource: Memory/quota exceeded, insufficient capacity
+- Model: 404 model not found
+
+**Fallback Behavior**:
+```
+ollama fails (ECONNREFUSED)
+  ↓
+Try openrouter (with equivalent model)
+  ↓
+Try anthropic (with equivalent model)
+  ↓
+Try openai (with equivalent model)
+  ↓
+Try google (with equivalent model)
+  ↓
+All failed → throw final error
+```
+
+**Model Equivalence Examples**:
+- gpt-4 → claude-3-5-sonnet (anthropic)
+- gpt-4o-mini → claude-3-5-haiku (anthropic)
+- llama → gpt-4o-mini (openai)
+
+### 🐛 Fixes
+
+- Corrected provider fallback chain order in `linux-admin.ts`
+- Fixed openrouter not being tried before anthropic/openai when ollama fails
+
+---
+
 ## [3.6.0-beta] - 2025-12-13
 
 ### 🔥 BREAKING CHANGES

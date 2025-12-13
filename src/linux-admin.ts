@@ -14,12 +14,13 @@ import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google";
 
 // Fallback chains for each provider
+// Standard fallback order: ollama → openrouter → anthropic → openai → google
 const FALLBACK_CHAINS: Record<Provider, Provider[]> = {
   ollama: ["openrouter", "anthropic", "openai", "google"],
-  openrouter: ["ollama", "anthropic", "openai", "google"],
-  anthropic: ["openrouter", "ollama", "openai", "google"],
-  openai: ["anthropic", "openrouter", "ollama", "google"],
-  google: ["openrouter", "ollama", "anthropic", "openai"],
+  openrouter: ["anthropic", "openai", "google", "ollama"],
+  anthropic: ["openai", "google", "ollama", "openrouter"],
+  openai: ["google", "ollama", "openrouter", "anthropic"],
+  google: ["ollama", "openrouter", "anthropic", "openai"],
 };
 
 // Check if a provider is configured

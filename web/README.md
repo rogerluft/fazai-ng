@@ -1,10 +1,10 @@
-# Terminal Jarvis - Web Interface
+# FazAI - Web Interface
 
-A modern web interface for the Terminal Jarvis autonomous Linux administration agent. Built with Next.js 14, TypeScript, TailwindCSS, and shadcn/ui.
+A modern web interface for the FazAI autonomous Linux administration agent. Built with Next.js 14, TypeScript, TailwindCSS, and shadcn/ui.
 
 ## Overview
 
-Terminal Jarvis Web is a comprehensive dashboard for monitoring, controlling, and configuring the Jarvis autonomous agent. It provides interfaces for:
+FazAI Web is a comprehensive dashboard for monitoring, controlling, and configuring the FazAI autonomous agent. It provides interfaces for:
 
 - **Dashboard**: Real-time agent status, metrics, and action timeline
 - **Personality Manager**: Define and adjust agent behavioral traits
@@ -203,19 +203,19 @@ The web interface communicates with the CLI agent via:
 
 The interface manages 5 specialized Qdrant collections:
 
-### 1. jarvis_personality
+### 1. fazai_personality
 Stores agent personality traits with intensities and categories.
 
-### 2. jarvis_memory
+### 2. fazai_memory
 Stores conversation history with semantic embeddings for search.
 
-### 3. jarvis_learning
+### 3. fazai_learning
 Stores learning records (errors, successes, patterns) with confidence scores.
 
-### 4. jarvis_kb
+### 4. fazai_kb
 Stores knowledge base entries with validation and confidence scoring.
 
-### 5. jarvis_inference
+### 5. fazai_inference
 Stores inference rules with conditions, actions, and priority levels.
 
 ## UI Components
