@@ -1,5 +1,76 @@
 # FazAI Changelog
 
+## [3.6.2-beta] - 2025-12-13
+
+### 🔧 IMPROVEMENTS - Systemd Services & Resource Management
+
+**Fixed systemd service files for production deployment**
+
+#### Systemd Services Updates
+
+1. **fazai.service** (`etc/fazai/fazai.service`)
+   - ✅ Fixed WorkingDirectory: `/home/%i/.fazai` → `/opt/fazai/data`
+   - ✅ Fixed ExecStart: `/home/%i/.local/bin/fazai` → `/usr/local/bin/fazai`
+   - ✅ Added global config: `EnvironmentFile=-/etc/fazai/fazai.conf`
+   - ✅ Updated ReadWritePaths: `/opt/fazai/data` and `/var/log/fazai`
+
+2. **fazai-web@.service** (`etc/fazai/fazai-web@.service`)
+   - ✅ Fixed WorkingDirectory: `%h/.fazai/web` → `/opt/fazai/web`
+   - ✅ Added PATH environment variable for npm
+
+3. **qdrant.service** (`etc/fazai/qdrant.service`, NEW)
+   - 🆕 Systemd service for Qdrant with Podman container
+   - 🔒 Resource limits: 512MB memory, 1GB swap, 2 CPUs
+   - 🔒 TasksMax: 512, MemoryMax: 1GB
+   - ⏱️ Graceful shutdown: 30s timeout
+   - 🗑️ Auto-cleanup: ExecStopPost removes container
+   - 🔐 Security: NoNewPrivileges, PrivateTmp
+
+4. **install.sh** (`install.sh`)
+   - ✅ Docker installation now installs systemd service
+   - ✅ Podman installation now installs systemd service
+   - ✅ Creates `/opt/fazai/qdrant_storage` with correct permissions
+   - ✅ Systemctl daemon-reload, enable, start
+   - ✅ Proper error logging with journalctl
+
+#### Resource Management
+
+**Qdrant Resource Limits** (via systemd)
+```ini
+--memory=512m
+--memory-swap=1g
+--cpus=2
+MemoryMax=1G
+TasksMax=512
+```
+
+**Benefits**:
+- Prevents runaway memory consumption
+- Graceful shutdown prevents data corruption
+- Auto-restart on failure
+- Centralized logging via journald
+- No orphan containers after service stop
+
+#### Investigation Results
+
+**Server Health Check**:
+- Total Memory: 283GB, Used: 14GB, Available: 268GB ✅
+- Qdrant RSS: 219MB (normal for vector database) ✅
+- No orphan processes detected ✅
+- No memory leaks detected ✅
+
+**Previously**: Qdrant ran as user container without systemd management, no resource limits, manual startup
+
+**Now**: Qdrant managed by systemd with proper resource limits and graceful shutdown
+
+### 🐛 Fixes
+
+- Fixed obsolete paths in fazai.service (~/. fazai → /opt/fazai/data)
+- Fixed obsolete paths in fazai-web@.service (~/.fazai/web → /opt/fazai/web)
+- Added missing systemd service for containerized Qdrant installations
+
+---
+
 ## [3.6.1-beta] - 2025-12-13
 
 ### 🔧 IMPROVEMENTS - Provider Fallback System

@@ -695,28 +695,55 @@ install_qdrant_docker() {
   docker rm qdrant 2>/dev/null || true
 
   # Criar volume para persistência
-  mkdir -p /opt/fazai/qdrant_storage
+  sudo mkdir -p /opt/fazai/qdrant_storage
+  sudo chown $(whoami):$(whoami) /opt/fazai/qdrant_storage
 
-  # Iniciar Qdrant com restart automático
-  docker run -d \
-    --name qdrant \
-    --restart unless-stopped \
-    -p 6333:6333 \
-    -p 6334:6334 \
-    -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
-    qdrant/qdrant:latest
+  # Instalar systemd service
+  if [ -f "$INSTALL_DIR/etc/fazai/qdrant.service" ]; then
+    info "Instalando serviço systemd para Qdrant..."
 
-  # Aguardar inicialização
-  info "Aguardando Qdrant inicializar..."
-  for i in {1..30}; do
-    if curl -sf "$QDRANT_DEFAULT_URL/collections" > /dev/null 2>&1; then
-      success "Qdrant instalado e rodando!"
-      return 0
-    fi
-    sleep 1
-  done
+    # Substituir podman por docker no service file
+    sudo sed 's/podman/docker/g' "$INSTALL_DIR/etc/fazai/qdrant.service" > /tmp/qdrant.service
+    sudo mv /tmp/qdrant.service /etc/systemd/system/qdrant.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable qdrant
+    sudo systemctl start qdrant
 
-  error "Qdrant não iniciou corretamente. Verifique: docker logs qdrant"
+    # Aguardar inicialização
+    info "Aguardando Qdrant inicializar..."
+    for i in {1..30}; do
+      if curl -sf "$QDRANT_DEFAULT_URL/collections" > /dev/null 2>&1; then
+        success "Qdrant instalado e rodando como serviço systemd!"
+        return 0
+      fi
+      sleep 1
+    done
+
+    error "Qdrant não iniciou. Verifique: sudo journalctl -u qdrant -n 50"
+  else
+    warning "Service file não encontrado. Instalando manualmente..."
+
+    # Fallback para instalação manual (modo antigo)
+    docker run -d \
+      --name qdrant \
+      --restart unless-stopped \
+      -p 6333:6333 \
+      -p 6334:6334 \
+      -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
+      qdrant/qdrant:latest
+
+    # Aguardar inicialização
+    info "Aguardando Qdrant inicializar..."
+    for i in {1..30}; do
+      if curl -sf "$QDRANT_DEFAULT_URL/collections" > /dev/null 2>&1; then
+        success "Qdrant instalado e rodando!"
+        return 0
+      fi
+      sleep 1
+    done
+
+    error "Qdrant não iniciou corretamente. Verifique: docker logs qdrant"
+  fi
 }
 
 # Instalar Qdrant via Podman
@@ -755,28 +782,53 @@ install_qdrant_podman() {
   podman rm qdrant 2>/dev/null || true
 
   # Criar volume para persistência
-  mkdir -p /opt/fazai/qdrant_storage
+  sudo mkdir -p /opt/fazai/qdrant_storage
+  sudo chown $(whoami):$(whoami) /opt/fazai/qdrant_storage
 
-  # Iniciar Qdrant com restart automático
-  podman run -d \
-    --name qdrant \
-    --restart unless-stopped \
-    -p 6333:6333 \
-    -p 6334:6334 \
-    -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
-    qdrant/qdrant:latest
+  # Instalar systemd service
+  if [ -f "$INSTALL_DIR/etc/fazai/qdrant.service" ]; then
+    info "Instalando serviço systemd para Qdrant..."
 
-  # Aguardar inicialização
-  info "Aguardando Qdrant inicializar..."
-  for i in {1..30}; do
-    if curl -sf "$QDRANT_DEFAULT_URL/collections" > /dev/null 2>&1; then
-      success "Qdrant instalado e rodando!"
-      return 0
-    fi
-    sleep 1
-  done
+    sudo cp "$INSTALL_DIR/etc/fazai/qdrant.service" /etc/systemd/system/qdrant.service
+    sudo systemctl daemon-reload
+    sudo systemctl enable qdrant
+    sudo systemctl start qdrant
 
-  error "Qdrant não iniciou corretamente. Verifique: podman logs qdrant"
+    # Aguardar inicialização
+    info "Aguardando Qdrant inicializar..."
+    for i in {1..30}; do
+      if curl -sf "$QDRANT_DEFAULT_URL/collections" > /dev/null 2>&1; then
+        success "Qdrant instalado e rodando como serviço systemd!"
+        return 0
+      fi
+      sleep 1
+    done
+
+    error "Qdrant não iniciou. Verifique: sudo journalctl -u qdrant -n 50"
+  else
+    warning "Service file não encontrado. Instalando manualmente..."
+
+    # Fallback para instalação manual (modo antigo)
+    podman run -d \
+      --name qdrant \
+      --restart unless-stopped \
+      -p 6333:6333 \
+      -p 6334:6334 \
+      -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
+      qdrant/qdrant:latest
+
+    # Aguardar inicialização
+    info "Aguardando Qdrant inicializar..."
+    for i in {1..30}; do
+      if curl -sf "$QDRANT_DEFAULT_URL/collections" > /dev/null 2>&1; then
+        success "Qdrant instalado e rodando!"
+        return 0
+      fi
+      sleep 1
+    done
+
+    error "Qdrant não iniciou corretamente. Verifique: podman logs qdrant"
+  fi
 }
 
 # Instalar Qdrant via binário

@@ -7,9 +7,10 @@ Wants=qdrant.service
 [Service]
 Type=simple
 User=%i
-WorkingDirectory=/home/%i/.fazai
-EnvironmentFile=/home/%i/.config/fazai/fazai.conf
-ExecStart=/home/%i/.local/bin/fazai --cli
+WorkingDirectory=/opt/fazai/data
+EnvironmentFile=-/etc/fazai/fazai.conf
+EnvironmentFile=-/home/%i/.config/fazai/fazai.conf
+ExecStart=/usr/local/bin/fazai --cli
 Restart=on-failure
 RestartSec=10
 StandardOutput=journal
@@ -21,7 +22,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/home/%i/.fazai /home/%i/.config/fazai /var/log/fazai
+ReadWritePaths=/opt/fazai/data /var/log/fazai
 
 [Install]
 WantedBy=multi-user.target

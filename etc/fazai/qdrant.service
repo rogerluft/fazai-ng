@@ -1,0 +1,56 @@
+[Unit]
+Description=Qdrant Vector Database (Podman)
+Documentation=https://qdrant.tech/
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=forking
+User=rluft
+Group=rluft
+
+# Environment
+Environment=PODMAN_SYSTEMD_UNIT=%n
+Environment=QDRANT_STORAGE=/opt/fazai/qdrant_storage
+
+# Container configuration
+ExecStartPre=/usr/bin/podman rm -f qdrant 2>/dev/null || true
+ExecStart=/usr/bin/podman run \
+  --detach \
+  --name qdrant \
+  --publish 6333:6333 \
+  --publish 6334:6334 \
+  --volume ${QDRANT_STORAGE}:/qdrant/storage:Z \
+  --memory=512m \
+  --memory-swap=1g \
+  --cpus=2 \
+  --restart=unless-stopped \
+  docker.io/qdrant/qdrant:latest
+
+# Graceful shutdown with timeout
+ExecStop=/usr/bin/podman stop -t 30 qdrant
+ExecStopPost=/usr/bin/podman rm -f qdrant
+
+# Restart policy
+Restart=on-failure
+RestartSec=30
+
+# Resource limits
+MemoryMax=1G
+TasksMax=512
+
+# Timeout
+TimeoutStartSec=120
+TimeoutStopSec=60
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=qdrant
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

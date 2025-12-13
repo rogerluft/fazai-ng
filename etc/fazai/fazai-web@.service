@@ -7,9 +7,10 @@ Wants=qdrant.service
 [Service]
 Type=simple
 User=%i
-WorkingDirectory=%h/.fazai/web
+WorkingDirectory=/opt/fazai/web
 Environment=NODE_ENV=production
 Environment=PORT=3456
+Environment=PATH=/usr/bin:/usr/local/bin
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=10
