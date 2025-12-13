@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.5.4-beta",
+  "version": "3.6.3-beta",
   "author": "Roger Luft (VeilWalker) <roger@webstorage.com.br> (fork from Mandark by Hrishi Olickel)",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -35,6 +35,7 @@
   "scripts": {
     "build": "bash scripts/setup-env.sh && tsup",
     "postbuild": "node scripts/postbuild.js",
+    "gen:completion": "node scripts/generate-completions.js",
     "dev": "tsx src/app.ts",
     "start": "node dist/app.cjs",
     "deploy": "npm run build && bash scripts/deploy.sh",

@@ -1,5 +1,5 @@
 #compdef fazai
-# Zsh completion for Terminal FazAI v3.1-beta
+# Zsh completion for FazAI - Auto-generated
 # Installation:
 #   mkdir -p ~/.zsh/completion
 #   cp completion/fazai-completion.zsh ~/.zsh/completion/_fazai
@@ -11,30 +11,31 @@ _fazai() {
 
     commands=(
         'ask:Ask general AI question without executing commands'
-        'alias:Create/manage global bash aliases'
         'config:List configured API keys'
         'completion:Print available CLI completions'
+        'alias:Create/manage global bash aliases'
         'search:Manual research via Context7/Web'
-        'vector:Manage Qdrant vector collections'
-        'import:Import conversations to Qdrant'
-        'cloudflare:Manage Cloudflare zones/dns/workers'
-        'github:GitHub integration (auth, repos, issues)'
+        'vector:Valida collections vetoriais (Qdrant)'
+        'import:Importa conversas para Qdrant'
+        'sync:Sync configuration and settings'
+        'cloudflare:Manage Cloudflare (zones, dns, workers)'
+        'cf:Cloudflare (alias)'
+        'github:GitHub integration (auth, repos, issues, etc)'
     )
 
     models=(
-        'gpt4mini:GPT-4o-mini (default, fast and cheap)'
-        'gpt4o:GPT-4o (latest, most capable)'
-        'gpt4turbo:GPT-4 Turbo (high performance)'
-        'sonnet35:Claude 3.5 Sonnet (most intelligent)'
-        'haiku:Claude 3 Haiku (fast and cheap)'
-        'llama32:Llama 3.2 (local)'
-        'qwen:Qwen 2.5:7b (local)'
-        'mistral:Mistral (local)'
+        'gpt-4o:openai model'
+        'gpt-4o-mini:openai model'
+        'claude-3-5-sonnet-latest:anthropic model'
+        'claude-3-5-haiku-latest:anthropic model'
+        'gemini-3.0-pro-latest:google model'
+        'gemini-1.5-flash:google model'
+        'gemini-1.5-pro:google model'
+        'llama-3-sonar-small-32k-online:perplexity model'
+        'qwen2.5:7b:ollama model'
     )
 
     opts=(
-        '--help:Show help message'
-        '-h:Show help message'
         '--dry-run:Simulate commands without executing'
         '--cli:Open interactive CLI mode'
         '--debug:Enable debug logging'
@@ -43,6 +44,8 @@ _fazai() {
         '--auto-research:Re-enable automatic research on failures'
         '--yolo:Skip confirmations (dangerous!)'
         '-y:Skip confirmations (dangerous!)'
+        '--help:Show help message'
+        '-h:Show help message'
     )
 
     case "$state" in
@@ -77,7 +80,7 @@ _fazai() {
             ;;
 
         ask)
-            # Freeform text, no completion
+            _describe 'fazai models' models
             ;;
 
         search)
@@ -106,9 +109,6 @@ _fazai() {
             ;;
         import)
             state=import
-            ;;
-        gpt4mini|gpt4o|gpt4turbo|sonnet35|haiku|llama32|qwen|mistral)
-            _describe 'fazai options' opts
             ;;
     esac
 }

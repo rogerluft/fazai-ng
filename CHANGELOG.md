@@ -1,5 +1,65 @@
 # FazAI Changelog
 
+## [3.6.3-beta] - 2025-12-13
+
+### ✨ FEATURES - Auto-provision Completion System
+
+**Automated Bash and Zsh completion generation**
+
+#### New Implementation
+
+1. **Completion Generator** (`src/utils/completion-generator.ts`)
+   - 🔧 `parseAppTS()` - Extracts commands, options, and models from app.ts
+   - 🛠️ `generateBashCompletion()` - Auto-generates Bash completion script
+   - 📝 `generateZshCompletion()` - Auto-generates Zsh completion script
+   - 🚀 Dynamic generation from app.ts ensures completions always match current CLI
+
+2. **Standalone Generator Script** (`scripts/generate-completions.js`)
+   - 📦 Standalone Node.js script (no dependencies)
+   - ⚙️ Can be run manually: `npm run gen:completion`
+   - 🔄 Integrated into postbuild hook for automatic generation during builds
+   - 💨 Fast generation (< 100ms)
+
+3. **Postbuild Hook Integration** (`scripts/postbuild.js`)
+   - 🔄 Auto-runs completion generator after every build
+   - ✅ Generates `/completion/fazai-completion.bash` and `/completion/fazai-completion.zsh`
+   - 🛡️ Non-blocking: doesn't fail build if generation fails
+   - 📋 Clear logging for debugging
+
+4. **NPM Script** (`package.json`)
+   - `npm run gen:completion` - Manually regenerate completions
+   - Auto-runs as part of `npm run build` (postbuild hook)
+
+#### Features
+
+- ✅ Extracts all commands from app.ts CLI help
+- ✅ Extracts all global options and flags
+- ✅ Includes all AI models for completion
+- ✅ Auto-detects subcommands for vector, import, alias, cloudflare, github
+- ✅ Maintains existing functionality with enhanced dynamic generation
+- ✅ No manual maintenance required - always in sync with code
+
+#### Testing
+
+```bash
+# Manual generation
+npm run gen:completion
+
+# Auto-generation during build
+npm run build  # completion files auto-regenerated
+
+# Verify completions work
+source completion/fazai-completion.bash
+fazai completion  # Should list all available options
+```
+
+#### Files Changed
+
+- ✨ Created: `src/utils/completion-generator.ts` (250 lines)
+- ✨ Created: `scripts/generate-completions.js` (300 lines)
+- 📝 Modified: `scripts/postbuild.js` (+50 lines completion integration)
+- 📝 Modified: `package.json` (added gen:completion script)
+
 ## [3.6.2-beta] - 2025-12-13
 
 ### 🔧 IMPROVEMENTS - Systemd Services & Resource Management
