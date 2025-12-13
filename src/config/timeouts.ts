@@ -24,9 +24,9 @@ export const API_TIMEOUTS = {
 
   /**
    * OpenAI API
-   * Standard timeout for GPT models
+   * Increased timeout for GPT models (streaming can be slow)
    */
-  openai: 90000, // 90 seconds
+  openai: 180000, // 3 minutes
 
   /**
    * OpenRouter (multi-model gateway)

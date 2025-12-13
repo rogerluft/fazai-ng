@@ -21,7 +21,7 @@ import chalk from "chalk";
 
 const ALIAS_DIR = "/etc/fazai";
 const ALIAS_FILE = path.join(ALIAS_DIR, "fzalias");
-const BACKUP_DIR = path.join(ALIAS_DIR, "backups");
+const BACKUP_DIR = "/opt/fazai/alias-backups";
 
 /**
  * Alias entry
@@ -56,11 +56,11 @@ function isDangerousCommand(command: string): boolean {
  */
 async function ensureAliasDir(): Promise<void> {
   try {
-    await fs.mkdir(ALIAS_DIR, { recursive: true, mode: 0o755 });
+    // Criar apenas backup dir (/opt/fazai/) - /etc/fazai deve existir do install
     await fs.mkdir(BACKUP_DIR, { recursive: true, mode: 0o755 });
   } catch (error: any) {
-    if (error.code !== "EEXIST") {
-      throw new Error(`Failed to create alias directory: ${error.message}`);
+    if (error.code !== "EEXIST" && error.code !== "EACCES") {
+      throw new Error(`Failed to create backup directory: ${error.message}`);
     }
   }
 }
@@ -182,8 +182,20 @@ export async function createAlias(
 
   const content = header + aliasLines + "\n";
 
-  // Escreve arquivo
-  await fs.writeFile(ALIAS_FILE, content, { mode: 0o644 });
+  // Escreve arquivo (tenta primeiro, se falhar por permissão, usa sudo)
+  try {
+    await fs.writeFile(ALIAS_FILE, content, { mode: 0o644 });
+  } catch (error: any) {
+    if (error.code === "EACCES") {
+      logger.warn(chalk.yellow("⚠  Permission denied. Creating with sudo..."));
+      const { execSync } = await import("child_process");
+      const tmpFile = `/tmp/fzalias.${Date.now()}`;
+      await fs.writeFile(tmpFile, content, { mode: 0o644 });
+      execSync(`sudo mv ${tmpFile} ${ALIAS_FILE}`);
+    } else {
+      throw error;
+    }
+  }
 
   logger.info(chalk.green(`✓ Alias '${name}' created successfully`));
   logger.info(chalk.gray(`  Command: ${command}`));
@@ -216,7 +228,20 @@ export async function removeAlias(name: string): Promise<void> {
 
   const content = header + aliasLines + "\n";
 
-  await fs.writeFile(ALIAS_FILE, content, { mode: 0o644 });
+  // Escreve arquivo (tenta primeiro, se falhar por permissão, usa sudo)
+  try {
+    await fs.writeFile(ALIAS_FILE, content, { mode: 0o644 });
+  } catch (error: any) {
+    if (error.code === "EACCES") {
+      logger.warn(chalk.yellow("⚠  Permission denied. Removing with sudo..."));
+      const { execSync } = await import("child_process");
+      const tmpFile = `/tmp/fzalias.${Date.now()}`;
+      await fs.writeFile(tmpFile, content, { mode: 0o644 });
+      execSync(`sudo mv ${tmpFile} ${ALIAS_FILE}`);
+    } else {
+      throw error;
+    }
+  }
 
   logger.info(chalk.green(`✓ Alias '${name}' removed successfully`));
 }

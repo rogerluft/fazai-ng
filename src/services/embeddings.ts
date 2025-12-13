@@ -61,6 +61,7 @@ class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly dimension: number;
+  private readonly MAX_TOKENS = 512; // mxbai-embed-large context limit
 
   constructor(
     baseUrl: string = "http://192.168.0.101:11434",
@@ -70,6 +71,18 @@ class OllamaEmbeddingService implements EmbeddingService {
     this.baseUrl = baseUrl;
     this.model = model;
     this.dimension = dimension;
+  }
+
+  /**
+   * Trunca texto para caber no contexto do modelo
+   */
+  private truncateText(text: string): string {
+    // Aproximação: ~4 chars por token
+    const maxChars = this.MAX_TOKENS * 4;
+    if (text.length <= maxChars) {
+      return text;
+    }
+    return text.substring(0, maxChars);
   }
 
   async generate(text: string): Promise<number[]> {
@@ -108,7 +121,7 @@ class OllamaEmbeddingService implements EmbeddingService {
                 },
                 body: JSON.stringify({
                   model: this.model,
-                  prompt: text,
+                  prompt: this.truncateText(text),
                 }),
                 signal: controller.signal,
               });

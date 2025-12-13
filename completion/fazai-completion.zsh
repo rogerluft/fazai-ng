@@ -11,11 +11,14 @@ _fazai() {
 
     commands=(
         'ask:Ask general AI question without executing commands'
+        'alias:Create/manage global bash aliases'
         'config:List configured API keys'
         'completion:Print available CLI completions'
         'search:Manual research via Context7/Web'
         'vector:Manage Qdrant vector collections'
         'import:Import conversations to Qdrant'
+        'cloudflare:Manage Cloudflare zones/dns/workers'
+        'github:GitHub integration (auth, repos, issues)'
     )
 
     models=(

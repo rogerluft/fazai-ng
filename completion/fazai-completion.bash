@@ -12,7 +12,7 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands
-    commands="ask alias config completion search vector import sync cloudflare github"
+    commands="ask alias config completion search vector import cloudflare github"
 
     # Options/flags
     opts="--help -h --dry-run --cli --debug --verbose --log-file --auto-research --yolo -y"

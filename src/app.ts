@@ -76,7 +76,6 @@ Usage:
   fazai search "query"                               # Manual research via Context7/Web
   fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
-  fazai sync                                         # Sync repository changes to /opt/fazai
   fazai cloudflare <action>                          # Manage Cloudflare (zones, dns, workers)
   fazai cf zones                                     # Cloudflare: list zones
   fazai cf dns list <zoneId>                         # Cloudflare: manage DNS
