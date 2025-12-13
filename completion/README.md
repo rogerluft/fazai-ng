@@ -2,6 +2,49 @@
 
 Auto-complete para Bash e Zsh com todos os comandos, flags e modelos do Terminal FazAI.
 
+## Auto-Provision System
+
+Os arquivos de completion são **gerados automaticamente** a partir de `src/app.ts` durante o build. Isso garante que as completions sempre estejam sincronizadas com a interface CLI atual.
+
+### Como os Completions são Gerados
+
+1. **Durante o Build** (`npm run build`)
+   - O postbuild hook (`scripts/postbuild.js`) executa automaticamente
+   - Chama o gerador standalone (`scripts/generate-completions.js`)
+   - Gera novos arquivos em `/completion/fazai-completion.{bash,zsh}`
+
+2. **Manualmente**
+   ```bash
+   npm run gen:completion
+   ```
+
+3. **Fluxo Automático**
+   ```
+   src/app.ts (comandos, opções, modelos)
+       ↓
+   scripts/generate-completions.js (parser e gerador)
+       ↓
+   completion/fazai-completion.bash (auto-gerado)
+   completion/fazai-completion.zsh  (auto-gerado)
+   ```
+
+### Regenerar Completions
+
+Se você adicionar novos comandos a `src/app.ts`:
+
+```bash
+# Opção 1: Build completo (regenera automaticamente)
+npm run build
+
+# Opção 2: Regenerar só os completions
+npm run gen:completion
+
+# Opção 3: Manualmente (não recomendado)
+node scripts/generate-completions.js
+```
+
+**Não edite `fazai-completion.bash` ou `fazai-completion.zsh` diretamente** - suas mudanças serão sobrescritas na próxima geração!
+
 ## Instalação
 
 ### Bash
@@ -204,26 +247,58 @@ autoload -Uz compinit && compinit
 
 ## Desenvolvimento
 
-Para adicionar novos comandos ou opções ao completion:
+### Adicionar Novos Comandos
 
-1. Editar `fazai-completion.bash` (Bash)
-2. Editar `fazai-completion.zsh` (Zsh)
-3. Testar com `source completion/fazai-completion.bash`
-4. Commitar mudanças
+O sistema de auto-provision garante que os completions sejam sempre atualizados automaticamente. Para adicionar novos comandos:
 
-### Estrutura do Completion
+1. **Editar `src/app.ts`**
+   - Adicione o novo comando ao `displayHelp()`
+   - Adicione lógica de parsing (se necessário)
+
+2. **Regenerar Completions**
+   ```bash
+   npm run gen:completion
+   # ou
+   npm run build  # regenera automaticamente
+   ```
+
+3. **Verificar Resultado**
+   ```bash
+   source completion/fazai-completion.bash
+   fazai <TAB>  # novo comando deve aparecer
+   ```
+
+### Estrutura do Gerador
+
+**Generator** (`scripts/generate-completions.js`):
+- `parseAppTS()` - Extrai comandos, opções e modelos de app.ts
+- `generateBashCompletion()` - Gera script Bash completo
+- `generateZshCompletion()` - Gera script Zsh completo
+- Execution: Node.js standalone (sem dependências)
+
+**Estrutura dos Completions**
 
 **Bash:**
 - Função principal: `_fazai_completion()`
-- Variáveis: `commands`, `models`, `opts`, etc.
+- Variáveis: `commands`, `models`, `opts` (auto-geradas)
 - Lógica de case para cada comando
 - Registro: `complete -F _fazai_completion fazai`
 
 **Zsh:**
 - Função principal: `_fazai()`
-- Arrays: `commands`, `models`, `opts`
+- Arrays: `commands`, `models`, `opts` (auto-gerados)
 - State machine para subcomandos
 - Uso de `_arguments` e `_describe`
+
+### Customizações Manuais
+
+Se você precisar customizar o comportamento de completion além do auto-provision:
+
+1. **Subcomandos**: Editar função `parseAppTS()` em `scripts/generate-completions.js`
+2. **Descrições**: Atualizar o objeto `commands` em `parseAppTS()`
+3. **Modelos**: Atualizar array `models` em `parseAppTS()`
+
+**⚠️ Importante**: Edições diretas em `fazai-completion.bash/zsh` serão perdidas na próxima geração!
 
 ## Licença
 
