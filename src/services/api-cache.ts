@@ -1,5 +1,6 @@
 import { createHash } from "crypto";
 import { promises as fs } from "fs";
+import path from "path";
 import { logger } from "../logger";
 import { FAZAI_PATHS, ensureFazaiDirectories } from "../utils/paths";
 
