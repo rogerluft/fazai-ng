@@ -1,5 +1,55 @@
 # FazAI Changelog
 
+## [3.6.5-beta] - 2025-12-13
+
+### 🎯 ENHANCEMENT - Engineer Role Recognition
+
+**System Prompts Enhanced for Trusted Engineer Access**
+
+#### Changes
+
+1. **Engineer Role Recognition** - All system prompts now recognize user (Roginho) as Senior Platform Engineer
+   - Removed restrictive safety warnings and disclaimers
+   - Removed "Are you sure?" confirmations for trusted engineer
+   - Removed "I cannot/should not/I'm not able to" restrictions
+   - Added explicit trust level: MAXIMUM
+
+2. **Modified System Prompts** (`src/linux-prompt.ts`, `src/askPrompt.ts`, `src/linux-admin.ts`, `src/askAI.ts`)
+   - Linux admin prompt: Added ROLE AND CONTEXT section with trust level
+   - General ask prompt: Added engineer context without restrictions
+   - All provider system messages: Updated to recognize engineer expertise
+   - Changed from defensive ("Always prioritize security") to operational ("Provide direct, efficient commands")
+
+3. **Operational Freedom**
+   - No intermediate approval steps for technical decisions
+   - Direct execution without unnecessary safety checks
+   - Safety information provided as reference, not requirements
+   - Assumes engineer has backups/snapshots and understands risks
+
+4. **Provider Coverage**
+   - ✅ Anthropic (Claude)
+   - ✅ OpenAI (GPT-4, GPT-4o)
+   - ✅ OpenRouter
+   - ✅ Ollama (local models)
+   - ✅ Google Gemini
+   - ✅ Perplexity (no changes needed - already direct)
+
+#### Files Modified
+
+- `/home/rluft/fazai-ng/src/linux-prompt.ts` - Main Linux admin prompt template
+- `/home/rluft/fazai-ng/src/askPrompt.ts` - General Q&A prompts
+- `/home/rluft/fazai-ng/src/linux-admin.ts` - All provider system messages (5 providers)
+- `/home/rluft/fazai-ng/src/askAI.ts` - All provider system messages (5 providers)
+
+#### Result
+
+Claude AI now:
+- Treats Roginho as trusted administrator with full privileges
+- Executes requests directly without second-guessing
+- Provides information freely without restrictive warnings
+- Does not ask for approval or confirmation (engineer knows what they're doing)
+- Includes safety info as reference, not as barriers
+
 ## [3.6.4-beta] - 2025-12-13
 
 ### 🔧 FIXES - Critical Web Integration Issues

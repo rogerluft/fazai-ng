@@ -548,7 +548,7 @@ async function* getLinuxCommandsFromClaude(
       max_tokens: tokens,
       stream: true,
       temperature: 0,
-      system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
+      system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.
 
 IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 {"commands": [array de comandos]}
@@ -574,7 +574,7 @@ async function* getLinuxCommandsFromOpenAI(
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com OpenAI (${model})...`);
 
-  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
+  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.
 
 IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 {"commands": [array de comandos]}
@@ -617,7 +617,7 @@ async function* getLinuxCommandsFromOpenRouter(
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com OpenRouter (${model})...`);
 
-  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
+  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.
 
 IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 {"commands": [array de comandos]}
@@ -654,7 +654,7 @@ async function* getLinuxCommandsFromOllama(
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Ollama (${model}) em ${baseUrl}...`);
 
-  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.`;
+  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.`;
 
   const prompt = `${linuxAdminPrompt(task)}
 
@@ -742,7 +742,7 @@ async function* getLinuxCommandsFromGemini(
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Gemini (${model})...`);
 
-  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nVocê é um administrador de sistemas Linux. Sempre priorize segurança e inclua verificações apropriadas.
+  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.
 
 IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
 {"commands": [array de comandos]}
