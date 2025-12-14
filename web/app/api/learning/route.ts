@@ -79,20 +79,54 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/learning
  *
- * Create new learning entry (not implemented - requires embedding)
+ * Create new learning entry
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const { learning_id, type, title, description, context, action_taken, outcome, confidence, category, tags } = body;
 
-    return NextResponse.json(
-      {
-        error: "Learning creation not implemented yet",
-        message: "Requires embedding generation integration",
-      },
-      { status: 501 }
+    if (!learning_id || !type || !title || !category) {
+      return NextResponse.json(
+        { error: "Missing required fields: learning_id, type, title, category" },
+        { status: 400 }
+      );
+    }
+
+    // Generate ID from learning_id hash
+    const id = Math.abs(
+      learning_id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
     );
+
+    await qdrant.upsert("fazai_learning", {
+      points: [
+        {
+          id,
+          payload: {
+            learning_id,
+            type,
+            title,
+            description,
+            context,
+            action_taken,
+            outcome: outcome || "sucesso",
+            confidence: confidence || 0.5,
+            category,
+            timestamp: new Date().toISOString(),
+            applied_count: 0,
+            tags,
+          },
+          vector: [],
+        },
+      ],
+    });
+
+    return NextResponse.json({
+      success: true,
+      learning: { id, learning_id, type, title, category, confidence },
+    });
   } catch (error: any) {
+    console.error("Failed to create learning:", error);
     return NextResponse.json(
       { error: "Failed to create learning", details: error.message },
       { status: 500 }

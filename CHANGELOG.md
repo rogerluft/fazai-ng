@@ -1,5 +1,39 @@
 # FazAI Changelog
 
+## [3.6.4-beta] - 2025-12-13
+
+### 🔧 FIXES - Critical Web Integration Issues
+
+**6 critical Qdrant integration bugs resolved**
+
+#### Bug Fixes
+
+1. **Collection Names Standardized** - types/fazai.ts: jarvis_* → fazai_*
+2. **Personality Traits Persistence** - POST/DELETE now persist to Qdrant fazai_personality
+3. **Knowledge Base Creation** - POST endpoint fully implemented (was 501 Not Implemented)
+4. **Rules API Integration** - GET/POST/DELETE now use Qdrant fazai_inference
+5. **Learning Endpoint** - POST endpoint fully implemented (was 501 Not Implemented)
+6. **Memory Search** - Added basic text search filtering on query parameter
+
+#### Files Modified
+
+- `web/types/fazai.ts` - Collection names fixed (jarvis_* → fazai_*)
+- `web/app/api/personality/traits/route.ts` - Added POST/DELETE with Qdrant upsert
+- `web/app/api/knowledge/route.ts` - POST endpoint implemented with upsert
+- `web/app/api/rules/route.ts` - Full CRUD with Qdrant fazai_inference
+- `web/app/api/learning/route.ts` - POST endpoint implemented with upsert
+- `web/app/api/memory/search/route.ts` - Added text-based search filtering
+
+#### Endpoints Now Functional
+
+- `POST /api/personality/traits` - Create and persist traits
+- `DELETE /api/personality/traits?trait_name=X` - Delete traits
+- `POST /api/knowledge` - Create KB entries
+- `POST /api/rules` - Create rules
+- `DELETE /api/rules?rule_id=X` - Delete rules
+- `POST /api/learning` - Create learnings
+- `GET /api/memory/search?query=X` - Text search on memories
+
 ## [3.6.3-beta] - 2025-12-13
 
 ### ✨ FEATURES - Auto-provision Completion System

@@ -29,8 +29,7 @@ export async function GET(request: NextRequest) {
       must.push({ key: "conversation_id", match: { value: conversation_id } });
     }
 
-    // TODO: Implement semantic search when query is provided
-    // For now, just scroll recent memories
+    // Scroll memories with filters
     const response = await qdrant.scroll("fazai_memory", {
       filter: must.length > 0 ? { must } : undefined,
       limit,
@@ -38,7 +37,7 @@ export async function GET(request: NextRequest) {
       with_vector: false,
     });
 
-    const memories = response.points.map((point) => ({
+    let memories = response.points.map((point) => ({
       id: point.id,
       conversation_id: point.payload?.conversation_id,
       message_id: point.payload?.message_id,
@@ -51,11 +50,22 @@ export async function GET(request: NextRequest) {
       tags: point.payload?.tags,
     }));
 
+    // Basic text search if query provided
+    if (query) {
+      const queryLower = query.toLowerCase();
+      memories = memories.filter(
+        (m) =>
+          m.content?.toLowerCase().includes(queryLower) ||
+          m.summary?.toLowerCase().includes(queryLower) ||
+          m.tags?.some((t) => t.toLowerCase().includes(queryLower))
+      );
+    }
+
     return NextResponse.json({
       memories,
       total: memories.length,
       query: query || null,
-      semantic_search: false, // TODO: Enable when embeddings are integrated
+      semantic_search: false, // Note: Full semantic search requires embedding model
     });
   } catch (error: any) {
     console.error("Failed to search memory:", error);

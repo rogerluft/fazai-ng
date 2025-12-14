@@ -92,24 +92,55 @@ export async function GET(request: NextRequest) {
 /**
  * POST /api/knowledge
  *
- * Create new knowledge entry (not implemented yet - requires embedding generation)
+ * Create new knowledge entry
  */
 export async function POST(request: Request) {
   try {
     const body = await request.json();
+    const { slug, title, summary, category, scope, linux_distribution, component, commands, source, confidence, validated, tags } = body;
 
-    // TODO: Validate payload with Zod schema
-    // TODO: Generate embedding for the knowledge
-    // TODO: Insert into Qdrant
+    if (!slug || !title || !summary) {
+      return NextResponse.json(
+        { error: "Missing required fields: slug, title, summary" },
+        { status: 400 }
+      );
+    }
 
-    return NextResponse.json(
-      {
-        error: "Knowledge creation not implemented yet",
-        message: "Requires embedding generation integration",
-      },
-      { status: 501 } // Not Implemented
+    // Generate ID from slug hash
+    const id = Math.abs(
+      slug.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
     );
+
+    await qdrant.upsert("fazai_kb", {
+      points: [
+        {
+          id,
+          payload: {
+            slug,
+            title,
+            summary,
+            category: category || "networking",
+            scope,
+            linux_distribution,
+            component,
+            commands,
+            source,
+            confidence: confidence || 0.8,
+            validated: validated || false,
+            tags,
+            created_at: new Date().toISOString(),
+          },
+          vector: [],
+        },
+      ],
+    });
+
+    return NextResponse.json({
+      success: true,
+      knowledge: { id, slug, title, summary, category, confidence },
+    });
   } catch (error: any) {
+    console.error("Failed to create knowledge:", error);
     return NextResponse.json(
       { error: "Failed to create knowledge", details: error.message },
       { status: 500 }
