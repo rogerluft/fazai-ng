@@ -1,11 +1,57 @@
 #!/usr/bin/env node
 /**
  * Auto-provision completion generator for FazAI
- * Dynamically generates Bash and Zsh completions from app.ts
+ * Dynamically generates Bash and Zsh completions from app.ts and models.ts
  */
 
 import fs from "node:fs";
 import path from "node:path";
+
+/**
+ * Parse models.ts to extract actual model definitions
+ * Reads from getBuiltInModels() function
+ */
+function parseModelsTS(modelsPath: string): Array<{ name: string; provider: string }> {
+  try {
+    const content = fs.readFileSync(modelsPath, "utf-8");
+    const models: Array<{ name: string; provider: string }> = [];
+
+    // Extract model definitions from getBuiltInModels() function
+    // Pattern: name: "model-name", provider: "provider-name"
+    const modelBlockRegex = /{\s*name:\s*["']([^"']+)["'],\s*provider:\s*["']([^"']+)["']/g;
+    let match;
+
+    while ((match = modelBlockRegex.exec(content)) !== null) {
+      models.push({
+        name: match[1],
+        provider: match[2],
+      });
+    }
+
+    if (models.length > 0) {
+      return models;
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not parse models.ts: ${error}`);
+  }
+
+  // Fallback to default models if parsing fails
+  return [
+    { name: "gemini-2.5-pro", provider: "google" },
+    { name: "gemini-2.5-flash", provider: "google" },
+    { name: "gemini-2.5-flash-lite", provider: "google" },
+    { name: "qwen2.5:7b", provider: "ollama" },
+    { name: "tinyllama:1b", provider: "ollama" },
+    { name: "qwen/qwen3-coder:free", provider: "openrouter" },
+    { name: "google/gemini-2.0-flash-exp:free", provider: "openrouter" },
+    { name: "llama-3-sonar-small-32k-online", provider: "perplexity" },
+    { name: "llama-3-sonar-large-32k-online", provider: "perplexity" },
+    { name: "gpt-4o-mini", provider: "openai" },
+    { name: "gpt-4o", provider: "openai" },
+    { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
+    { name: "claude-3-haiku-20240307", provider: "anthropic" },
+  ];
+}
 
 interface Command {
   name: string;
@@ -23,6 +69,10 @@ export function parseAppTS(appPath: string): {
   models: Array<{ name: string; provider: string }>;
 } {
   const content = fs.readFileSync(appPath, "utf-8");
+
+  // Get models from models.ts (real source of truth)
+  const modelsPath = path.join(path.dirname(appPath), "models.ts");
+  const models = parseModelsTS(modelsPath);
 
   // Extract commands from displayHelp()
   const commands: Command[] = [
@@ -97,22 +147,7 @@ export function parseAppTS(appPath: string): {
     "-h",
   ];
 
-  // Extract model imports - simplified extraction from models array
-  const modelsMatch = content.match(/import\s*{\s*models\s*}\s*from\s*["']\.\/models["']/);
-  const models = modelsMatch
-    ? [
-        { name: "gpt-4o", provider: "openai" },
-        { name: "gpt-4o-mini", provider: "openai" },
-        { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
-        { name: "claude-3-5-haiku-latest", provider: "anthropic" },
-        { name: "gemini-3.0-pro-latest", provider: "google" },
-        { name: "gemini-1.5-flash", provider: "google" },
-        { name: "gemini-1.5-pro", provider: "google" },
-        { name: "llama-3-sonar-small-32k-online", provider: "perplexity" },
-        { name: "qwen2.5:7b", provider: "ollama" },
-      ]
-    : [];
-
+  // Models already loaded from models.ts above
   return { commands, globalOptions, models };
 }
 

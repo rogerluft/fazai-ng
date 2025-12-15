@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Bash completion for FazAI - Auto-generated
+# Bash completion for FazAI - Auto-generated from models.ts
 # Installation:
 #   sudo cp completion/fazai-completion.bash /etc/bash_completion.d/fazai
 # Or:
@@ -18,12 +18,7 @@ _fazai_completion() {
     opts="--dry-run --cli --debug --verbose --log-file --auto-research --yolo -y --help -h"
 
     # AI models (auto-generated from models.ts)
-    models="gpt-4o gpt-4o-mini claude-3-5-sonnet-latest claude-3-5-haiku-latest gemini-3.0-pro-latest gemini-1.5-flash gemini-1.5-pro llama-3-sonar-small-32k-online qwen2.5:7b"
-
-    # Fallback if models not available
-    if [ -z "$models" ]; then
-        models="gpt-4o gpt-4o-mini claude-3-5-sonnet-latest claude-3-5-haiku-latest gemini-3.0-pro-latest gemini-1.5-flash qwen2.5:7b"
-    fi
+    models="gemini-3.0-pro-latest gemini-2.5-pro gemini-2.5-flash gemini-2.5-flash-lite qwen2.5:7b tinyllama:1b qwen/qwen3-coder:free google/gemini-2.0-flash-exp:free llama-3-sonar-small-32k-online llama-3-sonar-large-32k-online gpt-4o-mini gpt-4o claude-3-5-sonnet-latest claude-3-haiku-20240307"
 
     # First argument (command)
     if [ $COMP_CWORD -eq 1 ]; then

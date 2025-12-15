@@ -1,5 +1,5 @@
 #compdef fazai
-# Zsh completion for FazAI - Auto-generated
+# Zsh completion for FazAI - Auto-generated from models.ts
 # Installation:
 #   mkdir -p ~/.zsh/completion
 #   cp completion/fazai-completion.zsh ~/.zsh/completion/_fazai
@@ -24,15 +24,20 @@ _fazai() {
     )
 
     models=(
-        'gpt-4o:openai model'
-        'gpt-4o-mini:openai model'
-        'claude-3-5-sonnet-latest:anthropic model'
-        'claude-3-5-haiku-latest:anthropic model'
         'gemini-3.0-pro-latest:google model'
-        'gemini-1.5-flash:google model'
-        'gemini-1.5-pro:google model'
-        'llama-3-sonar-small-32k-online:perplexity model'
+        'gemini-2.5-pro:google model'
+        'gemini-2.5-flash:google model'
+        'gemini-2.5-flash-lite:google model'
         'qwen2.5:7b:ollama model'
+        'tinyllama:1b:ollama model'
+        'qwen/qwen3-coder:free:openrouter model'
+        'google/gemini-2.0-flash-exp:free:openrouter model'
+        'llama-3-sonar-small-32k-online:perplexity model'
+        'llama-3-sonar-large-32k-online:perplexity model'
+        'gpt-4o-mini:openai model'
+        'gpt-4o:openai model'
+        'claude-3-5-sonnet-latest:anthropic model'
+        'claude-3-haiku-20240307:anthropic model'
     )
 
     opts=(

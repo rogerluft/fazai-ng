@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 /**
  * Standalone completion generator script
- * Generates Bash and Zsh completion files from app.ts
+ * Generates Bash and Zsh completion files from app.ts and models.ts
+ *
+ * IMPORTANT: This script dynamically reads models from src/models.ts
+ * to ensure completions always match the actual available models.
  */
 
 import fs from "node:fs";
@@ -12,10 +15,59 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
 
 /**
+ * Parse models.ts to extract actual model definitions
+ */
+function parseModelsTS(modelsPath) {
+  try {
+    const content = fs.readFileSync(modelsPath, "utf-8");
+    const models = [];
+
+    // Extract model definitions from getBuiltInModels() function
+    // Pattern: name: "model-name", provider: "provider-name"
+    const modelBlockRegex = /{\s*name:\s*["']([^"']+)["'],\s*provider:\s*["']([^"']+)["']/g;
+    let match;
+
+    while ((match = modelBlockRegex.exec(content)) !== null) {
+      models.push({
+        name: match[1],
+        provider: match[2],
+      });
+    }
+
+    if (models.length > 0) {
+      console.log(`📋 Found ${models.length} models in models.ts`);
+      return models;
+    }
+  } catch (error) {
+    console.warn(`Warning: Could not parse models.ts: ${error.message}`);
+  }
+
+  // Fallback to default models if parsing fails
+  console.log("⚠️ Using fallback models (could not parse models.ts)");
+  return [
+    { name: "gemini-2.5-pro", provider: "google" },
+    { name: "gemini-2.5-flash", provider: "google" },
+    { name: "gemini-2.5-flash-lite", provider: "google" },
+    { name: "qwen2.5:7b", provider: "ollama" },
+    { name: "tinyllama:1b", provider: "ollama" },
+    { name: "qwen/qwen3-coder:free", provider: "openrouter" },
+    { name: "google/gemini-2.0-flash-exp:free", provider: "openrouter" },
+    { name: "llama-3-sonar-small-32k-online", provider: "perplexity" },
+    { name: "llama-3-sonar-large-32k-online", provider: "perplexity" },
+    { name: "gpt-4o-mini", provider: "openai" },
+    { name: "gpt-4o", provider: "openai" },
+    { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
+    { name: "claude-3-haiku-20240307", provider: "anthropic" },
+  ];
+}
+
+/**
  * Parse app.ts to extract commands and options
  */
 function parseAppTS(appPath) {
-  const content = fs.readFileSync(appPath, "utf-8");
+  // Get models from models.ts (real source of truth)
+  const modelsPath = path.join(path.dirname(appPath), "models.ts");
+  const models = parseModelsTS(modelsPath);
 
   // Extract commands from app.ts
   const commands = [
@@ -89,18 +141,6 @@ function parseAppTS(appPath) {
     "-h",
   ];
 
-  const models = [
-    { name: "gpt-4o", provider: "openai" },
-    { name: "gpt-4o-mini", provider: "openai" },
-    { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
-    { name: "claude-3-5-haiku-latest", provider: "anthropic" },
-    { name: "gemini-3.0-pro-latest", provider: "google" },
-    { name: "gemini-1.5-flash", provider: "google" },
-    { name: "gemini-1.5-pro", provider: "google" },
-    { name: "llama-3-sonar-small-32k-online", provider: "perplexity" },
-    { name: "qwen2.5:7b", provider: "ollama" },
-  ];
-
   return { commands, globalOptions, models };
 }
 
@@ -113,7 +153,7 @@ function generateBashCompletion(data) {
   const modelsList = data.models.map((m) => m.name).join(" ");
 
   return `#!/usr/bin/env bash
-# Bash completion for FazAI - Auto-generated
+# Bash completion for FazAI - Auto-generated from models.ts
 # Installation:
 #   sudo cp completion/fazai-completion.bash /etc/bash_completion.d/fazai
 # Or:
@@ -133,11 +173,6 @@ _fazai_completion() {
 
     # AI models (auto-generated from models.ts)
     models="${modelsList}"
-
-    # Fallback if models not available
-    if [ -z "$models" ]; then
-        models="gpt-4o gpt-4o-mini claude-3-5-sonnet-latest claude-3-5-haiku-latest gemini-3.0-pro-latest gemini-1.5-flash qwen2.5:7b"
-    fi
 
     # First argument (command)
     if [ $COMP_CWORD -eq 1 ]; then
@@ -309,7 +344,7 @@ function generateZshCompletion(data) {
     .join("\n        ");
 
   return `#compdef fazai
-# Zsh completion for FazAI - Auto-generated
+# Zsh completion for FazAI - Auto-generated from models.ts
 # Installation:
 #   mkdir -p ~/.zsh/completion
 #   cp completion/fazai-completion.zsh ~/.zsh/completion/_fazai
