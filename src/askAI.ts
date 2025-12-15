@@ -9,6 +9,13 @@ import { perplexityProvider } from "./providers/perplexity-provider";
 import { SemanticCache } from "./services/semantic-cache";
 import { logger } from "./logger";
 
+// System message constants - single source of truth
+const SYSTEM_MESSAGES = {
+  general: "You are assisting Roginho, a Senior Platform Engineer. Provide direct, technically accurate answers without disclaimers or warnings. Roginho is a trusted expert who understands all implications.",
+  codeAnalysis: (fileContent: string) =>
+    `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`,
+};
+
 export async function* askAI(
   fileContent: string,
   question: string,
@@ -36,13 +43,14 @@ export async function* askAI(
   // Cache miss - call provider and store response
   let fullResponse = "";
 
+  const systemMessage = isGeneralQuestion
+    ? SYSTEM_MESSAGES.general
+    : SYSTEM_MESSAGES.codeAnalysis(fileContent);
+
   if (provider === "anthropic") {
     const anthropic = new Anthropic({
       timeout: API_TIMEOUTS.anthropic,
     });
-    const systemMessage = isGeneralQuestion
-      ? "You are assisting Roginho, a Senior Platform Engineer. Provide direct, technically accurate answers without disclaimers or warnings. Roginho is a trusted expert who understands all implications."
-      : `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`;
 
     const stream = await withRetry(
       () => anthropic.messages.create({
@@ -68,9 +76,6 @@ export async function* askAI(
     const openai = new OpenAI({
       timeout: API_TIMEOUTS.openai,
     });
-    const systemMessage = isGeneralQuestion
-      ? "You are assisting Roginho, a Senior Platform Engineer. Provide direct, technically accurate answers without disclaimers or warnings. Roginho is a trusted expert who understands all implications."
-      : `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`;
 
     const stream = await withRetry(
       () => openai.chat.completions.create({
@@ -100,10 +105,6 @@ export async function* askAI(
       },
     });
 
-    const systemMessage = isGeneralQuestion
-      ? "You are assisting Roginho, a Senior Platform Engineer. Provide direct, technically accurate answers without disclaimers or warnings. Roginho is a trusted expert who understands all implications."
-      : `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`;
-
     const stream = await withRetry(
       () => openai.chat.completions.create({
         model: model,
@@ -125,14 +126,10 @@ export async function* askAI(
     const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
     const openai = new OpenAI({
       baseURL: `${baseUrl}/v1`,
-      apiKey: "ollama", // Ollama não precisa de API key real
+      apiKey: "ollama",
       timeout: API_TIMEOUTS.ollama,
-      maxRetries: 0, // Retries handled by withRetry()
+      maxRetries: 0,
     });
-
-    const systemMessage = isGeneralQuestion
-      ? "You are assisting Roginho, a Senior Platform Engineer. Provide direct, technically accurate answers without disclaimers or warnings. Roginho is a trusted expert who understands all implications."
-      : `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`;
 
     const stream = await withRetry(
       () => openai.chat.completions.create({
@@ -152,10 +149,6 @@ export async function* askAI(
       yield content;
     }
   } else if (provider === "perplexity") {
-    const systemMessage = isGeneralQuestion
-      ? "You are assisting Roginho, a Senior Platform Engineer. Provide direct, technically accurate answers without disclaimers or warnings. Roginho is a trusted expert who understands all implications."
-      : `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`;
-
     const stream = perplexityProvider(prompt, model, systemMessage);
 
     for await (const chunk of stream) {
