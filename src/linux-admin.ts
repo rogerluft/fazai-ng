@@ -441,7 +441,9 @@ export async function* getLinuxCommandsFromAI(
       yield { type: "command", command: cmd };
     }
     yield { type: "allcommands", commands: learnedCommands };
-    // Continue to provider chain for validation instead of returning
+    // FIX: Retorna após emitir comandos aprendidos para evitar duplicação
+    // com comandos do provider chain (issue identificada em análise de código)
+    return;
   }
 
   // 🧠 RAG ENRICHMENT: Enriquece prompt com contexto se ainda não foi feito

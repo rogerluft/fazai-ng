@@ -117,6 +117,9 @@ export class SemanticCache {
 
   private cleanupTimer: NodeJS.Timeout | null = null;
 
+  // Flag para evitar registro múltiplo de handlers de processo
+  private signalHandlersRegistered = false;
+
   /**
    * Private constructor (singleton pattern)
    */
@@ -413,8 +416,12 @@ export class SemanticCache {
     }, this.CLEANUP_INTERVAL);
 
     // Add process exit handlers to prevent memory leak
-    process.on('SIGINT', () => this.stop());
-    process.on('SIGTERM', () => this.stop());
+    // FIX: Registra handlers apenas UMA VEZ para evitar MaxListenersExceededWarning
+    if (!this.signalHandlersRegistered) {
+      process.on('SIGINT', () => this.stop());
+      process.on('SIGTERM', () => this.stop());
+      this.signalHandlersRegistered = true;
+    }
 
     logger.debug(
       `Semantic cache cleanup timer started (every ${this.CLEANUP_INTERVAL / 60000} minutes)`
@@ -576,14 +583,4 @@ export class SemanticCache {
     `.trim();
   }
 
-  /**
-   * Stop cleanup timer (cleanup on shutdown)
-   */
-  stop(): void {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
-      this.cleanupTimer = null;
-      logger.debug("Semantic cache cleanup timer stopped");
-    }
-  }
 }

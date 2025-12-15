@@ -1,5 +1,48 @@
 # FazAI Changelog
 
+## [3.6.6-beta] - 2025-12-14
+
+### 🐛 FIXES - Critical Bug Fixes from Code Review
+
+**Deep code analysis identified and fixed 3 critical issues in recent implementations**
+
+#### Bug Fixes
+
+1. **Neural Flow Command Duplication** (`src/linux-admin.ts`)
+   - **Problem**: After yielding learned commands, code continued to provider chain causing duplicate command emission
+   - **Impact**: Consumer received conflicting commands from both neural flow and provider
+   - **Fix**: Added `return` statement after yielding learned commands (line 446)
+
+2. **Signal Handler Memory Leak** (`src/services/semantic-cache.ts`)
+   - **Problem**: `process.on('SIGINT/SIGTERM')` called every time `startCleanupTimer()` runs
+   - **Impact**: Multiple handlers accumulated, causing MaxListenersExceededWarning
+   - **Fix**: Added `signalHandlersRegistered` flag to register handlers only once
+
+3. **Duplicate `stop()` Method** (`src/services/semantic-cache.ts`)
+   - **Problem**: Two `stop()` methods defined in the same class
+   - **Impact**: Build warning "Duplicate member stop in class body"
+   - **Fix**: Removed duplicate method at end of file
+
+#### New Test Suites Created
+
+- `tests/unit/neural-flow.test.ts` - 9 tests for neural flow behavior validation
+- `tests/unit/semantic-cache-handlers.test.ts` - 8 tests for handler registration
+- `tests/integration/recent-implementations.test.ts` - 14 tests for recent commit validation
+
+#### Documentation
+
+- `docs/ANALYSIS_REPORT.md` - Detailed analysis with ASCII flow diagrams
+
+#### Files Modified
+
+- `src/linux-admin.ts` - Neural flow return fix
+- `src/services/semantic-cache.ts` - Handler flag + remove duplicate stop()
+- `tests/unit/neural-flow.test.ts` - New test file
+- `tests/unit/semantic-cache-handlers.test.ts` - New test file
+- `tests/integration/recent-implementations.test.ts` - New test file
+
+---
+
 ## [3.6.5-beta] - 2025-12-13
 
 ### 🎯 ENHANCEMENT - Engineer Role Recognition
