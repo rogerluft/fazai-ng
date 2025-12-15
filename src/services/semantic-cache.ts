@@ -412,9 +412,24 @@ export class SemanticCache {
       await this.cleanup();
     }, this.CLEANUP_INTERVAL);
 
+    // Add process exit handlers to prevent memory leak
+    process.on('SIGINT', () => this.stop());
+    process.on('SIGTERM', () => this.stop());
+
     logger.debug(
       `Semantic cache cleanup timer started (every ${this.CLEANUP_INTERVAL / 60000} minutes)`
     );
+  }
+
+  /**
+   * Stop cleanup timer and release resources
+   */
+  stop(): void {
+    if (this.cleanupTimer) {
+      clearInterval(this.cleanupTimer);
+      this.cleanupTimer = undefined;
+      logger.debug('Semantic cache cleanup timer stopped');
+    }
   }
 
   /**

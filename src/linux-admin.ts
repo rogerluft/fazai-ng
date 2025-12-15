@@ -427,20 +427,30 @@ export async function* getLinuxCommandsFromAI(
   // 🧠 NEURAL FLOW: Tenta buscar padrão aprendido primeiro
   const learnedCommands = await consultNeuralFlow(task, systemInfo);
 
+  let enhancedSystemInfo = systemInfo;
+
   if (learnedCommands && learnedCommands.length > 0) {
-    // Usa comandos do learning
+    // Enrich learned commands with RAG context for validation
+    const ragContext = await enrichContextWithRAG(task, systemInfo);
+    enhancedSystemInfo = ragContext
+      ? `${systemInfo}\n\n${ragContext}`
+      : systemInfo;
+
+    // Yield learned commands with enriched context
     for (const cmd of learnedCommands) {
       yield { type: "command", command: cmd };
     }
     yield { type: "allcommands", commands: learnedCommands };
-    return; // Early return - não precisa chamar IA
+    // Continue to provider chain for validation instead of returning
   }
 
-  // 🧠 RAG ENRICHMENT: Se não encontrou comandos, enriquece prompt com contexto
-  const ragContext = await enrichContextWithRAG(task, systemInfo);
-  const enhancedSystemInfo = ragContext
-    ? `${systemInfo}\n\n${ragContext}`
-    : systemInfo;
+  // 🧠 RAG ENRICHMENT: Enriquece prompt com contexto se ainda não foi feito
+  if (!learnedCommands || learnedCommands.length === 0) {
+    const ragContext = await enrichContextWithRAG(task, systemInfo);
+    enhancedSystemInfo = ragContext
+      ? `${systemInfo}\n\n${ragContext}`
+      : systemInfo;
+  }
 
   // Build provider chain: primary + fallbacks
   const providerChain: { provider: Provider; model: string }[] = [
