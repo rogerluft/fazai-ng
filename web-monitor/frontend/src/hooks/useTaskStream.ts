@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
-import { useTaskStore } from './store';
-import { JulesTask } from './types';
+import { useTaskStore } from '../store';
+import { JulesTask } from '../types';
 import { getApiUrl, config } from '../config';
 
 export const useTaskStream = (taskIds: string[]) => {
