@@ -108,7 +108,7 @@ export async function POST(request: Request) {
 
     // Generate ID from slug hash
     const id = Math.abs(
-      slug.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
+      slug.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     );
 
     await qdrant.upsert("fazai_kb", {

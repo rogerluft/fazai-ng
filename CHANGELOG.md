@@ -1,5 +1,111 @@
 # FazAI Changelog
 
+## [3.6.21-beta] - 2025-12-17
+
+### FEATURE - Migrated web-monitor to Next.js App Router + Unified Build
+
+**Complete migration of integration pages (Cloudflare, SpamExperts, OPNsense) from React+Vite to Next.js 15 App Router.**
+
+#### Build Unification
+- Added unified build scripts to main package.json:
+  - `npm run build:all` - Build CLI + Web in sequence
+  - `npm run build:web` - Build only web interface
+  - `npm run dev:web` - Start web dev server
+  - `npm run start:web` - Start web production server
+  - `npm run deploy:all` - Build all + deploy
+
+#### Authentication System
+- **HTTP Basic Auth** middleware (`web/middleware.ts`)
+- Credentials loaded dynamically from `/etc/fazai/fazai.conf`:
+  - `WEB_UI_USERNAME` - Username for web access
+  - `WEB_UI_PASSWORD` - Password for web access
+- Protected routes: `/api/integrations/*`
+- Frontend auth helper: `web/lib/api-client.ts`
+
+#### Error Handling (Next.js App Router)
+- `web/app/error.tsx` - Client-side error boundary (500 errors)
+- `web/app/not-found.tsx` - Custom 404 page
+- `web/app/global-error.tsx` - Global error handler
+
+#### Types Created (`web/types/`)
+- `cloudflare.types.ts` - CloudflareZone, DNSRecord, FirewallRule, SSLSettings, Analytics
+- `spamexperts.types.ts` - SpamExpertsDomain, QuarantineItem, Report, ListEntry
+- `opnsense.types.ts` - FirewallRule, NATRule, VPNTunnel, Interface, DHCPLease, SystemStatus
+- `jarvis.ts` - Re-export from fazai.ts for compatibility
+
+#### Hooks Created (`web/lib/hooks/`)
+- `useCloudflare.ts` - Cloudflare data management with relative API URLs
+- `useSpamExperts.ts` - SpamExperts data management
+- `useOPNsense.ts` - OPNsense data management
+
+#### Managers Created (`web/lib/managers/`)
+- `cloudflare-manager.ts` - Self-contained CloudflareManager class
+- `spamexperts-manager.ts` - Self-contained SpamExpertsManager class
+- `opnsense-manager.ts` - Self-contained OPNsenseManager class
+- `config-loader.ts` - Config loader from fazai.conf or environment variables
+
+#### Components Created
+**Cloudflare (`web/components/cloudflare/`):**
+- ZonesTable.tsx, DNSRecordsTable.tsx, DNSRecordForm.tsx
+- FirewallRulesTable.tsx, SSLConfigPanel.tsx, CacheManager.tsx
+- AnalyticsDashboard.tsx, CloudflarePage.tsx
+
+**SpamExperts (`web/components/spamexperts/`):**
+- DomainsTable.tsx, DomainForm.tsx, QuarantineTable.tsx
+- ReportsDashboard.tsx, ListManager.tsx, SpamExpertsPage.tsx
+
+**OPNsense (`web/components/opnsense/`):**
+- FirewallRulesTable.tsx, FirewallRuleForm.tsx, NATTable.tsx, NATForm.tsx
+- VPNTunnelsTable.tsx, InterfacesTable.tsx, DHCPLeasesTable.tsx
+- SystemStatusPanel.tsx, OPNsensePage.tsx
+
+#### API Routes Created (`web/app/api/integrations/`)
+**Cloudflare:**
+- `/api/integrations/cloudflare/zones` - List zones
+- `/api/integrations/cloudflare/zones/[zoneId]/dns` - DNS records CRUD
+- `/api/integrations/cloudflare/zones/[zoneId]/firewall` - Firewall rules
+- `/api/integrations/cloudflare/zones/[zoneId]/ssl` - SSL settings
+- `/api/integrations/cloudflare/zones/[zoneId]/cache/purge` - Cache purge
+- `/api/integrations/cloudflare/zones/[zoneId]/analytics` - Analytics
+
+**SpamExperts:**
+- `/api/integrations/spamexperts/domains` - Domains CRUD
+- `/api/integrations/spamexperts/quarantine/[domain]` - Quarantine management
+- `/api/integrations/spamexperts/reports/[domain]` - Reports
+- `/api/integrations/spamexperts/lists/[type]` - Whitelist/Blacklist
+
+**OPNsense:**
+- `/api/integrations/opnsense/firewall` - Firewall rules CRUD
+- `/api/integrations/opnsense/nat` - NAT rules
+- `/api/integrations/opnsense/vpn` - VPN tunnels
+- `/api/integrations/opnsense/interfaces` - Network interfaces
+- `/api/integrations/opnsense/dhcp/leases` - DHCP leases
+- `/api/integrations/opnsense/system/status` - System status
+
+#### Pages Created (`web/app/(dashboard)/integrations/`)
+- `/integrations/cloudflare` - Cloudflare management page
+- `/integrations/spamexperts` - SpamExperts management page
+- `/integrations/opnsense` - OPNsense management page
+
+#### Sidebar Updated
+- Added Integrations section with links to Cloudflare, SpamExperts, OPNsense
+
+#### Bug Fixes
+- Fixed TypeScript implicit 'any' type errors in:
+  - `knowledge/route.ts` - Added types to reduce callback
+  - `learning/route.ts` - Added types to reduce callback
+  - `memory/search/route.ts` - Added MemoryPayload interface
+  - `personality/traits/route.ts` - Added types to reduce callback (2 occurrences)
+  - `rules/route.ts` - Added types to reduce callback (2 occurrences)
+
+#### Statistics
+- **~50 files** created/modified
+- **~4,000 lines** of code
+- **Zero placeholders** - All managers use real API calls
+- **Build passed** with NODE_ENV=production
+
+---
+
 ## [3.6.20-beta] - 2025-12-17
 
 ### ✨ FEATURE - Web UI Completa para Integrações FazAI

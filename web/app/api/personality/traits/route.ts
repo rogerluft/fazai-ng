@@ -15,7 +15,7 @@ export async function POST(request: Request) {
 
     // Generate ID from trait name hash
     const id = Math.abs(
-      trait_name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
+      trait_name.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     );
 
     await upsertPoint("fazai_personality", id, {
@@ -54,7 +54,7 @@ export async function DELETE(request: Request) {
     }
 
     const id = Math.abs(
-      trait_name.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
+      trait_name.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     );
 
     await deletePoint("fazai_personality", id);

@@ -37,18 +37,33 @@ export async function GET(request: NextRequest) {
       with_vector: false,
     });
 
-    let memories = response.points.map((point) => ({
-      id: point.id,
-      conversation_id: point.payload?.conversation_id,
-      message_id: point.payload?.message_id,
-      role: point.payload?.role,
-      timestamp: point.payload?.timestamp,
-      content: point.payload?.content,
-      summary: point.payload?.summary,
-      emotional_context: point.payload?.emotional_context,
-      importance: point.payload?.importance,
-      tags: point.payload?.tags,
-    }));
+    interface MemoryPayload {
+      conversation_id?: string;
+      message_id?: string;
+      role?: string;
+      timestamp?: string;
+      content?: string;
+      summary?: string;
+      emotional_context?: string;
+      importance?: number;
+      tags?: string[];
+    }
+
+    let memories = response.points.map((point) => {
+      const payload = point.payload as MemoryPayload | undefined;
+      return {
+        id: point.id,
+        conversation_id: payload?.conversation_id,
+        message_id: payload?.message_id,
+        role: payload?.role,
+        timestamp: payload?.timestamp,
+        content: payload?.content,
+        summary: payload?.summary,
+        emotional_context: payload?.emotional_context,
+        importance: payload?.importance,
+        tags: payload?.tags,
+      };
+    });
 
     // Basic text search if query provided
     if (query) {
@@ -57,7 +72,7 @@ export async function GET(request: NextRequest) {
         (m) =>
           m.content?.toLowerCase().includes(queryLower) ||
           m.summary?.toLowerCase().includes(queryLower) ||
-          m.tags?.some((t) => t.toLowerCase().includes(queryLower))
+          m.tags?.some((t: string) => t.toLowerCase().includes(queryLower))
       );
     }
 

@@ -1,11 +1,11 @@
 {
   "name": "fazai-web",
-  "version": "3.6.0",
+  "version": "3.6.21-beta",
   "description": "FazAI - Web Interface for Autonomous Linux Agent",
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "NODE_ENV=production next build",
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit"
