@@ -84,11 +84,12 @@ export class LinuxCommandExecutor {
       logger.info(chalk.gray("Executando..."));
 
       // Usar spawn para melhor controle e output em tempo real
+      // SECURITY: shell: false (default) prevents command injection
       const result = await new Promise<{ success: boolean; output: string }>((resolve) => {
         const [cmd, ...args] = command.command.split(' ');
         const child = spawn(cmd, args, {
           stdio: ['inherit', 'pipe', 'pipe'],
-          shell: true
+          // shell: false is default - NOT enabling to prevent RCE
         });
 
         let output = '';
