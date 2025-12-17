@@ -24,7 +24,8 @@ function parseModelsTS(modelsPath) {
 
     // Extract model definitions from getBuiltInModels() function
     // Pattern: name: "model-name", provider: "provider-name"
-    const modelBlockRegex = /{\s*name:\s*["']([^"']+)["'],\s*provider:\s*["']([^"']+)["']/g;
+    // Uses 's' flag (dotAll) to match across newlines
+    const modelBlockRegex = /{\s*name:\s*["']([^"']+)["']\s*,\s*provider:\s*["']([^"']+)["']/gs;
     let match;
 
     while ((match = modelBlockRegex.exec(content)) !== null) {
@@ -36,6 +37,7 @@ function parseModelsTS(modelsPath) {
 
     if (models.length > 0) {
       console.log(`📋 Found ${models.length} models in models.ts`);
+      models.forEach((m) => console.log(`   - ${m.name} (${m.provider})`));
       return models;
     }
   } catch (error) {
@@ -43,21 +45,29 @@ function parseModelsTS(modelsPath) {
   }
 
   // Fallback to default models if parsing fails
+  // These MUST match getBuiltInModels() in src/models.ts EXACTLY
   console.log("⚠️ Using fallback models (could not parse models.ts)");
   return [
+    // Google Gemini (stable) - 3 models
     { name: "gemini-2.5-pro", provider: "google" },
     { name: "gemini-2.5-flash", provider: "google" },
     { name: "gemini-2.5-flash-lite", provider: "google" },
+    // Ollama (local) - 2 models
     { name: "qwen2.5:7b", provider: "ollama" },
     { name: "tinyllama:1b", provider: "ollama" },
+    // OpenRouter (cloud free tier) - 2 models
     { name: "qwen/qwen3-coder:free", provider: "openrouter" },
     { name: "google/gemini-2.0-flash-exp:free", provider: "openrouter" },
+    // Perplexity (search-enabled) - 2 models
     { name: "llama-3-sonar-small-32k-online", provider: "perplexity" },
     { name: "llama-3-sonar-large-32k-online", provider: "perplexity" },
+    // OpenAI (optional) - 2 models
     { name: "gpt-4o-mini", provider: "openai" },
     { name: "gpt-4o", provider: "openai" },
+    // Anthropic Claude (optional) - 2 models
     { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
     { name: "claude-3-haiku-20240307", provider: "anthropic" },
+    // Total: 14 models (excluding preview feature gemini-3.0-pro-latest)
   ];
 }
 
@@ -153,11 +163,20 @@ function generateBashCompletion(data) {
   const modelsList = data.models.map((m) => m.name).join(" ");
 
   return `#!/usr/bin/env bash
-# Bash completion for FazAI - Auto-generated from models.ts
+# Bash completion for FazAI - Dynamic model loading from fazai.conf
 # Installation:
 #   sudo cp completion/fazai-completion.bash /etc/bash_completion.d/fazai
 # Or:
 #   source completion/fazai-completion.bash
+
+# Load models dynamically from fazai.conf - NO HARDCODED MODELS
+_fazai_load_models() {
+    local config_file="\${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+
+    if [[ -r "$config_file" ]]; then
+        grep '^MODELS_' "$config_file" 2>/dev/null | awk -F'=' '{print \$2}' | tr ',' ' ' | tr -s ' '
+    fi
+}
 
 _fazai_completion() {
     local cur prev opts commands models subcmds
@@ -171,8 +190,11 @@ _fazai_completion() {
     # Options/flags (auto-generated from app.ts)
     opts="${optionsList}"
 
-    # AI models (auto-generated from models.ts)
-    models="${modelsList}"
+    # AI models (loaded dynamically from /etc/fazai/fazai.conf - cached)
+    if [[ -z "\$FAZAI_MODELS_CACHE" ]]; then
+        FAZAI_MODELS_CACHE=\$(_fazai_load_models)
+    fi
+    models="\$FAZAI_MODELS_CACHE"
 
     # First argument (command)
     if [ $COMP_CWORD -eq 1 ]; then
@@ -344,12 +366,21 @@ function generateZshCompletion(data) {
     .join("\n        ");
 
   return `#compdef fazai
-# Zsh completion for FazAI - Auto-generated from models.ts
+# Zsh completion for FazAI - Dynamic model loading from fazai.conf
 # Installation:
 #   mkdir -p ~/.zsh/completion
 #   cp completion/fazai-completion.zsh ~/.zsh/completion/_fazai
 #   Add to ~/.zshrc: fpath=(~/.zsh/completion $fpath)
 #   Run: autoload -Uz compinit && compinit
+
+# Load models dynamically from fazai.conf - NO HARDCODED MODELS
+_fazai_load_models() {
+    local config_file="\${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+
+    if [[ -r "$config_file" ]]; then
+        grep '^MODELS_' "$config_file" 2>/dev/null | cut -d'=' -f2 | tr ',' '\\n'
+    fi
+}
 
 _fazai() {
     local -a commands models opts
@@ -358,9 +389,11 @@ _fazai() {
         ${commandsZsh}
     )
 
-    models=(
-        ${modelsZsh}
-    )
+    # Load models dynamically from config (cached)
+    if [[ -z "\$FAZAI_MODELS_CACHE_ZSH" ]]; then
+        FAZAI_MODELS_CACHE_ZSH=(\${(f)"\$(_fazai_load_models)"})
+    fi
+    models=("\$FAZAI_MODELS_CACHE_ZSH[@]")
 
     opts=(
         ${optsZsh}
@@ -412,6 +445,19 @@ _fazai() {
         completion)
             # No arguments
             ;;
+
+        alias)
+            local -a alias_cmds
+            alias_cmds=(
+                'list:List all aliases'
+                'ls:List all aliases (alias for list)'
+                'show:Show specific alias'
+                'remove:Remove alias'
+                'rm:Remove alias (short form)'
+                'delete:Delete alias'
+            )
+            _describe 'alias subcommands' alias_cmds
+            ;;
     esac
 
     _arguments \\
@@ -427,6 +473,9 @@ _fazai() {
             ;;
         import)
             state=import
+            ;;
+        alias)
+            state=alias
             ;;
     esac
 }

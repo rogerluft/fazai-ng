@@ -1,10 +1,19 @@
 #compdef fazai
-# Zsh completion for FazAI - Auto-generated from models.ts
+# Zsh completion for FazAI - Dynamic model loading from fazai.conf
 # Installation:
 #   mkdir -p ~/.zsh/completion
 #   cp completion/fazai-completion.zsh ~/.zsh/completion/_fazai
 #   Add to ~/.zshrc: fpath=(~/.zsh/completion $fpath)
 #   Run: autoload -Uz compinit && compinit
+
+# Load models dynamically from fazai.conf - NO HARDCODED MODELS
+_fazai_load_models() {
+    local config_file="${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+
+    if [[ -r "$config_file" ]]; then
+        grep '^MODELS_' "$config_file" 2>/dev/null | cut -d'=' -f2 | tr ',' '\n'
+    fi
+}
 
 _fazai() {
     local -a commands models opts
@@ -23,22 +32,11 @@ _fazai() {
         'github:GitHub integration (auth, repos, issues, etc)'
     )
 
-    models=(
-        'gemini-3.0-pro-latest:google model'
-        'gemini-2.5-pro:google model'
-        'gemini-2.5-flash:google model'
-        'gemini-2.5-flash-lite:google model'
-        'qwen2.5:7b:ollama model'
-        'tinyllama:1b:ollama model'
-        'qwen/qwen3-coder:free:openrouter model'
-        'google/gemini-2.0-flash-exp:free:openrouter model'
-        'llama-3-sonar-small-32k-online:perplexity model'
-        'llama-3-sonar-large-32k-online:perplexity model'
-        'gpt-4o-mini:openai model'
-        'gpt-4o:openai model'
-        'claude-3-5-sonnet-latest:anthropic model'
-        'claude-3-haiku-20240307:anthropic model'
-    )
+    # Load models dynamically from config (cached)
+    if [[ -z "$FAZAI_MODELS_CACHE_ZSH" ]]; then
+        FAZAI_MODELS_CACHE_ZSH=(${(f)"$(_fazai_load_models)"})
+    fi
+    models=("$FAZAI_MODELS_CACHE_ZSH[@]")
 
     opts=(
         '--dry-run:Simulate commands without executing'
@@ -99,6 +97,19 @@ _fazai() {
         completion)
             # No arguments
             ;;
+
+        alias)
+            local -a alias_cmds
+            alias_cmds=(
+                'list:List all aliases'
+                'ls:List all aliases (alias for list)'
+                'show:Show specific alias'
+                'remove:Remove alias'
+                'rm:Remove alias (short form)'
+                'delete:Delete alias'
+            )
+            _describe 'alias subcommands' alias_cmds
+            ;;
     esac
 
     _arguments \
@@ -114,6 +125,9 @@ _fazai() {
             ;;
         import)
             state=import
+            ;;
+        alias)
+            state=alias
             ;;
     esac
 }

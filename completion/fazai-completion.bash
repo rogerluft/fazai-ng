@@ -1,9 +1,18 @@
 #!/usr/bin/env bash
-# Bash completion for FazAI - Auto-generated from models.ts
+# Bash completion for FazAI - Dynamic model loading from fazai.conf
 # Installation:
 #   sudo cp completion/fazai-completion.bash /etc/bash_completion.d/fazai
 # Or:
 #   source completion/fazai-completion.bash
+
+# Load models dynamically from fazai.conf - NO HARDCODED MODELS
+_fazai_load_models() {
+    local config_file="${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+
+    if [[ -r "$config_file" ]]; then
+        grep '^MODELS_' "$config_file" 2>/dev/null | awk -F'=' '{print $2}' | tr ',' ' ' | tr -s ' '
+    fi
+}
 
 _fazai_completion() {
     local cur prev opts commands models subcmds
@@ -17,8 +26,11 @@ _fazai_completion() {
     # Options/flags (auto-generated from app.ts)
     opts="--dry-run --cli --debug --verbose --log-file --auto-research --yolo -y --help -h"
 
-    # AI models (auto-generated from models.ts)
-    models="gemini-3.0-pro-latest gemini-2.5-pro gemini-2.5-flash gemini-2.5-flash-lite qwen2.5:7b tinyllama:1b qwen/qwen3-coder:free google/gemini-2.0-flash-exp:free llama-3-sonar-small-32k-online llama-3-sonar-large-32k-online gpt-4o-mini gpt-4o claude-3-5-sonnet-latest claude-3-haiku-20240307"
+    # AI models (loaded dynamically from /etc/fazai/fazai.conf - cached)
+    if [[ -z "$FAZAI_MODELS_CACHE" ]]; then
+        FAZAI_MODELS_CACHE=$(_fazai_load_models)
+    fi
+    models="$FAZAI_MODELS_CACHE"
 
     # First argument (command)
     if [ $COMP_CWORD -eq 1 ]; then

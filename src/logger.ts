@@ -106,6 +106,36 @@ function log(level: LogLevel, ...args: unknown[]): void {
   const message = formatArgs(args);
   writeToFile(level, message);
 
+  // BUGFIX: Captura erros reais no error-tracker
+  if (level === "error") {
+    try {
+      // Import dinâmico para evitar dependência circular
+      import("./error-tracker").then(({ errorTracker }) => {
+        // Detecta tipo de erro pela mensagem
+        let errorType: "api" | "cache" | "provider" | "system" | "network" | "validation" = "system";
+        const lowerMsg = message.toLowerCase();
+
+        if (lowerMsg.includes("api") || lowerMsg.includes("cloudflare") || lowerMsg.includes("openai")) {
+          errorType = "api";
+        } else if (lowerMsg.includes("cache")) {
+          errorType = "cache";
+        } else if (lowerMsg.includes("provider") || lowerMsg.includes("ollama") || lowerMsg.includes("anthropic")) {
+          errorType = "provider";
+        } else if (lowerMsg.includes("network") || lowerMsg.includes("econnrefused") || lowerMsg.includes("timeout")) {
+          errorType = "network";
+        } else if (lowerMsg.includes("validation") || lowerMsg.includes("invalid")) {
+          errorType = "validation";
+        }
+
+        errorTracker.captureError(errorType, message);
+      }).catch(() => {
+        // Silenciosamente falha se error-tracker não disponível
+      });
+    } catch {
+      // Ignora erros no tracking
+    }
+  }
+
   if (!shouldLog(level)) {
     return;
   }

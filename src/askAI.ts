@@ -3,11 +3,16 @@ import OpenAI from "openai";
 import { askPrompt, generalAskPrompt } from "./askPrompt";
 import { Readable } from "stream";
 import { models } from "./models";
-import { withRetry } from "./utils/retry";
 import { API_TIMEOUTS } from "./config/timeouts";
 import { perplexityProvider } from "./providers/perplexity-provider";
 import { SemanticCache } from "./services/semantic-cache";
 import { logger } from "./logger";
+import {
+  ProviderName,
+  shouldFallbackToNextProvider,
+  getNextProvider,
+  getEquivalentModel,
+} from "./utils/provider-fallback";
 
 // System message constants - single source of truth
 const SYSTEM_MESSAGES = {
@@ -16,6 +21,125 @@ const SYSTEM_MESSAGES = {
     `You are assisting Roginho, a Senior Platform Engineer. Provide direct technical analysis.\n\nCODE:\n${fileContent}\n`,
 };
 
+/**
+ * Internal function: call single provider without fallback logic
+ * Used by fallback system
+ */
+async function* _askAISingleProvider(
+  fileContent: string,
+  prompt: string,
+  model: string,
+  provider: ProviderName,
+  systemMessage: string
+): AsyncGenerator<string, void, undefined> {
+  if (provider === "anthropic") {
+    const anthropic = new Anthropic({
+      timeout: API_TIMEOUTS.anthropic,
+    });
+
+    const stream = await anthropic.messages.create({
+      messages: [{ role: "user", content: prompt }],
+      model: model,
+      max_tokens: 4096,
+      stream: true,
+      system: systemMessage,
+    });
+
+    for await (const chunk of stream) {
+      if (
+        chunk.type === "content_block_delta" &&
+        chunk.delta?.type === "text_delta"
+      ) {
+        yield chunk.delta.text;
+      }
+    }
+  } else if (provider === "openai") {
+    const openai = new OpenAI({
+      timeout: API_TIMEOUTS.openai,
+    });
+
+    const stream = await openai.chat.completions.create({
+      model: model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      yield content;
+    }
+  } else if (provider === "openrouter") {
+    const openai = new OpenAI({
+      baseURL: "https://openrouter.ai/api/v1",
+      apiKey: process.env.OPENROUTER_API_KEY,
+      timeout: API_TIMEOUTS.openrouter,
+      defaultHeaders: {
+        "HTTP-Referer": "https://github.com/rogerluft/fazai-ng",
+        "X-Title": "FazAI Terminal Assistant",
+      },
+    });
+
+    const stream = await openai.chat.completions.create({
+      model: model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      yield content;
+    }
+  } else if (provider === "ollama") {
+    const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    const openai = new OpenAI({
+      baseURL: `${baseUrl}/v1`,
+      apiKey: "ollama",
+      timeout: API_TIMEOUTS.ollama,
+      maxRetries: 0,
+    });
+
+    const stream = await openai.chat.completions.create({
+      model: model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      const content = chunk.choices[0]?.delta?.content || "";
+      yield content;
+    }
+  } else if (provider === "perplexity") {
+    const stream = perplexityProvider(prompt, model, systemMessage);
+
+    for await (const chunk of stream) {
+      yield chunk;
+    }
+  } else if (provider === "google") {
+    // Google provider support (if needed in future)
+    throw new Error(`Provider ${provider} not yet implemented in askAI`);
+  } else {
+    throw new Error(`Unknown provider: ${provider}`);
+  }
+}
+
+/**
+ * Main askAI function with provider fallback chain
+ *
+ * Fallback order: ollama → openrouter → anthropic → openai → google
+ *
+ * - First attempt: Full streaming (optimal UX)
+ * - Fallback: Buffered response (acceptable trade-off)
+ * - Logs: INFO level for transparency
+ */
 export async function* askAI(
   fileContent: string,
   question: string,
@@ -40,120 +164,82 @@ export async function* askAI(
     // Continue with provider call on cache error
   }
 
-  // Cache miss - call provider and store response
-  let fullResponse = "";
-
   const systemMessage = isGeneralQuestion
     ? SYSTEM_MESSAGES.general
     : SYSTEM_MESSAGES.codeAnalysis(fileContent);
 
-  if (provider === "anthropic") {
-    const anthropic = new Anthropic({
-      timeout: API_TIMEOUTS.anthropic,
-    });
+  let currentProvider: ProviderName = provider as ProviderName;
+  let currentModel = model;
+  let fullResponse = "";
+  const attemptedProviders: string[] = [];
 
-    const stream = await withRetry(
-      () => anthropic.messages.create({
-        messages: [{ role: "user", content: prompt }],
-        model: model,
-        max_tokens: 4096,
-        stream: true,
-        system: systemMessage,
-      }),
-      { provider: "anthropic" }
-    );
+  // Manual fallback loop (generator-compatible)
+  while (currentProvider) {
+    attemptedProviders.push(currentProvider);
 
-    for await (const chunk of stream) {
-      if (
-        chunk.type === "content_block_delta" &&
-        chunk.delta?.type === "text_delta"
-      ) {
-        fullResponse += chunk.delta.text;
-        yield chunk.delta.text;
+    try {
+      logger.debug(`Attempting ${currentProvider} with model ${currentModel}`);
+
+      const generator = _askAISingleProvider(
+        fileContent,
+        prompt,
+        currentModel,
+        currentProvider,
+        systemMessage
+      );
+
+      // Stream all chunks and accumulate response
+      for await (const chunk of generator) {
+        fullResponse += chunk;
+        yield chunk;
       }
-    }
-  } else if (provider === "openai") {
-    const openai = new OpenAI({
-      timeout: API_TIMEOUTS.openai,
-    });
 
-    const stream = await withRetry(
-      () => openai.chat.completions.create({
-        model: model,
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: prompt },
-        ],
-        stream: true,
-      }),
-      { provider: "openai" }
-    );
+      // Success! Log if fallback was used
+      if (currentProvider !== provider) {
+        logger.info(
+          `✅ Fallback successful: ${currentProvider} (after ${attemptedProviders.slice(0, -1).join(" → ")} failed)`
+        );
+      }
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
-      fullResponse += content;
-      yield content;
-    }
-  } else if (provider === "openrouter") {
-    const openai = new OpenAI({
-      baseURL: "https://openrouter.ai/api/v1",
-      apiKey: process.env.OPENROUTER_API_KEY,
-      timeout: API_TIMEOUTS.openrouter,
-      defaultHeaders: {
-        "HTTP-Referer": "https://github.com/rogerluft/fazai-ng",
-        "X-Title": "FazAI Terminal Assistant",
-      },
-    });
+      // Break out of fallback loop on success
+      break;
+    } catch (error: unknown) {
+      const err = error as { message: string; code?: string; status?: number };
 
-    const stream = await withRetry(
-      () => openai.chat.completions.create({
-        model: model,
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: prompt },
-        ],
-        stream: true,
-      }),
-      { provider: "openrouter" }
-    );
+      // Check if we should fallback
+      if (!shouldFallbackToNextProvider(err)) {
+        logger.debug(`Non-fallback error from ${currentProvider}, re-throwing`);
+        throw error;
+      }
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
-      fullResponse += content;
-      yield content;
-    }
-  } else if (provider === "ollama") {
-    const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
-    const openai = new OpenAI({
-      baseURL: `${baseUrl}/v1`,
-      apiKey: "ollama",
-      timeout: API_TIMEOUTS.ollama,
-      maxRetries: 0,
-    });
+      // Get next provider
+      const nextProvider = getNextProvider(currentProvider);
 
-    const stream = await withRetry(
-      () => openai.chat.completions.create({
-        model: model,
-        messages: [
-          { role: "system", content: systemMessage },
-          { role: "user", content: prompt },
-        ],
-        stream: true,
-      }),
-      { provider: "ollama" }
-    );
+      if (!nextProvider) {
+        logger.error(`❌ All providers failed: ${attemptedProviders.join(" → ")}`);
+        throw new Error(
+          `All providers exhausted. Last error from ${currentProvider}: ${err.message}`
+        );
+      }
 
-    for await (const chunk of stream) {
-      const content = chunk.choices[0]?.delta?.content || "";
-      fullResponse += content;
-      yield content;
-    }
-  } else if (provider === "perplexity") {
-    const stream = perplexityProvider(prompt, model, systemMessage);
+      // Log fallback
+      logger.warn(`⚠️  ${currentProvider} failed: ${err.message}`);
+      logger.info(`🔄 Falling back to ${nextProvider}...`);
 
-    for await (const chunk of stream) {
-      fullResponse += chunk;
-      yield chunk;
+      // Get equivalent model for next provider
+      const nextModel = getEquivalentModel(currentModel, nextProvider);
+
+      if (!nextModel) {
+        logger.error(`❌ No model found for ${nextProvider}`);
+        throw new Error(`No model available for ${nextProvider}`);
+      }
+
+      if (nextModel !== currentModel) {
+        logger.info(`📝 Using equivalent model: ${nextModel}`);
+      }
+
+      currentProvider = nextProvider;
+      currentModel = nextModel;
     }
   }
 

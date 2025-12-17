@@ -97,30 +97,28 @@ function createCompleter() {
 
 /**
  * Busca comandos recentes do histórico
+ * BUGFIX: Agora retorna erros reais do error-tracker (não command history)
  */
 async function getRecentCommands(): Promise<Array<{ timestamp: string; command: string; status: "success" | "error" | "pending" }>> {
   try {
-    const history = loadCommandHistory();
-    const recent = history.slice(-5).reverse(); // Últimos 5 comandos
+    const { errorTracker } = await import("./error-tracker");
+    const errors = errorTracker.getRecentErrors(5);
 
-    return recent.map((cmd) => {
-      const now = new Date();
-      const timestamp = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
-
-      return {
-        timestamp,
-        command: cmd.substring(0, 50), // Limita tamanho
-        status: "success" as const, // Assume sucesso (não temos log de erros ainda)
-      };
-    });
+    // Converte erros para formato compatível com RecentCommand
+    return errors.map((err) => ({
+      timestamp: err.timestamp,
+      command: `[${err.type.toUpperCase()}] ${err.message}`,
+      status: "error" as const,
+    }));
   } catch (error: unknown) {
-    logger.debug("Erro ao carregar comandos recentes");
+    logger.debug("Erro ao carregar erros recentes do tracker");
     return [];
   }
 }
 
 /**
  * Verifica status de APIs externas
+ * BUGFIX: Thresholds corrigidos - <1000ms=online, 1000-3000ms=degraded, >3000ms=offline
  */
 async function getAPIStatus(): Promise<Array<{ name: string; status: "online" | "offline" | "degraded"; responseTime?: string }>> {
   const apis = [
@@ -136,14 +134,28 @@ async function getAPIStatus(): Promise<Array<{ name: string; status: "online" | 
         const response = await fetch(api.url, {
           method: "HEAD",
           headers: { "User-Agent": "FazAI/3.5.4" },
-          signal: AbortSignal.timeout(3000),
+          signal: AbortSignal.timeout(5000), // 5s timeout
         });
         const elapsed = Date.now() - start;
 
-        const status = response.ok ? "online" : "degraded";
+        // Thresholds corretos:
+        // <1000ms = online (boa performance)
+        // 1000-3000ms = degraded (lento mas funcional)
+        // >3000ms ou erro = offline
+        let status: "online" | "offline" | "degraded";
+        if (!response.ok) {
+          status = "offline";
+        } else if (elapsed < 1000) {
+          status = "online";
+        } else if (elapsed < 3000) {
+          status = "degraded";
+        } else {
+          status = "offline";
+        }
+
         return {
           name: api.name,
-          status: status as "online" | "offline" | "degraded",
+          status,
           responseTime: `${elapsed}ms`,
         };
       } catch (error: unknown) {

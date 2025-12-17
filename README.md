@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.5.1-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.6.12-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
@@ -22,10 +22,28 @@
   - `fazai_inference` - Políticas de segurança, SLAs e regras operacionais
   - `fazai_semantic_cache` - **NOVO**: Cache semântico com similarity search
 
-### 🤖 IA Multi-Modelo
+### 🤖 IA Multi-Modelo com Fallback Automático
 - **Claude** (Anthropic): Sonnet 3.5, Haiku - Tarefas complexas e rápidas
 - **GPT** (OpenAI): GPT-4o, GPT-4 Turbo, GPT-4 Mini
 - **Ollama** (Local): Llama 3.2, Qwen 2.5, Mistral - 100% privado e gratuito
+- **OpenRouter**: Acesso a 100+ modelos open-source (muitos free)
+- **Perplexity**: Modelos com pesquisa web integrada
+
+### 🔄 Provider Fallback Chain (NEW v3.6.12)
+- **Resiliência Automática**: Se um provider falha, tenta próximo automaticamente
+- **Cadeia Inteligente**: ollama → openrouter → anthropic → openai → google
+- **Equivalência de Modelos**: Mapeia modelo equivalente ao fazer fallback
+- **Logs Transparentes**: INFO level mostra cada tentativa e motivo do fallback
+- **Zero Downtime**: Mesmo com Ollama offline, comandos continuam funcionando
+- **Exemplo**:
+  ```bash
+  $ fazai ask "what is 2+2?" -m qwen2.5:7b
+  ⚠️  ollama failed: ECONNREFUSED
+  🔄 Falling back to openrouter...
+  📝 Using equivalent model: qwen/qwen3-coder:free
+  ✅ Fallback successful
+  4
+  ```
 
 ### 🛡️ Segurança em 5 Camadas
 - **Pattern Matching**: Bloqueia comandos destrutivos conhecidos
@@ -44,7 +62,7 @@
 - **Comandos especiais**: `/exec`, `/history`, `/memory`, `/cache`, `/help`
 - **Cache Semântico**: Reutiliza respostas de queries similares (não apenas idênticas)
 - **Histórico navegável**: Setas ↑/↓ e auto-complete
-- **Bash completion**: Instalação automática para Bash e Zsh
+- **Bash completion**: Instalação automática em `/etc/bash_completion.d/` ao buildar
 
 ### ⚡ Cache Semântico Inteligente (NEW v3.5.1)
 - **Similarity Search**: Encontra respostas de queries similares, não só idênticas

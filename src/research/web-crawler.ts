@@ -16,7 +16,7 @@
  */
 
 import * as cheerio from "cheerio";
-import PQueue from "p-queue";
+// import PQueue from "p-queue"; // Commented due to tsup bundling issue
 import { logger } from "../logger";
 import { createEmbeddingService } from "../services/embeddings";
 import { getQdrantClient } from "../database/qdrant-pool";
@@ -117,6 +117,8 @@ export class AgenticWebCrawler {
 
   constructor() {
     // Rate limiting: max 5 concurrent requests, 1 request per second
+    // WORKAROUND: tsup minification breaks p-queue default export, use require() directly
+    const PQueue = require("p-queue").default;
     this.queue = new PQueue({ concurrency: 5, interval: 1000, intervalCap: 1 });
 
     // Cache file
