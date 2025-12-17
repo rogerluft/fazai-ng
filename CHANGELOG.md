@@ -1,5 +1,35 @@
 # FazAI Changelog
 
+## [3.6.15-beta] - 2025-12-18
+
+### ✨ FEATURE - Integração Real da API Cloudflare
+
+**O `CloudflareUI` agora usa a API real, eliminando completamente o código mock.**
+
+#### Mudanças Principais:
+1.  **`CloudflareManager` Estendido:**
+    - Adicionados 5 novos métodos para cobrir as funcionalidades de Firewall, SSL, Cache e Analytics.
+    - Novas interfaces TypeScript (`CloudflareFirewallRule`, `CloudflareSSLSettings`, etc.) para garantir a tipagem estrita.
+
+2.  **`CloudflareUI` Integrado:**
+    - O construtor agora instancia `CloudflareManager`, com tratamento de erro caso as credenciais não estejam configuradas.
+    - Todos os métodos que antes usavam dados mock (`fetchZones`, `fetchDNSRecords`, etc.) foram substituídos por chamadas diretas ao `CloudflareManager`.
+
+3.  **Código Mock Removido:**
+    - A seção de métodos mock (linhas 409-476) foi completamente deletada de `cloudflare-ui.ts`.
+    - O código está mais limpo, menor e usa apenas a implementação real.
+
+#### Comportamento Esperado:
+- O comando `/cloudflare` no CLI agora exibe e gerencia dados reais da sua conta Cloudflare.
+- Todas as funcionalidades do menu (Zonas, DNS, Firewall, SSL, Cache, Analytics) estão operacionais e interagem com a API.
+- O tratamento de erros foi melhorado, com mensagens claras caso a API falhe ou as credenciais estejam ausentes.
+
+#### Arquivos Modificados:
+- `src/cloudflare-manager.ts`: Adicionadas novas interfaces e métodos para interagir com a API da Cloudflare.
+- `src/commands/api/cloudflare-ui.ts`: Removidos todos os mocks e substituídos por chamadas ao `CloudflareManager`.
+
+---
+
 ## [3.6.13-beta] - 2025-12-17
 
 ### 🐛 FIXES - Dashboard CLI Critical Bugs

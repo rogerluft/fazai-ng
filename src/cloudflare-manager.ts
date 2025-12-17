@@ -3,7 +3,7 @@
  * Gerencia recursos Cloudflare via API
  */
 
-import { loadConfig } from './config-loader';
+import { loadConfig } from './config';
 
 interface CloudflareZone {
   id: string;
@@ -30,6 +30,40 @@ interface CloudflareWorker {
   script: string;
   routes?: string[];
 }
+
+// Interfaces for new methods
+interface CloudflareFirewallRule {
+  id: string;
+  description: string;
+  action: string;
+  paused: boolean;
+  filter: {
+    id: string;
+    expression: string;
+    paused: boolean;
+  };
+}
+
+interface CloudflareSSLSettings {
+  id: string;
+  value: 'off' | 'flexible' | 'full' | 'strict';
+  editable: boolean;
+  modified_on: string;
+}
+
+interface CloudflareCachePurge {
+  id: string;
+}
+
+interface CloudflareAnalytics {
+  totals: {
+    requests: number;
+    bandwidth: number;
+    threats: number;
+    pageviews: number;
+  };
+}
+
 
 export class CloudflareManager {
   private apiKey: string;
@@ -191,5 +225,46 @@ export class CloudflareManager {
       throw new Error('CLOUDFLARE_ACCOUNT_ID não configurada');
     }
     return this.request(`/accounts/${this.accountId}/ai-gateway/gateways`);
+  }
+
+  // Firewall Rules
+  async listFirewallRules(zoneId: string): Promise<CloudflareFirewallRule[]> {
+    return this.request(`/zones/${zoneId}/firewall/rules`);
+  }
+
+  // SSL Settings
+  async getSSLSettings(zoneId: string): Promise<CloudflareSSLSettings> {
+    return this.request(`/zones/${zoneId}/settings/ssl`);
+  }
+
+  async updateSSLMode(zoneId: string, mode: 'off' | 'flexible' | 'full' | 'strict'): Promise<CloudflareSSLSettings> {
+    return this.request(`/zones/${zoneId}/settings/ssl`, {
+      method: 'PATCH',
+      body: JSON.stringify({ value: mode }),
+    });
+  }
+
+  // Cache
+  async purgeCache(zoneId: string, options: { purge_everything?: boolean; files?: string[]; tags?: string[] }): Promise<CloudflareCachePurge> {
+    const body: any = {};
+    if (options.purge_everything) {
+      body.purge_everything = true;
+    } else if (options.files) {
+      body.files = options.files;
+    } else if (options.tags) {
+      body.tags = options.tags;
+    }
+
+    return this.request(`/zones/${zoneId}/purge_cache`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  // Analytics
+  async getAnalytics(zoneId: string, since: string = '-1440'): Promise<CloudflareAnalytics> {
+    // since: -1440 for last 24 hours
+    const response = await this.request(`/zones/${zoneId}/analytics/dashboard?since=${since}`);
+    return response;
   }
 }
