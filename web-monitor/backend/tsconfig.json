@@ -2,12 +2,17 @@
   "compilerOptions": {
     "target": "es6",
     "module": "commonjs",
-    "rootDir": "./src",
     "outDir": "./dist",
     "esModuleInterop": true,
     "strict": true,
-    "moduleResolution": "node"
+    "moduleResolution": "node",
+    "baseUrl": ".",
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "paths": {
+      "@fazai/*": ["../../src/*"]
+    }
   },
-  "include": ["src/**/*"],
-  "exclude": ["node_modules"]
+  "include": ["src/**/*", "../../src/cloudflare-manager.ts", "../../src/spamexperts-manager.ts", "../../src/opnsense-manager.ts", "../../src/config.ts"],
+  "exclude": ["node_modules", "dist"]
 }

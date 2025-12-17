@@ -4,15 +4,21 @@ This project is a web-based monitoring interface for FazAI's Jules sessions. It 
 
 ## Features
 
+### Dashboard (Jules Tasks Monitor)
 - **Real-time Dashboard:** Monitor multiple Jules tasks at a glance.
 - **Live Logs:** A terminal-like view of the logs from all tasks.
 - **Progress Visualization:** A timeline and progress bars to track the status of each task.
 - **File Tracking:** See which files are being modified by the tasks.
 - **Desktop Notifications:** Get notified when a task is complete or encounters an error.
 
+### Management Pages (Coming Soon)
+- **Cloudflare Management:** DNS, WAF, and Cache configuration
+- **SpamExperts Management:** Anti-spam protection settings
+- **OPNsense Management:** Firewall and security rules
+
 ## Tech Stack
 
-- **Frontend:** React, TypeScript, Vite, Tailwind CSS, Zustand
+- **Frontend:** React 18, TypeScript, Vite, Tailwind CSS, Zustand, React Router v6
 - **Backend:** Node.js, Express, TypeScript, Server-Sent Events (SSE)
 - **Containerization:** Docker, Docker Compose
 
@@ -91,6 +97,42 @@ The application is composed of two main services:
 
 -   **`frontend`:** A React application built with Vite that serves as the user interface. It connects to the backend to receive real-time updates.
 -   **`backend`:** An Express.js server that provides a REST API and a Server-Sent Events (SSE) endpoint. It simulates the Jules tasks and streams the data to the frontend.
+
+### Frontend Structure
+
+```
+src/
+├── App.tsx                 # Main router configuration
+├── main.tsx                # Entry point with BrowserRouter
+├── components/
+│   ├── Layout.tsx          # Main layout with sidebar navigation
+│   ├── TaskCard.tsx        # Task status card
+│   ├── LogViewer.tsx       # Real-time log viewer
+│   ├── Timeline.tsx        # Task timeline
+│   ├── FilesModified.tsx   # Modified files list
+│   └── CodePreview.tsx     # Code preview component
+├── pages/
+│   ├── DashboardPage.tsx   # Jules tasks monitor (main page)
+│   ├── CloudflarePage.tsx  # Cloudflare management (placeholder)
+│   ├── SpamExpertsPage.tsx # SpamExperts management (placeholder)
+│   └── OPNsensePage.tsx    # OPNsense management (placeholder)
+├── hooks/
+│   ├── useTaskStream.ts    # SSE connection hook
+│   └── useNotifications.ts # Browser notifications hook
+├── store.ts                # Zustand state management
+└── types.ts                # TypeScript type definitions
+```
+
+### Navigation
+
+The application uses React Router v6 with the following routes:
+
+- `/` - Dashboard (Jules Tasks Monitor)
+- `/cloudflare` - Cloudflare Management
+- `/spamexperts` - SpamExperts Management
+- `/opnsense` - OPNsense Management
+
+The sidebar navigation is responsive and collapses to a hamburger menu on mobile devices.
 
 ### Communication
 

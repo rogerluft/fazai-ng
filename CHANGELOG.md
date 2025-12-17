@@ -1,5 +1,76 @@
 # FazAI Changelog
 
+## [3.6.20-beta] - 2025-12-17
+
+### ✨ FEATURE - Web UI Infrastructure (Phase 1)
+
+**Implementada infraestrutura base de navegação para Web Monitor com React Router.**
+
+#### Arquivos Modificados:
+**`web-monitor/frontend/package.json`**
+- Adicionado `react-router-dom@^6.22.0`
+
+**`web-monitor/frontend/src/main.tsx`**
+- Envolvido `<App />` com `<BrowserRouter>`
+
+**`web-monitor/frontend/src/App.tsx`**
+- Transformado em router principal com Routes e Route
+- Define estrutura de rotas aninhadas com Layout
+
+**`web-monitor/frontend/src/hooks/useNotifications.ts`**
+- Corrigido import path de `./store` para `../store`
+- Adicionado null check para task
+
+#### Arquivos Criados:
+**`web-monitor/frontend/src/components/Layout.tsx` (150 linhas)**
+- Sidebar fixa 240px com bg-gray-800
+- Logo FazAI no topo
+- 4 itens de navegação com icons emoji e highlight ativo
+- Responsive: hamburger menu em mobile com overlay
+- Footer com versão FazAI
+- Usa `<Outlet />` do react-router
+
+**`web-monitor/frontend/src/pages/DashboardPage.tsx`**
+- Migrado conteúdo do antigo App.tsx
+- Monitor de Jules tasks (funcionalidade principal)
+
+**`web-monitor/frontend/src/pages/CloudflarePage.tsx`**
+- Placeholder com título e mensagem "Em construção"
+- Icon ☁️
+
+**`web-monitor/frontend/src/pages/SpamExpertsPage.tsx`**
+- Placeholder para gerenciamento anti-spam
+- Icon 📧
+
+**`web-monitor/frontend/src/pages/OPNsensePage.tsx`**
+- Placeholder para gerenciamento de firewall
+- Icon 🛡️
+
+#### Rotas Implementadas:
+- `/` - Dashboard (Jules Tasks Monitor)
+- `/cloudflare` - Cloudflare Management (placeholder)
+- `/spamexperts` - SpamExperts Management (placeholder)
+- `/opnsense` - OPNsense Management (placeholder)
+
+#### README Atualizado:
+**`web-monitor/README.md`**
+- Documentada nova estrutura de navegação
+- Adicionado React Router v6 no tech stack
+- Seção "Frontend Structure" com tree dos diretórios
+- Seção "Navigation" com lista de rotas
+
+#### Build Status:
+✅ TypeScript compilation: SUCCESS
+✅ Vite build: SUCCESS (dist/ gerado)
+✅ Dev server: Running on port 8080
+
+#### Next Steps (Phase 2):
+- Implementar páginas Cloudflare/SpamExperts/OPNsense
+- Conectar com backend APIs
+- Adicionar formulários de gerenciamento
+
+---
+
 ## [3.6.19-beta] - 2025-12-17
 
 ### ✨ FEATURE - OPNsense Manager Completo

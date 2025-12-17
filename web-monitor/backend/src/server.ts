@@ -3,6 +3,8 @@ import express from 'express';
 import cors from 'cors';
 import { readFileSync } from 'fs';
 import { julesMonitor } from './services/jules-monitor';
+import { authMiddleware } from './middleware/auth';
+import apiRoutes from './routes/index';
 
 // Load config from /etc/fazai/fazai.conf
 function loadConfig(): { hostname: string; port: number } {
@@ -56,6 +58,10 @@ const port = config.port;
 app.use(cors());
 app.use(express.json());
 
+// ============================================================================
+// Public Routes (no authentication)
+// ============================================================================
+
 // Endpoint to get all tasks
 app.get('/api/tasks', (req, res) => {
   res.json(julesMonitor.getTasks());
@@ -98,7 +104,7 @@ app.get('/api/tasks/:id/stream', (req, res) => {
   sendEvent(initialData);
 
   const updateListener = (updatedTask: ReturnType<typeof julesMonitor.getTask>): void => {
-    if (updatedTask.id === taskId) {
+    if (updatedTask && updatedTask.id === taskId) {
       sendEvent({ type: 'update', payload: updatedTask });
     }
   };
@@ -110,6 +116,13 @@ app.get('/api/tasks/:id/stream', (req, res) => {
     res.end();
   });
 });
+
+// ============================================================================
+// Protected Routes (require authentication)
+// ============================================================================
+
+// Mount protected integration API routes
+app.use('/api/integrations', authMiddleware, apiRoutes);
 
 
 app.listen(port, () => {
