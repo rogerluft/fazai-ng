@@ -36,6 +36,8 @@ export default defineConfig({
       '127.0.0.1',
       hostname,
       `${hostname}.local`,
+      'walker.local',
+      'walker.storageweb',
     ],
   },
 })
