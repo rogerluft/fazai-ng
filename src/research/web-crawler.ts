@@ -11,12 +11,13 @@
  * - Cruzamento agêntico de dados
  * - Cache em Qdrant para reuso
  * - Rate limiting e robots.txt compliance
+ * - Suporte a SPA via Playwright/Crawlee (DevDocs)
  *
  * @module research/web-crawler
  */
 
 import * as cheerio from "cheerio";
-// import PQueue from "p-queue"; // Commented due to tsup bundling issue
+import PQueue from "p-queue";
 import { logger } from "../logger";
 import { createEmbeddingService } from "../services/embeddings";
 import { getQdrantClient } from "../database/qdrant-pool";
@@ -24,6 +25,7 @@ import { randomUUID } from "crypto";
 import { FAZAI_PATHS } from "../utils/paths";
 import * as fs from "fs";
 import * as path from "path";
+import { PlaywrightCrawler, Dataset } from "crawlee";
 
 /**
  * Search result from a single source
@@ -65,7 +67,8 @@ export interface ConsolidatedData {
 interface Source {
   name: string;
   endpoint: string;
-  parser: (html: string) => SearchResult[];
+  type?: "http" | "browser"; // Default: http
+  parser: (input: string) => Promise<SearchResult[]> | SearchResult[];
 }
 
 /**
@@ -96,6 +99,7 @@ export class AgenticWebCrawler {
       {
         name: "DuckDuckGo",
         endpoint: "https://html.duckduckgo.com/html/?q=",
+        type: "http",
         parser: this.parseDuckDuckGo.bind(this),
       },
     ],
@@ -103,6 +107,7 @@ export class AgenticWebCrawler {
       {
         name: "StackOverflow",
         endpoint: "https://stackoverflow.com/search?q=",
+        type: "http",
         parser: this.parseStackOverflow.bind(this),
       },
     ],
@@ -110,6 +115,7 @@ export class AgenticWebCrawler {
       {
         name: "DevDocs",
         endpoint: "https://devdocs.io/#q=",
+        type: "browser",
         parser: this.parseDevDocs.bind(this),
       },
     ],
@@ -117,8 +123,6 @@ export class AgenticWebCrawler {
 
   constructor() {
     // Rate limiting: max 5 concurrent requests, 1 request per second
-    // WORKAROUND: tsup minification breaks p-queue default export, use require() directly
-    const PQueue = require("p-queue").default;
     this.queue = new PQueue({ concurrency: 5, interval: 1000, intervalCap: 1 });
 
     // Cache file
@@ -200,30 +204,41 @@ export class AgenticWebCrawler {
   ): Promise<SearchResult[]> {
     try {
       const url = `${source.endpoint}${encodeURIComponent(query)}`;
+      const sourceType = source.type || "http";
 
-      logger.debug(`Fetching from ${source.name}: ${url}`);
+      logger.debug(`Fetching from ${source.name} (${sourceType}): ${url}`);
 
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
+      let results: SearchResult[] = [];
 
-      const response = await fetch(url, {
-        headers: {
-          "User-Agent": "Mozilla/5.0 (compatible; FazAI/3.5.4; +https://github.com/rogerluft/fazai-ng)",
-          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-          "Accept-Language": "en-US,en;q=0.9",
-        },
-        signal: controller.signal,
-      });
+      if (sourceType === "browser") {
+        // Browser scraping (SPA) - pass URL directly to parser
+        // We do not use the abort controller timeout here as Crawlee manages its own timeouts
+        // but we could race it if needed. For now, rely on Crawlee configuration.
+        results = await source.parser(url);
+      } else {
+        // HTTP scraping (Static)
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-      clearTimeout(timeoutId);
+        const response = await fetch(url, {
+          headers: {
+            "User-Agent": "Mozilla/5.0 (compatible; FazAI/3.5.4; +https://github.com/rogerluft/fazai-ng)",
+            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": "en-US,en;q=0.9",
+          },
+          signal: controller.signal,
+        });
 
-      if (!response.ok) {
-        logger.debug(`${source.name} returned status ${response.status}`);
-        return [];
+        clearTimeout(timeoutId);
+
+        if (!response.ok) {
+          logger.debug(`${source.name} returned status ${response.status}`);
+          return [];
+        }
+
+        const html = await response.text();
+        results = await source.parser(html);
       }
-
-      const html = await response.text();
-      const results = source.parser(html);
 
       // Add metadata
       for (const result of results) {
@@ -297,12 +312,100 @@ export class AgenticWebCrawler {
   }
 
   /**
-   * Parse DevDocs results
+   * Parse DevDocs results using Playwright/Crawlee
    */
-  private parseDevDocs(html: string): SearchResult[] {
-    // DevDocs é uma SPA, retorna vazio por enquanto
-    // TODO: Implementar com puppeteer se necessário
-    return [];
+  private async parseDevDocs(searchUrl: string): Promise<SearchResult[]> {
+    // Use a unique dataset name to avoid collisions if concurrent
+    const datasetName = `devdocs-${randomUUID()}`;
+    const dataset = await Dataset.open(datasetName);
+
+    try {
+      const crawler = new PlaywrightCrawler({
+        maxRequestsPerCrawl: 1, // só uma página por vez aqui, mas escalável
+        maxConcurrency: 5, // ajusta pra tua máquina/servidor
+        requestHandlerTimeoutSecs: 60,
+        headless: true,
+        navigationTimeoutSecs: 30,
+        requestHandler: async ({ page, request }) => {
+          // Bloqueia lixo pra velocidade máxima
+          await page.route('**/*', (route) => {
+            const type = route.request().resourceType();
+            if (['stylesheet', 'font', 'image', 'media'].includes(type)) {
+              route.abort();
+            } else {
+              route.continue();
+            }
+          });
+
+          // Wait for selector - DevDocs specific
+          // Note: devdocs.io/#q=... might redirect or load content dynamically
+          // .entry selector is commonly used in devdocs list
+          try {
+            await page.waitForSelector('.entry', { timeout: 15000 });
+          } catch (e) {
+            // If timeout, maybe no results or different layout
+            return;
+          }
+
+          const results = await page.evaluate(() => {
+            const items: SearchResult[] = [];
+            document.querySelectorAll('.entry').forEach((entry) => {
+              const link = entry.querySelector('a');
+              const title = entry.querySelector('h4') || link;
+              // Some devdocs themes might not have description class, fallback
+              const desc = entry.querySelector('.search-result__description');
+
+              if (link && title) {
+                let href = link.getAttribute('href') || '';
+                // Fix relative links
+                if (href && !href.startsWith('http')) {
+                  if (href.startsWith('/')) {
+                     href = 'https://devdocs.io' + href;
+                  } else {
+                     href = 'https://devdocs.io/' + href;
+                  }
+                }
+
+                items.push({
+                  title: title.textContent?.trim() || '',
+                  link: href,
+                  snippet: desc?.textContent?.trim() || title.textContent?.trim() || '',
+                  source: 'DevDocs',
+                  category: 'docs' // Placeholder
+                });
+              }
+            });
+            return items;
+          });
+
+          // Salva direto no dataset do Crawlee
+          await Dataset.pushData({
+            url: request.loadedUrl,
+            results
+          });
+        },
+        failedRequestHandler: async ({ request }) => {
+          logger.debug(`Falha em ${request.url}`);
+        }
+      });
+
+      await crawler.run([searchUrl]);
+
+      // Pega os dados salvos
+      const { items } = await dataset.getData();
+
+      // Extract results from dataset items
+      const allResults: SearchResult[] = items.flatMap((item: any) => item.results || []);
+
+      return allResults;
+    } catch (err: unknown) {
+      const error = err instanceof Error ? err : new Error(String(err));
+      logger.error(`Error parsing DevDocs: ${error.message}`);
+      return [];
+    } finally {
+      // Clean up dataset
+      await dataset.drop();
+    }
   }
 
   /**

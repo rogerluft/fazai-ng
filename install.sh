@@ -288,6 +288,15 @@ install_deps() {
   local npm_log="${TMPDIR:-/tmp}/fazai-npm-$$.log"
   if npm install --silent > "$npm_log" 2>&1; then
     success "Dependências instaladas ($(ls node_modules | wc -l) pacotes)"
+
+    # Instalar browsers do Playwright (necessário para scraping de SPA)
+    info "Instalando browsers do Playwright (Chromium)..."
+    if npx playwright install chromium > "$npm_log" 2>&1; then
+       success "Playwright Chromium instalado"
+    else
+       warning "Falha ao instalar Playwright Chromium. Verifique $npm_log"
+    fi
+
     rm -f "$npm_log"
   else
     error "Falha ao instalar dependências. Verifique $npm_log"

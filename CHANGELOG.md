@@ -1,5 +1,45 @@
 # FazAI Changelog
 
+## [3.7.0-beta] - 2025-12-18
+
+### 🕸️ FEATURE - SPA Web Scraping (DevDocs)
+
+**Suporte completo a sites SPA (Single Page Applications) no Web Crawler**
+
+#### New Features
+- **Browser-based Scraping** (`src/research/web-crawler.ts`)
+  - Integração com `crawlee` e `playwright`
+  - Renderização completa de JavaScript (Headless Chromium)
+  - Suporte específico para DevDocs.io (SPA)
+  - Bloqueio inteligente de recursos (imagens, fonts) para performance
+
+- **Architecture Updates**
+  - Nova interface `Source` com suporte a `type: 'browser'`
+  - Parser assíncrono para operações complexas
+  - Instalação automática de browsers no `install.sh`
+
+#### Dependencies
+- `crawlee` ^3.11.3
+- `@crawlee/playwright` ^3.11.3
+- `playwright` ^1.49.0
+
+#### Files Modified
+- `src/research/web-crawler.ts` - Refatoração completa para suporte a browser
+- `install.sh` - Adicionado `npx playwright install chromium`
+- `package.json` - Novas dependências
+- `src/app.ts` - Help text atualizado
+
+#### Usage
+```bash
+# O sistema seleciona automaticamente o modo browser para fontes configuradas (ex: DevDocs)
+fazai search "nginx configuration"
+```
+
+#### Notes
+- A interface web pode requerer atualizações futuras para refletir novas capacidades de scraping.
+
+---
+
 ## [3.6.13-beta] - 2025-12-17
 
 ### 🐛 FIXES - Dashboard CLI Critical Bugs

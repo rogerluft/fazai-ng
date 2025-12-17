@@ -73,7 +73,7 @@ Usage:
   fazai completion                                   # Print available CLI completions
   fazai alias <name> <command>                       # Create/manage global bash aliases
   fazai alias list                                   # List all aliases
-  fazai search "query"                               # Manual research via Context7/Web
+  fazai search "query"                               # Manual research via Context7/Web (supports SPAs)
   fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
   fazai cloudflare <action>                          # Manage Cloudflare (zones, dns, workers)

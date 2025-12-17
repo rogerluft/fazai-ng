@@ -54,6 +54,7 @@
 
 ### 🔍 Pesquisa Assistida
 - **MCP Context7**: Integração com servidor de contexto local
+- **SPA Support (NEW)**: Scraping de Single Page Applications via Playwright (DevDocs)
 - **Fallback Web**: DuckDuckGo automático quando precisa de mais informação
 - **Importação de Conversas**: Claude/ChatGPT Desktop → Vector Store
 
