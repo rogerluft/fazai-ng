@@ -502,6 +502,39 @@ O FazAI suporta integração com Google Gemini através de Cloudflare Workers, o
 - Projeto: [gemini-cli-openai](https://github.com/GewoonJaap/gemini-cli-openai)
 - Documentação: https://github.com/GewoonJaap/gemini-cli-openai#readme
 
+## 🔥 Integração OPNsense
+
+O FazAI permite gerenciar seu firewall OPNsense diretamente pelo terminal:
+
+### Funcionalidades
+- **Firewall**: Listar, adicionar e remover regras
+- **NAT**: Gerenciar redirecionamento de portas
+- **VPN**: Monitorar túneis IPsec
+- **Interfaces**: Visualizar status e IPs
+- **DHCP**: Listar leases ativos
+
+### Configuração
+
+Adicione ao `/etc/fazai/fazai.conf`:
+
+```bash
+# OPNsense API
+OPNSENSE_API_URL=https://192.168.1.1
+OPNSENSE_API_KEY=sua_api_key
+OPNSENSE_API_SECRET=seu_api_secret
+OPNSENSE_VERIFY_SSL=false  # Se usar certificado auto-assinado
+```
+
+### Uso
+
+```bash
+fazai --cli
+# No modo interativo:
+/opnsense
+# ou
+/ops
+```
+
 ## 🛡️ Sistema de Segurança
 
 FazAI possui **5 camadas de proteção**:

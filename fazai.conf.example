@@ -259,3 +259,19 @@ ENABLE_PREVIEW_FEATURES=false
 # Authentication Method 2: Username/Password (legacy)
 # SPAMEXPERTS_USERNAME=your_username
 # SPAMEXPERTS_PASSWORD=your_password
+# ============================================================================
+# OPNsense INTEGRATION
+# ============================================================================
+
+# OPNsense API Configuration
+# URL: URL of your OPNsense instance (e.g., https://192.168.1.1)
+# OPNSENSE_API_URL=https://192.168.1.1
+
+# API Credentials
+# Create an API key in System > Access > Users > [User] > API keys
+# OPNSENSE_API_KEY=your_api_key
+# OPNSENSE_API_SECRET=your_api_secret
+
+# SSL Verification
+# Set to 'false' if using self-signed certificates (common in OPNsense)
+# OPNSENSE_VERIFY_SSL=false
