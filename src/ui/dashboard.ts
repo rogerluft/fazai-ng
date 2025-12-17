@@ -81,7 +81,7 @@ export interface RecentCommand {
  */
 export interface APIStatus {
   name: string;
-  status: "online" | "offline" | "degraded";
+  status: "online" | "offline" | "degraded" | "not_configured" | "unauthorized";
   responseTime?: string;
   lastCheck?: string;
 }

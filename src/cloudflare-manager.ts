@@ -3,7 +3,7 @@
  * Gerencia recursos Cloudflare via API
  */
 
-import { loadConfig } from './config-loader';
+import { loadConfig } from './config';
 
 interface CloudflareZone {
   id: string;
@@ -29,6 +29,41 @@ interface CloudflareWorker {
   name: string;
   script: string;
   routes?: string[];
+}
+
+interface CloudflareFirewallRule {
+  id: string;
+  description: string;
+  action: 'block' | 'challenge' | 'js_challenge' | 'allow' | 'log';
+  paused: boolean;
+  filter: {
+    id: string;
+    expression: string;
+  };
+}
+
+interface CloudflareSSLSettings {
+  mode: 'off' | 'flexible' | 'full' | 'strict';
+  universal_ssl: boolean;
+  edge_certificates_count: number;
+}
+
+interface CachePurgeOptions {
+  purge_everything?: boolean;
+  files?: string[];
+  tags?: string[];
+  hosts?: string[];
+}
+
+interface CloudflareAnalytics {
+  requests: number;
+  bandwidth: number;
+  threats: number;
+  pageViews: number;
+  period: {
+    since: string;
+    until: string;
+  };
 }
 
 export class CloudflareManager {

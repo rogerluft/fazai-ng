@@ -41,8 +41,6 @@ const THRESHOLDS = {
   ONLINE: 1000,
   /** 1000-3000ms = degraded (lento mas funcional) */
   DEGRADED: 3000,
-  /** >3000ms = offline (timeout/indisponível) */
-  OFFLINE: 3000,
 } as const;
 
 /**
@@ -460,6 +458,7 @@ export async function checkAllAPIs(): Promise<APIStatusResult[]> {
     checkAnthropicStatus(),
     checkGoogleStatus(),
     checkOllamaStatus(),
+    checkPerplexityStatus(),
   ]);
 
   // Log resumo

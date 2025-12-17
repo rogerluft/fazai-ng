@@ -266,6 +266,7 @@ Total:                      ~10k tokens Claude
 ## Implementação
 
 ### Orquestrador (src/orchestrator/)
+leia /src/orchestrator/README.md
 
 ```typescript
 // src/orchestrator/task-router.ts

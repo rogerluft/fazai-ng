@@ -349,5 +349,11 @@ export function statusColor(value: any): string {
   if (["pending", "warning", "degraded", "starting"].includes(val)) {
     return chalk.yellow(value);
   }
+  if (["not_configured", "not configured"].includes(val)) {
+    return chalk.gray(value);
+  }
+  if (["unauthorized", "forbidden"].includes(val)) {
+    return chalk.magenta(value);
+  }
   return chalk.gray(value);
 }
