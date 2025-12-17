@@ -9,5 +9,6 @@ export default defineConfig({
     port: 8080,
     strictPort: false,
     cors: true,
+    allowedHosts: ['all'], // Allow all hostnames (walker.local, walker.storageweb, etc)
   },
 })
