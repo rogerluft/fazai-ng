@@ -117,57 +117,26 @@ async function getRecentCommands(): Promise<Array<{ timestamp: string; command: 
 }
 
 /**
- * Verifica status de APIs externas
- * BUGFIX: Thresholds corrigidos - <1000ms=online, 1000-3000ms=degraded, >3000ms=offline
+ * Verifica status de APIs externas usando credenciais reais
+ * USA: api-status-checker com credenciais dos Managers (CloudflareManager, OpenAI SDK, Anthropic SDK, etc.)
  */
-async function getAPIStatus(): Promise<Array<{ name: string; status: "online" | "offline" | "degraded"; responseTime?: string }>> {
-  const apis = [
-    { name: "Cloudflare", url: "https://api.cloudflare.com/client/v4/user/tokens/verify" },
-    { name: "OpenAI", url: "https://api.openai.com/v1/models" },
-    { name: "Anthropic", url: "https://api.anthropic.com/v1/messages" },
-  ];
+async function getAPIStatus(): Promise<Array<{ name: string; status: "online" | "offline" | "degraded" | "not_configured" | "unauthorized"; responseTime?: string }>> {
+  try {
+    const { checkAllAPIs, formatResponseTime } = await import("./services/api-status-checker");
+    const results = await checkAllAPIs();
 
-  const results = await Promise.all(
-    apis.map(async (api) => {
-      try {
-        const start = Date.now();
-        const response = await fetch(api.url, {
-          method: "HEAD",
-          headers: { "User-Agent": "FazAI/3.5.4" },
-          signal: AbortSignal.timeout(5000), // 5s timeout
-        });
-        const elapsed = Date.now() - start;
+    return results.map((result) => ({
+      name: result.name,
+      status: result.status,
+      responseTime: result.responseTime ? formatResponseTime(result.responseTime) : undefined,
+    }));
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.error(`Erro ao verificar status de APIs: ${err.message}`);
 
-        // Thresholds corretos:
-        // <1000ms = online (boa performance)
-        // 1000-3000ms = degraded (lento mas funcional)
-        // >3000ms ou erro = offline
-        let status: "online" | "offline" | "degraded";
-        if (!response.ok) {
-          status = "offline";
-        } else if (elapsed < 1000) {
-          status = "online";
-        } else if (elapsed < 3000) {
-          status = "degraded";
-        } else {
-          status = "offline";
-        }
-
-        return {
-          name: api.name,
-          status,
-          responseTime: `${elapsed}ms`,
-        };
-      } catch (error: unknown) {
-        return {
-          name: api.name,
-          status: "offline" as const,
-        };
-      }
-    })
-  );
-
-  return results;
+    // Retorna array vazio em caso de erro
+    return [];
+  }
 }
 
 /**

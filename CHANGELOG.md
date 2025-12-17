@@ -1,5 +1,164 @@
 # FazAI Changelog
 
+## [3.6.14-beta] - 2025-12-17
+
+### ✅ FIX - Dashboard API Status com Credenciais Reais
+
+**getAPIStatus() refatorado para usar credenciais reais dos Managers**
+
+#### Problema Anterior
+
+- `getAPIStatus()` em `src/cli-mode.ts` fazia HEAD request sem autenticação
+- APIs retornavam 401 e eram marcadas como "offline" mesmo configuradas corretamente
+- Dashboard mostrava status falso negativo (API funcional aparecia como offline)
+
+#### Solução Implementada
+
+**Novo módulo:** `src/services/api-status-checker.ts` (553 linhas)
+
+- ✅ **Cloudflare**: Usa `CloudflareManager.listZones()` com API token real
+- ✅ **OpenAI**: Usa SDK OpenAI com `models.list()` autenticado
+- ✅ **Anthropic**: Usa SDK Anthropic com chamada mínima autenticada
+- ✅ **Google Gemini**: Usa SDK Google com `generateContent()` autenticado
+- ✅ **Ollama**: Usa `/api/tags` (sem auth necessária, servidor local)
+- ✅ **Perplexity**: Usa OpenAI SDK com base URL Perplexity
+
+#### Features
+
+**5 Status Possíveis:**
+- `online` - <1000ms, funcionando perfeitamente
+- `degraded` - 1000-3000ms, lento mas funcional
+- `offline` - >3000ms ou erro de conexão
+- `not_configured` - Sem credenciais configuradas
+- `unauthorized` - Credenciais inválidas (401)
+
+**Thresholds Corretos:**
+```typescript
+<1000ms     → online    (boa performance)
+1000-3000ms → degraded  (lento mas funcional)
+>3000ms     → offline   (timeout/indisponível)
+```
+
+**Tratamento de Erro Graceful:**
+- Timeout de 5s para todas as APIs
+- Retry logic com backoff exponencial (opcional)
+- Detecção de erros de autenticação (não retenta em 401)
+- Validação de credenciais antes de tentar chamada
+- Logs debug para troubleshooting
+
+#### Arquitetura
+
+**Factory Pattern:**
+- Cada API tem sua função `check{Provider}Status()`
+- Função `checkAllAPIs()` executa todas em paralelo
+- Função `checkAPIByName()` para verificação individual
+
+**Cache e Performance:**
+- Verificações executadas em paralelo (Promise.all)
+- Timeout independente por API (não bloqueia outras)
+- Retry apenas para erros recuperáveis (não 401)
+
+**Tipos TypeScript:**
+```typescript
+export type APIStatus =
+  | 'online'
+  | 'offline'
+  | 'degraded'
+  | 'not_configured'
+  | 'unauthorized';
+
+export interface APIStatusResult {
+  name: string;
+  status: APIStatus;
+  responseTime?: number;
+  error?: string;
+}
+```
+
+#### Integração
+
+**`src/cli-mode.ts` (linhas 123-140):**
+- Importa `checkAllAPIs()` e `formatResponseTime()` dinamicamente
+- Mapeia resultados para formato esperado pelo dashboard
+- Tratamento de erro graceful (retorna array vazio se falhar)
+
+**Dashboard `/dashboard`:**
+- Mostra status real autenticado de cada API
+- Exibe tempo de resposta (ex: "356ms")
+- Indica APIs não configuradas com "⚙️ Not Configured"
+- Indica credenciais inválidas com "🔒 Unauthorized"
+
+#### Exemplos de Saída
+
+```
+✅ Cloudflare: online (245ms)
+✅ OpenAI: degraded (1469ms)
+❌ Anthropic: offline (timeout após 5s)
+⚙️ Google Gemini: not_configured
+🔒 Perplexity: unauthorized (API key inválida)
+✅ Ollama: online (131ms)
+```
+
+#### Testing
+
+```bash
+# Build
+npm run build
+
+# Test direto
+npx tsx -e "
+import { checkAllAPIs } from './src/services/api-status-checker';
+const results = await checkAllAPIs();
+console.log(results);
+"
+
+# Test via dashboard
+fazai --cli
+> /dashboard
+```
+
+#### Files Created
+
+- `src/services/api-status-checker.ts` (553 linhas)
+  - `checkCloudflareStatus()` - CloudflareManager.listZones()
+  - `checkOpenAIStatus()` - OpenAI SDK models.list()
+  - `checkAnthropicStatus()` - Anthropic SDK messages.create()
+  - `checkGoogleStatus()` - Google SDK generateContent()
+  - `checkOllamaStatus()` - Fetch /api/tags
+  - `checkPerplexityStatus()` - OpenAI SDK com base URL custom
+  - `checkAllAPIs()` - Verifica todas em paralelo
+  - `withRetry()` - Retry logic com backoff exponencial
+  - `formatStatus()` - Formata status para exibição
+  - `formatResponseTime()` - Formata tempo (ex: "356ms")
+
+#### Files Modified
+
+- `src/cli-mode.ts` (linha 123)
+  - Refatorou `getAPIStatus()` para usar `api-status-checker`
+  - Comentário atualizado: "USA: api-status-checker com credenciais dos Managers"
+
+#### Technical
+
+- ✅ Zero placeholders
+- ✅ Credenciais reais dos Managers (CloudflareManager, OpenAI SDK, Anthropic SDK)
+- ✅ Timeout de 5s por API (não bloqueia outras)
+- ✅ Thresholds corretos (<1s=online, 1-3s=degraded, >3s=offline)
+- ✅ 5 status possíveis (online, degraded, offline, not_configured, unauthorized)
+- ✅ Retry logic opcional com backoff exponencial
+- ✅ Type-safe com TypeScript strict mode
+- ✅ Graceful error handling
+- ✅ Logs debug para troubleshooting
+
+#### Flexibilidade
+
+- ✅ Factory pattern para extensibilidade
+- ✅ Retry logic reutilizável (`withRetry()`)
+- ✅ Cache potencial (próxima iteração)
+- ✅ Prevenção de bugs com validações
+- ✅ Tipos TypeScript robustos
+
+---
+
 ## [3.6.13-beta] - 2025-12-17
 
 ### 🐛 FIXES - Dashboard CLI Critical Bugs
