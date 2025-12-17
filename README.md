@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.6.12-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.6.15-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
@@ -29,7 +29,38 @@
 - **OpenRouter**: Acesso a 100+ modelos open-source (muitos free)
 - **Perplexity**: Modelos com pesquisa web integrada
 
-### 🔄 Provider Fallback Chain (NEW v3.6.12)
+### 📊 Dashboard API Status com Credenciais Reais (NEW v3.6.14)
+- **Verificação Autenticada**: Status real das APIs usando credenciais dos Managers
+- **6 Providers Suportados**: Cloudflare, OpenAI, Anthropic, Google, Ollama, Perplexity
+- **5 Estados Possíveis**: online, degraded, offline, not_configured, unauthorized
+- **Thresholds Inteligentes**: <1s=online, 1-3s=degraded, >3s=offline
+- **Timeout Protection**: 5s timeout com graceful degradation
+- **Exemplo**:
+  ```bash
+  $ fazai /dashboard
+  ✅ Cloudflare: online (234ms)
+  ✅ OpenAI: online (891ms)
+  ⚠️  Google: degraded (2.1s)
+  ❌ Anthropic: unauthorized (invalid key)
+  ⚙️  Perplexity: not_configured
+  ```
+
+### 🛡️ Security Hardening (NEW v3.6.15)
+- **CORS Protection**: Whitelist-based origins (DNS rebinding prevention)
+- **Config Validation**: Input sanitization (command injection prevention)
+- **Zero TypeScript `any`**: Full type safety enforcement
+- **Hostname Validation**: Regex-based `/^[a-zA-Z0-9.-]+$/`
+- **Port Range Check**: 1024-65535 validation (non-root safe)
+
+### 🌐 Web Monitor - Real-Time Interface (NEW v3.6.15)
+- **Backend**: Express + Server-Sent Events streaming
+- **Frontend**: React + Vite + Tailwind CSS
+- **Features**: Task cards, Timeline, Log viewer, Desktop notifications
+- **Configuration**: Reads from `/etc/fazai/fazai.conf`
+- **Access**: http://walker.storageweb:8080 ou http://localhost:8080
+- **Security**: Secure CORS with allowlist, validated config parser
+
+### 🔄 Provider Fallback Chain (v3.6.12)
 - **Resiliência Automática**: Se um provider falha, tenta próximo automaticamente
 - **Cadeia Inteligente**: ollama → openrouter → anthropic → openai → google
 - **Equivalência de Modelos**: Mapeia modelo equivalente ao fazer fallback
