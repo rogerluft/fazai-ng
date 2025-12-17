@@ -5,7 +5,7 @@
 
 import { loadConfig } from './config';
 
-interface CloudflareZone {
+export interface CloudflareZone {
   id: string;
   name: string;
   status: string;
@@ -15,7 +15,7 @@ interface CloudflareZone {
   };
 }
 
-interface CloudflareDNSRecord {
+export interface CloudflareDNSRecord {
   id: string;
   type: string;
   name: string;
@@ -24,14 +24,14 @@ interface CloudflareDNSRecord {
   ttl: number;
 }
 
-interface CloudflareWorker {
+export interface CloudflareWorker {
   id: string;
   name: string;
   script: string;
   routes?: string[];
 }
 
-interface CloudflareFirewallRule {
+export interface CloudflareFirewallRule {
   id: string;
   description: string;
   action: 'block' | 'challenge' | 'js_challenge' | 'allow' | 'log';
@@ -42,28 +42,31 @@ interface CloudflareFirewallRule {
   };
 }
 
-interface CloudflareSSLSettings {
-  mode: 'off' | 'flexible' | 'full' | 'strict';
-  universal_ssl: boolean;
-  edge_certificates_count: number;
+export interface CloudflareSSLSettings {
+  id: string;
+  value: 'off' | 'flexible' | 'full' | 'strict';
+  editable: boolean;
+  modified_on: string;
 }
 
-interface CachePurgeOptions {
+export interface CachePurgeOptions {
   purge_everything?: boolean;
   files?: string[];
   tags?: string[];
   hosts?: string[];
 }
 
-interface CloudflareAnalytics {
-  requests: number;
-  bandwidth: number;
-  threats: number;
-  pageViews: number;
-  period: {
-    since: string;
-    until: string;
+export interface CloudflareAnalytics {
+  totals: {
+    requests: number;
+    bandwidth: number;
+    threats: number;
+    pageviews: number;
   };
+}
+
+export interface CloudflareCachePurge {
+  id: string;
 }
 
 export class CloudflareManager {
@@ -226,5 +229,46 @@ export class CloudflareManager {
       throw new Error('CLOUDFLARE_ACCOUNT_ID não configurada');
     }
     return this.request(`/accounts/${this.accountId}/ai-gateway/gateways`);
+  }
+
+  // Firewall Rules
+  async listFirewallRules(zoneId: string): Promise<CloudflareFirewallRule[]> {
+    return this.request(`/zones/${zoneId}/firewall/rules`);
+  }
+
+  // SSL Settings
+  async getSSLSettings(zoneId: string): Promise<CloudflareSSLSettings> {
+    return this.request(`/zones/${zoneId}/settings/ssl`);
+  }
+
+  async updateSSLMode(zoneId: string, mode: 'off' | 'flexible' | 'full' | 'strict'): Promise<CloudflareSSLSettings> {
+    return this.request(`/zones/${zoneId}/settings/ssl`, {
+      method: 'PATCH',
+      body: JSON.stringify({ value: mode }),
+    });
+  }
+
+  // Cache
+  async purgeCache(zoneId: string, options: { purge_everything?: boolean; files?: string[]; tags?: string[] }): Promise<CloudflareCachePurge> {
+    const body: any = {};
+    if (options.purge_everything) {
+      body.purge_everything = true;
+    } else if (options.files) {
+      body.files = options.files;
+    } else if (options.tags) {
+      body.tags = options.tags;
+    }
+
+    return this.request(`/zones/${zoneId}/purge_cache`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  // Analytics
+  async getAnalytics(zoneId: string, since: string = '-1440'): Promise<CloudflareAnalytics> {
+    // since: -1440 for last 24 hours
+    const response = await this.request(`/zones/${zoneId}/analytics/dashboard?since=${since}`);
+    return response;
   }
 }

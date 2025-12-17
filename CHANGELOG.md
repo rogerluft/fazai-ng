@@ -1,5 +1,192 @@
 # FazAI Changelog
 
+## [3.6.19-beta] - 2025-12-17
+
+### ✨ FEATURE - OPNsense Manager Completo
+
+**Criado sistema completo de gerenciamento do OPNsense com integração real à API.**
+
+#### Novo Arquivo Criado:
+**`src/opnsense-manager.ts` (241 linhas)**
+- Classe `OPNsenseManager` com autenticação Basic Auth (API Key/Secret)
+- Suporte a HTTPS com controle de verificação SSL
+- Interfaces TypeScript exportadas:
+  - `FirewallRule` - Regras de firewall (pass/block/reject)
+  - `NATRule` - Regras de Port Forwarding
+  - `VPNTunnel` - Túneis IPsec
+  - `NetworkInterface` - Interfaces de rede
+  - `DHCPLease` - Leases DHCP ativos
+  - `SystemStatus` - Status do sistema
+
+#### Métodos Implementados:
+**Firewall:**
+- `listFirewallRules()` - Lista regras com parsing de source/destination
+- `addFirewallRule(rule)` - Adiciona nova regra
+- `deleteFirewallRule(uuid)` - Deleta regra por UUID
+- `applyFirewallChanges()` - Aplica mudanças pendentes
+
+**NAT:**
+- `listNATRules()` - Lista regras de port forward
+- `addPortForward(rule)` - Adiciona redirecionamento
+- `deletePortForward(uuid)` - Deleta regra
+- `applyNATChanges()` - Aplica mudanças de NAT
+
+**Outros:**
+- `listInterfaces()`, `listVPNTunnels()`, `connectVPN()`, `disconnectVPN()`
+- `getSystemStatus()`, `listDHCPLeases()`, `restartService()`
+
+#### Integração UI:
+**`src/commands/api/opnsense-ui.ts` (495 linhas)**
+- Removidos 12 métodos mock
+- Removidas funcionalidades: Traffic Shaper, OpenVPN (mantido IPsec), menu DNS separado
+- Todos os métodos agora usam `this.manager` para chamadas reais à API
+- Melhorias de UX: IDs UUID com largura 38, confirmações para operações destrutivas
+
+#### Configuração:
+```bash
+OPNSENSE_API_URL=https://opnsense.local
+OPNSENSE_API_KEY=your_key_here
+OPNSENSE_API_SECRET=your_secret_here
+OPNSENSE_SSL_VERIFY=false  # Desabilitar verificação SSL (dev)
+```
+
+**Arquivos modificados:**
+- `/src/opnsense-manager.ts` (criado)
+- `/src/commands/api/opnsense-ui.ts` (refatorado)
+- `/fazai.conf.example` (documentado)
+
+---
+
+## [3.6.18-beta] - 2025-12-17
+
+### ✨ FEATURE - SpamExperts Manager Completo
+
+**Criado sistema completo de gerenciamento do SpamExperts com integração real à API.**
+
+#### Novo Arquivo Criado:
+**`src/spamexperts-manager.ts` (169 linhas)**
+- Classe `SpamExpertsManager` com integração axios
+- Suporte a autenticação via API Key ou Username/Password
+- Interfaces TypeScript fortemente tipadas:
+  - `SpamExpertsDomain` - Domínios protegidos
+  - `QuarantineMessage` - Mensagens em quarentena
+  - `SpamExpertsReport` - Relatórios de spam
+  - `SpamExpertsListItem` - Itens de whitelist/blacklist
+  - `SpamExpertsSettings` - Configurações do sistema
+
+#### Métodos Implementados:
+**Domínios:**
+- `listDomains()` - Lista domínios protegidos
+- `addDomain(domain, destination)` - Adiciona domínio
+- `removeDomain(domain)` - Remove proteção
+
+**Quarentena:**
+- `listQuarantine(domain)` - Lista emails em quarentena
+- `releaseMessage(messageId)` - Libera email bloqueado
+- `deleteMessage(messageId)` - Deleta email permanentemente
+
+**Outros:**
+- `getReport(domain)` - Obtém relatórios de estatísticas
+- `listList(type)` - Lista whitelist/blacklist
+- `addToList(type, entry)` - Adiciona à lista
+- `removeFromList(type, entry)` - Remove da lista
+- `getSettings()`, `updateSettings()` - Gerencia configurações
+
+#### Integração UI:
+**`src/commands/api/spamexperts-ui.ts` (314 linhas)**
+- Removidos todos os mocks (147 linhas eliminadas)
+- Constructor com tratamento de erro na inicialização
+- Todos os métodos agora usam chamadas reais: `manager.listDomains()`, etc.
+- Removido menu "Usuários"
+
+#### Configuração:
+```bash
+SPAMEXPERTS_API_URL=https://api.antispamcloud.com/
+SPAMEXPERTS_API_KEY=your_api_key_here
+SPAMEXPERTS_USERNAME=your_username  # Alternativa à API Key
+SPAMEXPERTS_PASSWORD=your_password
+```
+
+**Dependências adicionadas:**
+- `axios` v1.7.9
+
+**Arquivos modificados:**
+- `/src/spamexperts-manager.ts` (criado)
+- `/src/commands/api/spamexperts-ui.ts` (refatorado)
+- `/fazai.conf.example` (documentado)
+- `/package.json` (axios adicionado)
+
+---
+
+## [3.6.17-beta] - 2025-12-17
+
+### ✨ FEATURE - Integração Real da API Cloudflare
+
+**CloudflareUI agora usa a API real do Cloudflare, eliminando completamente o código mock.**
+
+#### Mudanças Implementadas:
+
+**1. CloudflareManager Estendido:**
+- Adicionados 5 novos métodos para interagir com a API Cloudflare:
+  - `listFirewallRules()` - Lista regras de firewall de uma zona
+  - `getSSLSettings()` - Obtém configurações SSL/TLS
+  - `updateSSLMode()` - Atualiza modo SSL (off, flexible, full, strict)
+  - `purgeCache()` - Limpa cache (tudo, arquivos, tags)
+  - `getAnalytics()` - Obtém analytics de uma zona (últimas 24h)
+
+**2. Interfaces TypeScript Exportadas:**
+- `CloudflareZone` - Dados de zona DNS
+- `CloudflareDNSRecord` - Registros DNS
+- `CloudflareWorker` - Workers scripts
+- `CloudflareFirewallRule` - Regras de firewall
+- `CloudflareSSLSettings` - Configurações SSL/TLS
+- `CloudflareAnalytics` - Dados de analytics
+- `CloudflareCachePurge` - Resposta de purge cache
+- `CachePurgeOptions` - Opções de purge
+
+**3. CloudflareUI Integrado:**
+- Constructor agora instancia `CloudflareManager` com tratamento de erro
+- Todos os métodos mock foram removidos (linhas 409-476)
+- Métodos agora chamam diretamente `this.manager`:
+  - `listZones()` → `manager.listZones()`
+  - `manageDNS()` → `manager.listDNSRecords()`
+  - `addDNSRecord()` → `manager.createDNSRecord()`
+  - `deleteDNSRecord()` → `manager.deleteDNSRecord()`
+  - `manageWorkers()` → `manager.listWorkers()`
+  - `manageFirewall()` → `manager.listFirewallRules()`
+  - `manageSSL()` → `manager.getSSLSettings()` / `updateSSLMode()`
+  - `manageCache()` → `manager.purgeCache()`
+  - `showAnalytics()` → `manager.getAnalytics()`
+
+**4. Melhorias de UX:**
+- Analytics agora exibe números formatados (pt-BR) e bytes humanizados
+- SSL settings mostra data de modificação formatada
+- Cache purge confirmação mais clara
+- Mensagens de erro mais descritivas
+
+#### Arquivos Modificados:
+- `/home/rluft/fazai-ng/src/cloudflare-manager.ts` - 5 novos métodos, 8 interfaces exportadas
+- `/home/rluft/fazai-ng/src/commands/api/cloudflare-ui.ts` - 68 linhas removidas, integração real
+
+#### Comportamento Esperado:
+- O comando `/cloudflare` no CLI agora gerencia recursos reais da conta Cloudflare
+- Todas as funcionalidades do menu estão operacionais e interagem com a API real
+- Credenciais podem ser configuradas via `fazai.conf` ou variáveis de ambiente
+- Tratamento de erro robusto caso credenciais não estejam configuradas
+
+#### Requisitos:
+```bash
+# Configurar credenciais (uma das opções):
+export CLOUDFLARE_API_KEY="seu_token_aqui"
+export CLOUDFLARE_ACCOUNT_ID="seu_account_id" # opcional
+
+# Ou via /etc/fazai/fazai.conf:
+# cloudflareApiKey=seu_token_aqui
+# cloudflareAccountId=seu_account_id
+```
+
+---
+
 ## [3.6.16-beta] - 2025-12-17
 
 ### 🔒 CRITICAL SECURITY FIX - Command Injection (H1)
