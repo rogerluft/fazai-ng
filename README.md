@@ -1,13 +1,30 @@
-# 🖥️ FazAI v3.6.15-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.6.19-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
-**Administrador de Sistemas Linux Senior + Redes**  
+**Administrador de Sistemas Linux Senior + Redes**
 *AutoGPT · Genkit · RAG · Vector Store Qdrant*
 
 </div>
 
 <h3 align="center">Terminal inteligente que converte linguagem natural em comandos Linux seguros, com memória operacional, aprendizado contínuo e pesquisa assistida.</h3>
+
+---
+
+## 🆕 Mudanças Recentes (v3.6.17-19)
+
+| Integração              | Status      | Versão  | Descrição                                          |
+|-------------------------|-------------|---------|-----------------------------------------------------|
+| **Cloudflare Integration** | ✅ Aplicado | v3.6.17 | 5 métodos novos, 8 interfaces, mocks removidos     |
+| **SpamExperts Manager**    | ✅ Aplicado | v3.6.18 | Arquivo criado (169L), axios integrado, 11 métodos |
+| **OPNsense Manager**       | ✅ Aplicado | v3.6.19 | Arquivo criado (241L), 15 métodos, IPsec VPN       |
+| **Crawler Integration**    | ✅ Aplicado | -       | Aplicado em sessão anterior                        |
+
+**Destaques:**
+- 🎯 **3 APIs Reais Integradas**: Cloudflare, SpamExperts, OPNsense
+- 🗑️ **372 linhas de mocks removidas**: código real substituiu simulações
+- 📦 **2 novos managers criados**: 410 linhas de código TypeScript strict
+- 🔧 **31 métodos novos**: firewall, DNS, VPN, quarentena, analytics
 
 ---
 
@@ -309,6 +326,284 @@ O script:
 - ✅ Gera embeddings REAIS via Ollama (nomic-embed-text)
 - ✅ Popula `fazai_personality` com traços categorizados
 - ✅ Detecta: expertise (linux, docker, security), estilos (metódico, prático), abordagens (sequencial, flexível)
+
+---
+
+## 🚀 Como Usar as Novas Integrações (v3.6.17-19)
+
+### ☁️ Cloudflare Integration (v3.6.17)
+
+**Configuração** (`/etc/fazai/fazai.conf`):
+```bash
+CLOUDFLARE_API_KEY=your_cloudflare_api_token
+CLOUDFLARE_ACCOUNT_ID=your_account_id  # Opcional
+```
+
+**Comandos disponíveis:**
+```bash
+fazai cloudflare              # Menu principal Cloudflare
+fazai cf                      # Alias para cloudflare
+```
+
+**Exemplos práticos:**
+
+1. **Gerenciar Zonas DNS:**
+```bash
+# Listar todas as zonas
+fazai cloudflare
+# > Zonas DNS
+
+# Visualizar registros DNS de uma zona
+# > Registros DNS > Digite Zone ID
+```
+
+2. **Adicionar Registro DNS:**
+```bash
+# No menu Cloudflare:
+# > Registros DNS > Adicionar Registro
+# Tipo: A
+# Nome: app
+# Conteúdo: 192.168.1.100
+# Proxied: Sim
+```
+
+3. **Gerenciar Firewall:**
+```bash
+# No menu Cloudflare:
+# > Firewall
+# Lista regras ativas com ações (allow/block/challenge)
+```
+
+4. **Configurar SSL/TLS:**
+```bash
+# No menu Cloudflare:
+# > SSL/TLS
+# Modos disponíveis: off, flexible, full, strict
+# Mostra data de última modificação
+```
+
+5. **Limpar Cache:**
+```bash
+# No menu Cloudflare:
+# > Cache > Limpar Todo Cache
+# Confirmação obrigatória para segurança
+```
+
+6. **Visualizar Analytics:**
+```bash
+# No menu Cloudflare:
+# > Analytics > Digite Zone ID
+# Mostra: Requests, Bandwidth, Threats Blocked, Page Views (últimas 24h)
+# Formatação automática de números e bytes
+```
+
+**Métodos da API disponíveis:**
+- `listZones()` - Lista zonas DNS
+- `listDNSRecords(zoneId)` - Lista registros de uma zona
+- `createDNSRecord(zoneId, record)` - Adiciona registro DNS
+- `deleteDNSRecord(zoneId, recordId)` - Remove registro
+- `listFirewallRules(zoneId)` - Lista regras de firewall
+- `getSSLSettings(zoneId)` - Obtém configurações SSL/TLS
+- `updateSSLMode(zoneId, mode)` - Atualiza modo SSL
+- `purgeCache(zoneId, options)` - Limpa cache
+- `getAnalytics(zoneId)` - Obtém estatísticas
+
+---
+
+### 📧 SpamExperts Manager (v3.6.18)
+
+**Configuração** (`/etc/fazai/fazai.conf`):
+```bash
+SPAMEXPERTS_API_URL=https://api.antispamcloud.com/
+SPAMEXPERTS_API_KEY=your_api_key_here
+
+# OU autenticação via username/password:
+SPAMEXPERTS_USERNAME=your_username
+SPAMEXPERTS_PASSWORD=your_password
+```
+
+**Comandos disponíveis:**
+```bash
+fazai spamexperts             # Menu principal SpamExperts
+```
+
+**Exemplos práticos:**
+
+1. **Gerenciar Domínios Protegidos:**
+```bash
+# Listar domínios protegidos
+fazai spamexperts
+# > Domínios
+
+# Adicionar domínio
+# > Domínios > Adicionar
+# Domain: example.com
+# Destination: mail.example.com
+```
+
+2. **Visualizar Quarentena:**
+```bash
+# Ver emails em quarentena
+# > Quarentena > Digite domínio
+# Lista: messageId, subject, sender, date, score
+
+# Liberar email bloqueado
+# > Quarentena > Liberar > Digite messageId
+
+# Deletar email permanentemente
+# > Quarentena > Deletar > Digite messageId
+```
+
+3. **Relatórios de Spam:**
+```bash
+# Ver estatísticas
+# > Relatórios > Digite domínio
+# Mostra: total emails, spam blocked, clean delivered, quarantined
+```
+
+4. **Gerenciar Whitelist/Blacklist:**
+```bash
+# Adicionar à whitelist
+# > Whitelist/Blacklist > Whitelist > Adicionar
+# Email: friend@example.com
+
+# Adicionar à blacklist
+# > Whitelist/Blacklist > Blacklist > Adicionar
+# Email: spam@badsite.com
+
+# Remover da lista
+# > Whitelist/Blacklist > Whitelist > Remover
+```
+
+5. **Configurações do Sistema:**
+```bash
+# Ver configurações atuais
+# > Configurações
+# Mostra: spam threshold, quarantine retention, etc.
+```
+
+**Métodos da API disponíveis:**
+- `listDomains()` - Lista domínios protegidos
+- `addDomain(domain, destination)` - Adiciona proteção a domínio
+- `removeDomain(domain)` - Remove proteção
+- `listQuarantine(domain)` - Lista emails em quarentena
+- `releaseMessage(messageId)` - Libera email da quarentena
+- `deleteMessage(messageId)` - Deleta email permanentemente
+- `getReport(domain)` - Obtém relatório de estatísticas
+- `listList(type)` - Lista whitelist/blacklist
+- `addToList(type, entry)` - Adiciona à lista
+- `removeFromList(type, entry)` - Remove da lista
+- `getSettings()` / `updateSettings()` - Gerencia configurações
+
+---
+
+### 🔥 OPNsense Manager (v3.6.19)
+
+**Configuração** (`/etc/fazai/fazai.conf`):
+```bash
+OPNSENSE_API_URL=https://opnsense.local
+OPNSENSE_API_KEY=your_api_key_here
+OPNSENSE_API_SECRET=your_api_secret_here
+OPNSENSE_SSL_VERIFY=false  # Desabilitar verificação SSL (dev/lab)
+```
+
+**Comandos disponíveis:**
+```bash
+fazai opnsense                # Menu principal OPNsense
+```
+
+**Exemplos práticos:**
+
+1. **Gerenciar Regras de Firewall:**
+```bash
+# Listar regras de firewall
+fazai opnsense
+# > Firewall
+
+# Adicionar regra
+# > Firewall > Adicionar Regra
+# Interface: LAN
+# Source: 192.168.1.0/24
+# Destination: any
+# Port: 443
+# Action: pass (ou block/reject)
+# Description: Allow HTTPS from LAN
+
+# Deletar regra
+# > Firewall > Deletar Regra > Digite UUID da regra
+
+# Aplicar mudanças pendentes
+# > Firewall > Aplicar Mudanças
+```
+
+2. **Configurar Port Forwarding (NAT):**
+```bash
+# Listar regras de NAT
+# > NAT / Port Forwarding
+
+# Adicionar redirecionamento
+# > NAT > Adicionar Port Forward
+# Interface: WAN
+# Protocol: TCP
+# External Port: 8080
+# Internal IP: 192.168.1.10
+# Internal Port: 80
+# Description: Redirect HTTP to internal server
+
+# Aplicar mudanças de NAT
+# > NAT > Aplicar Mudanças
+```
+
+3. **Gerenciar VPN IPsec:**
+```bash
+# Listar túneis IPsec
+# > VPN
+
+# Conectar VPN
+# > VPN > Conectar > Digite IKE ID do túnel
+
+# Desconectar VPN
+# > VPN > Desconectar > Digite IKE ID
+```
+
+4. **Visualizar Interfaces de Rede:**
+```bash
+# Listar interfaces
+# > Interfaces
+# Mostra: name, ipv4, ipv6, mac, status, speed
+```
+
+5. **DHCP Leases Ativos:**
+```bash
+# Ver leases DHCP
+# > DHCP Leases
+# Lista: IP, MAC, hostname, lease start/end
+```
+
+6. **Status do Sistema:**
+```bash
+# Verificar status
+# > Status do Sistema
+# Mostra: uptime, CPU, memory, temperature, disk usage
+```
+
+**Métodos da API disponíveis:**
+- `listFirewallRules()` - Lista regras de firewall
+- `addFirewallRule(rule)` - Adiciona regra
+- `deleteFirewallRule(uuid)` - Remove regra
+- `applyFirewallChanges()` - Aplica mudanças pendentes
+- `listNATRules()` - Lista regras de port forwarding
+- `addPortForward(rule)` - Adiciona redirecionamento
+- `deletePortForward(uuid)` - Remove port forward
+- `applyNATChanges()` - Aplica mudanças de NAT
+- `listVPNTunnels()` - Lista túneis IPsec
+- `connectVPN(ikeid)` / `disconnectVPN(ikeid)` - Controla VPN
+- `listInterfaces()` - Lista interfaces de rede
+- `listDHCPLeases()` - Lista leases DHCP ativos
+- `getSystemStatus()` - Obtém status do sistema
+- `restartService(service)` - Reinicia serviço
+
+---
 
 ### Sistema de Aliases Global (fzalias)
 
