@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.6.19-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.6.22-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
@@ -11,20 +11,23 @@
 
 ---
 
-## 🆕 Mudanças Recentes (v3.6.17-19)
+## 🆕 Mudanças Recentes (v3.6.20-22)
 
-| Integração              | Status      | Versão  | Descrição                                          |
-|-------------------------|-------------|---------|-----------------------------------------------------|
+| Recurso                    | Status      | Versão  | Descrição                                          |
+|----------------------------|-------------|---------|-----------------------------------------------------|
+| **Web Interface Next.js**  | ✅ Aplicado | v3.6.21 | Interface web migrada para Next.js 15 App Router   |
+| **Unified Build System**   | ✅ Aplicado | v3.6.21 | Build CLI + Web unificado, auth HTTP Basic         |
+| **Config Unification**     | ✅ Aplicado | v3.6.22 | Variáveis web unificadas (WEB_HOST, WEB_PORT)      |
 | **Cloudflare Integration** | ✅ Aplicado | v3.6.17 | 5 métodos novos, 8 interfaces, mocks removidos     |
 | **SpamExperts Manager**    | ✅ Aplicado | v3.6.18 | Arquivo criado (169L), axios integrado, 11 métodos |
 | **OPNsense Manager**       | ✅ Aplicado | v3.6.19 | Arquivo criado (241L), 15 métodos, IPsec VPN       |
-| **Crawler Integration**    | ✅ Aplicado | -       | Aplicado em sessão anterior                        |
 
 **Destaques:**
+- 🌐 **Interface Web Completa**: Next.js 15 com App Router, Server Components
+- 🔐 **Autenticação HTTP Basic**: Credenciais em fazai.conf, middleware robusto
+- 🏗️ **Build Unificado**: npm run build:all compila CLI + Web em sequência
 - 🎯 **3 APIs Reais Integradas**: Cloudflare, SpamExperts, OPNsense
 - 🗑️ **372 linhas de mocks removidas**: código real substituiu simulações
-- 📦 **2 novos managers criados**: 410 linhas de código TypeScript strict
-- 🔧 **31 métodos novos**: firewall, DNS, VPN, quarentena, analytics
 
 ---
 
@@ -69,13 +72,21 @@
 - **Hostname Validation**: Regex-based `/^[a-zA-Z0-9.-]+$/`
 - **Port Range Check**: 1024-65535 validation (non-root safe)
 
-### 🌐 Web Monitor - Real-Time Interface (NEW v3.6.15)
-- **Backend**: Express + Server-Sent Events streaming
-- **Frontend**: React + Vite + Tailwind CSS
-- **Features**: Task cards, Timeline, Log viewer, Desktop notifications
-- **Configuration**: Reads from `/etc/fazai/fazai.conf`
-- **Access**: http://walker.storageweb:8080 ou http://localhost:8080
-- **Security**: Secure CORS with allowlist, validated config parser
+### 🌐 Interface Web - Monitoramento e Integrações (NEW v3.6.21-22)
+- **Framework**: Next.js 15 com App Router e React Server Components
+- **Autenticação**: HTTP Basic Auth via middleware (credenciais em fazai.conf)
+- **Páginas Disponíveis**:
+  - `/integrations/cloudflare` - Gerenciamento Cloudflare (DNS, Firewall, SSL, Cache)
+  - `/integrations/spamexperts` - SpamExperts (Quarentena, Domínios, Relatórios)
+  - `/integrations/opnsense` - OPNsense (Firewall, NAT, VPN, DHCP, Status)
+- **Configuração**:
+  - `WEB_HOST=0.0.0.0` - Interface de escuta (todas as interfaces)
+  - `WEB_PORT=3000` - Porta do servidor web
+  - `WEB_UI_USERNAME=admin` - Usuário para autenticação
+  - `WEB_UI_PASSWORD=senha_segura` - Senha para autenticação
+- **Acesso**: http://localhost:3000 (configurável em `/etc/fazai/fazai.conf`)
+- **Build**: npm run build:all (CLI + Web) ou npm run build:web (somente Web)
+- **Deploy**: Systemd service disponível em `etc/fazai/fazai-web@.service`
 
 ### 🔄 Provider Fallback Chain (v3.6.12)
 - **Resiliência Automática**: Se um provider falha, tenta próximo automaticamente
@@ -149,10 +160,26 @@ npx fazai
 git clone https://github.com/rogerluft/fazai-ng
 cd fazai-ng
 npm install
+
+# Build apenas CLI
 npm run build
+
+# Build CLI + Web Interface
+npm run build:all
+
+# Link para usar globalmente
 npm link
 fazai --help
 ```
+
+#### Comandos de Build Disponíveis
+
+- `npm run build` - Compila apenas o CLI (TypeScript → dist/app.cjs)
+- `npm run build:all` - Compila CLI + Interface Web (sequencial)
+- `npm run build:web` - Compila apenas Interface Web (Next.js)
+- `npm run dev` - Modo desenvolvimento CLI (tsx watch)
+- `npm run dev:web` - Modo desenvolvimento Web (Next.js dev server)
+- `npm run start:web` - Inicia Web em modo produção
 
 #### Auto-build para Desenvolvimento
 O launcher detecta alterações em `src/` e executa `npm run build` automaticamente.
@@ -326,6 +353,226 @@ O script:
 - ✅ Gera embeddings REAIS via Ollama (nomic-embed-text)
 - ✅ Popula `fazai_personality` com traços categorizados
 - ✅ Detecta: expertise (linux, docker, security), estilos (metódico, prático), abordagens (sequencial, flexível)
+
+---
+
+## 🌐 Interface Web FazAI (v3.6.21-22)
+
+A Interface Web FazAI oferece acesso visual às integrações de infraestrutura através de um dashboard Next.js moderno e responsivo.
+
+### Configuração da Interface Web
+
+**Arquivo de Configuração** (`/etc/fazai/fazai.conf` ou `~/.config/fazai/fazai.conf`):
+
+```bash
+# ============================================
+# WEB INTERFACE - Interface Web Next.js
+# ============================================
+
+# Interface de escuta (0.0.0.0 = todas as interfaces, localhost = apenas local)
+WEB_HOST=0.0.0.0
+
+# Porta do servidor web (padrão: 3000)
+WEB_PORT=3000
+
+# Credenciais de autenticação HTTP Basic
+WEB_UI_USERNAME=admin
+WEB_UI_PASSWORD=sua_senha_segura_aqui
+
+# IMPORTANTE: Altere a senha padrão em produção!
+# Gere senha forte: openssl rand -base64 32
+```
+
+### Instalação e Build
+
+```bash
+# Instalar dependências web
+cd /opt/fazai/web
+npm install
+
+# Build da interface web
+npm run build
+
+# Iniciar em modo desenvolvimento
+npm run dev
+
+# Iniciar em modo produção
+npm start
+```
+
+### Deploy com Systemd
+
+O FazAI inclui um serviço systemd para rodar a interface web em produção:
+
+```bash
+# Copiar arquivo de serviço
+sudo cp /opt/fazai/etc/fazai/fazai-web@.service /etc/systemd/system/
+
+# Habilitar e iniciar serviço (substituir usuario pelo seu usuário)
+sudo systemctl daemon-reload
+sudo systemctl enable fazai-web@usuario
+sudo systemctl start fazai-web@usuario
+
+# Verificar status
+sudo systemctl status fazai-web@usuario
+
+# Ver logs
+sudo journalctl -u fazai-web@usuario -f
+```
+
+### Autenticação
+
+A interface web utiliza **HTTP Basic Authentication** para proteger o acesso:
+
+- **Middleware**: `web/middleware.ts` valida credenciais em todas as rotas `/api/integrations/*`
+- **Credenciais**: Carregadas dinamicamente de `/etc/fazai/fazai.conf`
+- **Headers**: `Authorization: Basic <base64(username:password)>`
+- **Frontend**: Helper `web/lib/api-client.ts` injeta automaticamente as credenciais
+
+**Testando autenticação via curl:**
+
+```bash
+# Com credenciais (substituir admin:senha pelos valores do fazai.conf)
+curl -u admin:senha http://localhost:3000/api/integrations/cloudflare/zones
+
+# Sem credenciais (retorna 401 Unauthorized)
+curl http://localhost:3000/api/integrations/cloudflare/zones
+```
+
+### Páginas Disponíveis
+
+#### 1. Cloudflare Integration (`/integrations/cloudflare`)
+
+Gerenciamento completo da infraestrutura Cloudflare:
+
+- **Zonas DNS**: Listagem de domínios configurados
+- **Registros DNS**: Criar, editar e deletar registros (A, AAAA, CNAME, MX, TXT)
+- **Regras de Firewall**: Visualizar e gerenciar regras de segurança
+- **Configurações SSL/TLS**: Modos (Off, Flexible, Full, Strict)
+- **Cache**: Limpar cache (purge all ou por arquivos específicos)
+- **Analytics**: Requisições, bandwidth, ameaças bloqueadas (últimas 24h)
+
+**Requisitos de Configuração:**
+```bash
+CLOUDFLARE_API_KEY=your_cloudflare_api_token
+CLOUDFLARE_ACCOUNT_ID=your_account_id  # Opcional
+```
+
+#### 2. SpamExperts Integration (`/integrations/spamexperts`)
+
+Gerenciamento anti-spam e quarentena de emails:
+
+- **Domínios Protegidos**: Adicionar/remover proteção de domínios
+- **Quarentena**: Visualizar, liberar ou deletar emails bloqueados
+- **Relatórios**: Estatísticas de spam (total, bloqueado, limpo, quarentena)
+- **Whitelist/Blacklist**: Gerenciar listas de remetentes permitidos/bloqueados
+- **Configurações**: Threshold de spam, retenção de quarentena
+
+**Requisitos de Configuração:**
+```bash
+SPAMEXPERTS_API_URL=https://api.antispamcloud.com/
+SPAMEXPERTS_API_KEY=your_api_key_here
+# OU autenticação via username/password:
+SPAMEXPERTS_USERNAME=your_username
+SPAMEXPERTS_PASSWORD=your_password
+```
+
+#### 3. OPNsense Integration (`/integrations/opnsense`)
+
+Gerenciamento de firewall e rede OPNsense:
+
+- **Regras de Firewall**: Criar, editar e deletar regras (LAN, WAN, etc)
+- **Port Forwarding (NAT)**: Configurar redirecionamentos de porta
+- **VPN IPsec**: Listar túneis, conectar/desconectar
+- **Interfaces de Rede**: Status, IPs, MACs, velocidade
+- **DHCP Leases**: Leases ativos, IPs, MACs, hostnames
+- **Status do Sistema**: Uptime, CPU, memória, temperatura, disco
+- **Serviços**: Reiniciar serviços (nginx, unbound, dhcpd, etc)
+
+**Requisitos de Configuração:**
+```bash
+OPNSENSE_API_URL=https://opnsense.local
+OPNSENSE_API_KEY=your_api_key_here
+OPNSENSE_API_SECRET=your_api_secret_here
+OPNSENSE_SSL_VERIFY=false  # Desabilitar verificação SSL (dev/lab)
+```
+
+### Acesso Remoto
+
+Para acessar a interface web de outros dispositivos na rede:
+
+```bash
+# 1. Configurar WEB_HOST para aceitar conexões externas
+WEB_HOST=0.0.0.0
+
+# 2. Liberar porta no firewall
+sudo ufw allow 3000/tcp
+
+# 3. Acessar via IP da máquina
+http://192.168.1.100:3000
+# ou via hostname
+http://servidor.local:3000
+```
+
+### Segurança
+
+**Recomendações de Segurança:**
+
+1. **Altere as credenciais padrão** em produção
+2. **Use HTTPS** com reverse proxy (nginx, Caddy, Traefik)
+3. **Configure firewall** para limitar acesso à porta 3000
+4. **Rotate senhas** periodicamente
+5. **Use senha forte** (gere com: `openssl rand -base64 32`)
+
+**Exemplo de Reverse Proxy com Nginx:**
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name fazai.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/fazai.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fazai.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Troubleshooting
+
+**Porta já em uso:**
+```bash
+# Verificar processos usando porta 3000
+sudo lsof -i :3000
+sudo netstat -tulpn | grep :3000
+
+# Alterar porta em fazai.conf
+WEB_PORT=8080
+```
+
+**Credenciais não funcionam:**
+```bash
+# Verificar configuração
+grep -E "^WEB_UI_(USERNAME|PASSWORD)=" /etc/fazai/fazai.conf
+
+# Testar credenciais via curl
+curl -u admin:senha http://localhost:3000/api/integrations/cloudflare/zones
+```
+
+**Build falha:**
+```bash
+# Limpar cache e rebuildar
+cd /opt/fazai/web
+rm -rf .next node_modules
+npm install
+npm run build
+```
 
 ---
 

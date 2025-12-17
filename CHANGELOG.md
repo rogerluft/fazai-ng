@@ -1,5 +1,78 @@
 # FazAI Changelog
 
+## [3.6.22-beta] - 2025-12-17
+
+### REFACTOR - Unificacao da Configuracao Web e Instalacao
+
+**Unificacao das variaveis de configuracao web e atualizacao do instalador.**
+
+#### Configuracao Unificada (`/etc/fazai/fazai.conf`)
+
+Substituidas variaveis antigas por novas variaveis unificadas:
+
+| Variavel Antiga | Nova Variavel | Padrao |
+|-----------------|---------------|--------|
+| `WEB_MONITOR_HOSTNAME` | `WEB_HOST` | 0.0.0.0 |
+| `WEB_MONITOR_BACKEND_PORT` | `WEB_PORT` | 3000 |
+| `WEB_MONITOR_FRONTEND_PORT` | (removida) | - |
+
+#### Novos Arquivos/Alteracoes
+
+**`/etc/fazai/fazai.conf`:**
+- `WEB_HOST` - Host de escuta (0.0.0.0 = todas interfaces)
+- `WEB_PORT` - Porta unica do servidor web (padrao 3000)
+- `WEB_UI_USERNAME` - Usuario para acesso web
+- `WEB_UI_PASSWORD` - Senha para acesso web
+- Comentarios em portugues
+
+**`fazai.conf.example`:**
+- Atualizado com nova secao WEB INTERFACE
+- Documentacao completa das variaveis
+- Placeholders para API keys (sem valores reais)
+
+**`web/lib/managers/config-loader.ts`:**
+- Adicionados `webHost` e `webPort` na interface FazAIConfig
+- Novos cases para WEB_HOST e WEB_PORT no switch
+- Nova funcao exportada `getWebConfig()` retornando { host, port, username, password }
+- Nova interface `WebServerConfig`
+
+**`install.sh`:**
+- FAZAI_VERSION atualizado para "3.6.21-beta"
+- Banner atualizado com nova versao
+- `install_web_interface()` instala deps em /opt/fazai/web
+- `create_web_service()` le WEB_PORT do config
+- Mensagens atualizadas para porta 3000
+
+**`scripts/deploy.sh`:**
+- Verifica e inclui build web (.next)
+- Instala dependencias web se existirem
+- Exclui web-monitor do rsync
+- Mostra URL com porta configurada
+
+**`etc/fazai/fazai-web@.service`:**
+- Adicionado `EnvironmentFile=-/etc/fazai/fazai.conf`
+- WorkingDirectory: /opt/fazai/web
+- NODE_ENV=production
+- Porta padrao 3000
+- Comentarios explicativos
+
+#### Diretorio Depreciado
+
+**`web-monitor/`** - Diretorio antigo deve ser removido manualmente:
+```bash
+rm -rf /home/rluft/fazai-ng/web-monitor
+```
+
+#### Migracao
+
+Para migrar de versao anterior:
+1. Editar `/etc/fazai/fazai.conf`
+2. Substituir `WEB_MONITOR_*` por `WEB_*`
+3. Remover diretorio `web-monitor/`
+4. Reinstalar servico: `sudo systemctl daemon-reload`
+
+---
+
 ## [3.6.21-beta] - 2025-12-17
 
 ### FEATURE - Migrated web-monitor to Next.js App Router + Unified Build

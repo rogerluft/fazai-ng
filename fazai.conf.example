@@ -259,3 +259,29 @@ ENABLE_PREVIEW_FEATURES=false
 # Authentication Method 2: Username/Password (legacy)
 # SPAMEXPERTS_USERNAME=your_username
 # SPAMEXPERTS_PASSWORD=your_password
+
+# =============================================================================
+# WEB INTERFACE - Configuracao da Interface Web FazAI
+# =============================================================================
+#
+# A interface web permite gerenciar integracoes (Cloudflare, SpamExperts, OPNsense)
+# e monitorar o sistema FazAI atraves de um navegador.
+#
+# Porta padrao: 3000
+# URL de acesso: http://localhost:3000 ou http://<seu-ip>:3000
+#
+
+# Host para escuta do servidor web
+# 0.0.0.0 = escuta em todas as interfaces (acesso remoto habilitado)
+# 127.0.0.1 = apenas localhost (acesso local apenas)
+# Padrao: 0.0.0.0
+WEB_HOST=0.0.0.0
+
+# Porta do servidor web Next.js
+# Padrao: 3000
+WEB_PORT=3000
+
+# Credenciais de acesso a interface web (HTTP Basic Auth)
+# IMPORTANTE: Troque as credenciais padrao em producao!
+WEB_UI_USERNAME=admin
+WEB_UI_PASSWORD=fazai123

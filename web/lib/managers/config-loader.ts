@@ -16,6 +16,8 @@ interface FazAIConfig {
   opnsenseApiSecret?: string;
   webUiUsername?: string;
   webUiPassword?: string;
+  webHost?: string;
+  webPort?: number;
 }
 
 let cachedConfig: FazAIConfig | null = null;
@@ -78,6 +80,12 @@ export function loadConfig(): FazAIConfig {
             case 'WEB_UI_PASSWORD':
               config.webUiPassword = value;
               break;
+            case 'WEB_HOST':
+              config.webHost = value;
+              break;
+            case 'WEB_PORT':
+              config.webPort = parseInt(value, 10) || 3000;
+              break;
           }
         }
         break; // Found and loaded config, stop searching
@@ -97,6 +105,8 @@ export function loadConfig(): FazAIConfig {
   config.opnsenseApiSecret = process.env.OPNSENSE_API_SECRET || config.opnsenseApiSecret;
   config.webUiUsername = process.env.WEB_UI_USERNAME || config.webUiUsername || 'admin';
   config.webUiPassword = process.env.WEB_UI_PASSWORD || config.webUiPassword || 'fazai123';
+  config.webHost = process.env.WEB_HOST || config.webHost || '0.0.0.0';
+  config.webPort = parseInt(process.env.WEB_PORT || '', 10) || config.webPort || 3000;
 
   cachedConfig = config;
   return config;
@@ -108,6 +118,35 @@ export function loadConfig(): FazAIConfig {
 export function getWebUICredentials(): { username: string; password: string } {
   const config = loadConfig();
   return {
+    username: config.webUiUsername || 'admin',
+    password: config.webUiPassword || 'fazai123',
+  };
+}
+
+/**
+ * Interface para configuracao do servidor web
+ */
+export interface WebServerConfig {
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+}
+
+/**
+ * Obtem configuracao completa do servidor web
+ * Lê de /etc/fazai/fazai.conf ou variaveis de ambiente
+ *
+ * @returns {WebServerConfig} Configuracao do servidor web
+ * @example
+ * const webConfig = getWebConfig();
+ * console.log(`Server: http://${webConfig.host}:${webConfig.port}`);
+ */
+export function getWebConfig(): WebServerConfig {
+  const config = loadConfig();
+  return {
+    host: config.webHost || '0.0.0.0',
+    port: config.webPort || 3000,
     username: config.webUiUsername || 'admin',
     password: config.webUiPassword || 'fazai123',
   };

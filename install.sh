@@ -24,7 +24,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configurações
-FAZAI_VERSION="3.1.0-beta"
+FAZAI_VERSION="3.6.22-beta"
 # SEMPRE instala em /opt/fazai (centralizado)
 INSTALL_DIR="/opt/fazai"
 BIN_DIR="/usr/local/bin"
@@ -44,7 +44,7 @@ print_banner() {
 ║   ██║     ██║  ██║███████╗██║  ██║██║              ║
 ║   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝              ║
 ║                                                       ║
-║   Terminal FazAI v3.1-beta                           ║
+║   Terminal FazAI v3.6.22-beta                        ║
 ║   Administrador Linux Senior + Redes                 ║
 ║   AutoGPT + Genkit + RAG                             ║
 ║                                                       ║
@@ -943,45 +943,46 @@ install_web_interface() {
   echo ""
   info "═══════════════════════════════════════════════════════"
   info "  Interface Web FazAI (Next.js) - Opcional"
+  info "  Porta padrao: 3000 (configuravel em /etc/fazai/fazai.conf)"
   info "═══════════════════════════════════════════════════════"
   echo ""
-  
+
   read -p "$(echo -e ${YELLOW}"Deseja instalar a interface web? [y/N]: "${NC})" -n 1 -r
   echo
-  
+
   if [[ ! $REPLY =~ ^[Yy]$ ]]; then
     info "Interface web pulada. Instale manualmente:"
     info "  cd $INSTALL_DIR/web && npm install && npm run build"
     return 0
   fi
-  
+
   # Verificar se diretório web existe
   if [ ! -d "$INSTALL_DIR/web" ]; then
     warning "Diretório web/ não encontrado. Interface web não disponível."
     return 1
   fi
-  
-  info "Instalando dependências da interface web..."
+
+  info "Instalando dependências da interface web em /opt/fazai/web..."
   cd "$INSTALL_DIR/web"
-  
+
   # Verificar package.json
   if [ ! -f "package.json" ]; then
     warning "package.json não encontrado em web/"
     return 1
   fi
-  
+
   # Instalar dependências
   npm install || {
     warning "Falha ao instalar dependências web. Continue manualmente."
     return 1
   }
-  
-  success "Dependências web instaladas"
-  
+
+  success "Dependências web instaladas em /opt/fazai/web"
+
   # Criar .env se não existir
   if [ ! -f ".env" ]; then
     info "Criando arquivo .env para interface web..."
-    cp .env.example .env || cat > .env <<'WEBENV'
+    cp .env.example .env 2>/dev/null || cat > .env <<'WEBENV'
 # Qdrant Vector Database
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=
@@ -994,7 +995,7 @@ NEXT_PUBLIC_WS_URL=ws://localhost:3000
 WEBENV
     success "Arquivo .env criado"
   fi
-  
+
   # Build da aplicação
   info "Construindo interface web (Next.js)... (pode demorar)"
   npm run build || {
@@ -1002,15 +1003,15 @@ WEBENV
     warning "  cd $INSTALL_DIR/web && npm run build"
     return 1
   }
-  
+
   success "Interface web instalada e construída!"
-  
+
   # Oferecer criar serviço systemd
   if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
     echo ""
     read -p "$(echo -e ${YELLOW}"Criar serviço systemd para interface web? [y/N]: "${NC})" -n 1 -r
     echo
-    
+
     if [[ $REPLY =~ ^[Yy]$ ]]; then
       create_web_service
     else
@@ -1021,43 +1022,54 @@ WEBENV
       info "  sudo systemctl start fazai-web@\$(whoami)"
     fi
   fi
-  
+
   echo ""
   info "Para iniciar manualmente:"
-  info "  cd $INSTALL_DIR/web && npm run dev    # Desenvolvimento (port 3000)"
-  info "  cd $INSTALL_DIR/web && npm start      # Produção (port 3000)"
+  info "  cd $INSTALL_DIR/web && npm run dev    # Desenvolvimento (porta 3000)"
+  info "  cd $INSTALL_DIR/web && npm start      # Producao (porta 3000)"
+  info ""
+  info "Configurar porta em /etc/fazai/fazai.conf:"
+  info "  WEB_HOST=0.0.0.0   # Interface de escuta"
+  info "  WEB_PORT=3000      # Porta do servidor"
 }
 
 # Criar serviço systemd para web
 create_web_service() {
   local web_user=$(whoami)
-  
+
   info "Criando serviço systemd fazai-web@$web_user..."
-  
+
   # Copiar arquivo de serviço template
   sudo cp "$INSTALL_DIR/etc/fazai/fazai-web@.service" /etc/systemd/system/ || {
     warning "Falha ao copiar fazai-web@.service"
     return 1
   }
-  
+
   sudo systemctl daemon-reload
   sudo systemctl enable "fazai-web@$web_user" || {
     warning "Falha ao habilitar serviço"
     return 1
   }
-  
+
   sudo systemctl start "fazai-web@$web_user" || {
     warning "Falha ao iniciar serviço"
     warning "Verifique logs: sudo journalctl -u fazai-web@$web_user -n 50"
     return 1
   }
-  
+
   # Aguardar inicialização
   sleep 3
-  
+
+  # Ler porta configurada (padrao 3000)
+  local web_port=3000
+  if [ -f "/etc/fazai/fazai.conf" ]; then
+    web_port=$(grep -E "^WEB_PORT=" /etc/fazai/fazai.conf 2>/dev/null | cut -d= -f2 || echo "3000")
+    web_port=${web_port:-3000}
+  fi
+
   if systemctl is-active --quiet "fazai-web@$web_user"; then
     success "Serviço fazai-web@$web_user criado e iniciado!"
-    info "Interface web disponível em: http://localhost:3000"
+    info "Interface web disponível em: http://localhost:${web_port}"
     info "Logs: sudo journalctl -u fazai-web@$web_user -f"
   else
     warning "Serviço criado mas não está rodando"
