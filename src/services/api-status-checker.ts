@@ -444,6 +444,92 @@ async function checkOllamaStatus(): Promise<APIStatusResult> {
 }
 
 /**
+ * Verifica status do Perplexity usando OpenAI SDK com base URL custom
+ *
+ * @returns Resultado da verificação de status
+ */
+async function checkPerplexityStatus(): Promise<APIStatusResult> {
+  const start = Date.now();
+  const config = loadConfig();
+
+  try {
+    const apiKey = config.perplexityApiKey || process.env.PERPLEXITY_API_KEY;
+
+    if (!apiKey) {
+      return {
+        name: "Perplexity",
+        status: "not_configured",
+        error: "PERPLEXITY_API_KEY não configurada",
+      };
+    }
+
+    // Perplexity uses OpenAI-compatible API
+    const OpenAI = (await import("openai")).default;
+    const client = new OpenAI({
+      apiKey,
+      baseURL: "https://api.perplexity.ai",
+    });
+
+    const models = await Promise.race([
+      client.models.list(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), API_TIMEOUT)
+      ),
+    ]);
+
+    const elapsed = Date.now() - start;
+
+    // Classifica status baseado em tempo de resposta
+    let status: APIStatus;
+    if (elapsed < THRESHOLDS.ONLINE) {
+      status = "online";
+    } else if (elapsed < THRESHOLDS.DEGRADED) {
+      status = "degraded";
+    } else {
+      status = "offline";
+    }
+
+    logger.debug(
+      `Perplexity: ${models.data.length} models, ${elapsed}ms, status=${status}`
+    );
+
+    return {
+      name: "Perplexity",
+      status,
+      responseTime: elapsed,
+    };
+  } catch (error: unknown) {
+    const elapsed = Date.now() - start;
+    const err = error instanceof Error ? error : new Error(String(error));
+
+    // Detecta tipo de erro
+    if (err.message.includes("Timeout")) {
+      return {
+        name: "Perplexity",
+        status: "offline",
+        responseTime: elapsed,
+        error: "Timeout após 5s",
+      };
+    }
+
+    if (err.message.includes("401") || err.message.includes("unauthorized")) {
+      return {
+        name: "Perplexity",
+        status: "unauthorized",
+        error: "API key inválida",
+      };
+    }
+
+    return {
+      name: "Perplexity",
+      status: "offline",
+      responseTime: elapsed,
+      error: err.message.substring(0, 50),
+    };
+  }
+}
+
+/**
  * Verifica status de todas as APIs configuradas em paralelo
  *
  * @returns Array de resultados de status de API

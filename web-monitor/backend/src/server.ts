@@ -14,17 +14,37 @@ function loadConfig(): { hostname: string; port: number } {
     let port = 3001;
 
     for (const line of lines) {
-      if (line.startsWith('WEB_MONITOR_HOSTNAME=')) {
-        hostname = line.split('=')[1].trim();
+      // Skip comments and empty lines
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith('#')) continue;
+
+      if (trimmed.startsWith('WEB_MONITOR_HOSTNAME=')) {
+        const value = trimmed.split('=')[1]?.trim();
+        // Validate hostname (alphanumeric, dots, hyphens only)
+        if (value && /^[a-zA-Z0-9.-]+$/.test(value)) {
+          hostname = value;
+        } else {
+          console.warn(`Invalid hostname in config: ${value}, using default`);
+        }
       }
-      if (line.startsWith('WEB_MONITOR_BACKEND_PORT=')) {
-        port = parseInt(line.split('=')[1].trim(), 10);
+
+      if (trimmed.startsWith('WEB_MONITOR_BACKEND_PORT=')) {
+        const value = trimmed.split('=')[1]?.trim();
+        const parsedPort = parseInt(value || '', 10);
+        // Validate port range (1024-65535 for non-root)
+        if (!isNaN(parsedPort) && parsedPort >= 1024 && parsedPort <= 65535) {
+          port = parsedPort;
+        } else {
+          console.warn(`Invalid port in config: ${value}, using default 3001`);
+        }
       }
     }
 
     return { hostname, port };
   } catch (error) {
-    console.warn('Could not read /etc/fazai/fazai.conf, using defaults');
+    const err = error instanceof Error ? error : new Error(String(error));
+    console.warn(`Could not read /etc/fazai/fazai.conf: ${err.message}`);
+    console.warn('Using default config: localhost:3001');
     return { hostname: 'localhost', port: 3001 };
   }
 }
@@ -65,16 +85,19 @@ app.get('/api/tasks/:id/stream', (req, res) => {
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const sendEvent = (data: any) => {
-    res.write(`data: ${JSON.stringify(data)}
+  interface SSEEvent {
+    type: 'initial' | 'update';
+    payload: ReturnType<typeof julesMonitor.getTask>;
+  }
 
-`);
+  const sendEvent = (data: SSEEvent): void => {
+    res.write(`data: ${JSON.stringify(data)}\n\n`);
   };
 
-  const initialData = { type: 'initial', payload: task };
+  const initialData: SSEEvent = { type: 'initial', payload: task };
   sendEvent(initialData);
 
-  const updateListener = (updatedTask: any) => {
+  const updateListener = (updatedTask: ReturnType<typeof julesMonitor.getTask>): void => {
     if (updatedTask.id === taskId) {
       sendEvent({ type: 'update', payload: updatedTask });
     }
