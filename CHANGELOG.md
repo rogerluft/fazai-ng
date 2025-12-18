@@ -1,5 +1,36 @@
 # FazAI Changelog
 
+## [3.8.0-ecoa] - 2025-12-18
+
+### 🧬 ARCHITECTURE - ECOA Integration & Vector Standardization
+
+**Implementação da arquitetura de Inodes Semânticos e padronização vetorial.**
+
+#### Core Changes
+- **Semantic Inodes (Qdrant):**
+  - Schema de collections atualizado para suportar metadados ricos (`fazai_personality`, `fazai_memory`, `fazai_kb`).
+  - Implementado mecanismo de **Hop Contextual** no `neural-flow`.
+  - Adicionado suporte a **Arrays Auto-Informativos** para recuperação de dados sem latência.
+
+- **Vector Standardization (1536 dim):**
+  - **Unificação:** Todas as collections agora usam dimensão fixa de **1536** (padrão `text-embedding-3-small`).
+  - **CPU Fallback (Zero Padding):** Implementada lógica de projeção vetorial para modelos locais (Ollama). Se um modelo gerar vetores menores (ex: 1024), o sistema automaticamente preenche com zeros para manter compatibilidade com o índice 1536. Isso permite rodar **sem GPU** mantendo a integridade do banco.
+
+- **Personality Engine:**
+  - Integração de prompts de sistema dinâmicos baseados em contexto emocional.
+  - Ajuste de pesos no `neural-flow`: Personalidade removida da busca de fatos (peso 0.0) para evitar alucinação, mantida apenas para injeção de estilo no chat.
+
+#### Files Modified
+- `src/vector-store.ts` - Schemas atualizados e dimensão 1536 fixada.
+- `src/rag/neural-flow.ts` - Lógica de Hop, Ressonância e Extração de Conteúdo.
+- `src/services/embeddings.ts` - Zero Padding para compatibilidade Ollama/OpenAI.
+- `src/askAI.ts` - Integração de ferramentas (`[[WEB]]`, `[[SAVE]]`) e prompts de persona.
+
+#### Usage
+Nenhuma ação requerida pelo usuário. O sistema migrará automaticamente para o novo comportamento de busca e armazenamento.
+
+---
+
 ## [3.7.0-beta] - 2025-12-18
 
 ### 🕸️ FEATURE - SPA Web Scraping (DevDocs)

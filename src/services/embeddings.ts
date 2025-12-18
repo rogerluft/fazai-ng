@@ -135,20 +135,21 @@ class OllamaEmbeddingService implements EmbeddingService {
                 );
               }
 
-              const data = await response.json();
-
-              if (!data.embedding || !Array.isArray(data.embedding)) {
-                throw new Error("Invalid response from Ollama API");
+              const rawEmbedding = data.embedding as number[];
+              
+              // ECOA Logic: Zero Padding para padronização de dimensões
+              // Se o modelo local (CPU) gerar vetor menor (ex: 1024), projeta para 1536
+              const targetDim = 1536; // Padrão ECOA/OpenAI
+              
+              if (rawEmbedding.length < targetDim) {
+                logger.debug(`Padding vector from ${rawEmbedding.length} to ${targetDim}`);
+                return [...rawEmbedding, ...new Array(targetDim - rawEmbedding.length).fill(0)];
+              } else if (rawEmbedding.length > targetDim) {
+                logger.warn(`Truncating vector from ${rawEmbedding.length} to ${targetDim}`);
+                return rawEmbedding.slice(0, targetDim);
               }
 
-              // Validate dimension
-              if (data.embedding.length !== this.dimension) {
-                logger.warn(
-                  `Expected ${this.dimension} dimensions, got ${data.embedding.length}`
-                );
-              }
-
-              return data.embedding as number[];
+              return rawEmbedding;
             } catch (error: any) {
               clearTimeout(timeoutId);
               throw error;
@@ -171,7 +172,7 @@ class OllamaEmbeddingService implements EmbeddingService {
       } catch (error: any) {
         logger.error(`Failed to generate embedding for text ${i + 1}: ${error.message}`);
         // Return zero vector as fallback
-        embeddings.push(new Array(this.dimension).fill(0));
+        embeddings.push(new Array(1536).fill(0));
       }
     }
 
@@ -182,7 +183,7 @@ class OllamaEmbeddingService implements EmbeddingService {
     return {
       provider: "ollama" as const,
       model: this.model,
-      dimension: this.dimension,
+      dimension: 1536, // Reporta a dimensão padronizada (com padding)
       isLocal: true,
     };
   }
