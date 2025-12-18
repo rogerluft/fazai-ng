@@ -233,14 +233,23 @@ export async function createAlias(
   logger.info(chalk.green(`✓ Alias '${name}' created successfully`));
   logger.info(chalk.gray(`  Command: ${command}`));
 
-  // Verifica se /etc/profile.d/fazai-aliases.sh existe (instalação completa)
-  const profileScript = "/etc/profile.d/fazai-aliases.sh";
-  const profileExists = await fs.access(profileScript).then(() => true).catch(() => false);
+  // Verifica se o source está configurado no bashrc do sistema
+  let autoLoadConfigured = false;
+  try {
+    const bashrcFile = await fs.access("/etc/bashrc").then(() => "/etc/bashrc").catch(() => null)
+      || await fs.access("/etc/bash.bashrc").then(() => "/etc/bash.bashrc").catch(() => null);
 
-  if (profileExists) {
+    if (bashrcFile) {
+      const content = await fs.readFile(bashrcFile, "utf-8");
+      autoLoadConfigured = content.includes("source /etc/fazai/fzalias");
+    }
+  } catch {
+    // Ignora erro
+  }
+
+  if (autoLoadConfigured) {
     logger.info(chalk.gray("  Alias disponível em novas sessões de terminal"));
   } else {
-    // Se não tiver o profile.d configurado, mostra instrução manual
     logger.info(chalk.cyan("\n  Para usar agora: source /etc/fazai/fzalias"));
     logger.info(chalk.gray("  Ou abra um novo terminal"));
   }

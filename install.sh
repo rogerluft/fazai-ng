@@ -380,30 +380,31 @@ install_fzalias_system() {
     warning "Script fzalias não encontrado em $INSTALL_DIR/scripts/"
   fi
 
-  # Criar script em /etc/profile.d/ para carregar aliases automaticamente
-  local PROFILE_SCRIPT="/etc/profile.d/fazai-aliases.sh"
+  # Injetar source no /etc/bashrc (Fedora/RHEL) ou /etc/bash.bashrc (Debian/Ubuntu)
   info "Configurando carregamento automático de aliases..."
 
-  if [ "$EUID" -eq 0 ]; then
-    cat > "$PROFILE_SCRIPT" << 'EOFPROFILE'
-# FazAI Global Aliases - Auto-load
-# Carrega aliases do FazAI em todas as sessões bash/zsh
-if [ -f /etc/fazai/fzalias ]; then
-  source /etc/fazai/fzalias
-fi
-EOFPROFILE
-    chmod 644 "$PROFILE_SCRIPT"
-  else
-    sudo tee "$PROFILE_SCRIPT" > /dev/null << 'EOFPROFILE'
-# FazAI Global Aliases - Auto-load
-# Carrega aliases do FazAI em todas as sessões bash/zsh
-if [ -f /etc/fazai/fzalias ]; then
-  source /etc/fazai/fzalias
-fi
-EOFPROFILE
-    sudo chmod 644 "$PROFILE_SCRIPT"
+  local BASHRC_FILE=""
+  if [ -f /etc/bashrc ]; then
+    BASHRC_FILE="/etc/bashrc"
+  elif [ -f /etc/bash.bashrc ]; then
+    BASHRC_FILE="/etc/bash.bashrc"
   fi
-  success "Aliases serão carregados automaticamente em novas sessões"
+
+  if [ -n "$BASHRC_FILE" ]; then
+    # Verifica se já tem a linha
+    if ! grep -q "source /etc/fazai/fzalias" "$BASHRC_FILE" 2>/dev/null; then
+      if [ "$EUID" -eq 0 ]; then
+        echo -e "\n# FazAI aliases\n[ -f /etc/fazai/fzalias ] && source /etc/fazai/fzalias" >> "$BASHRC_FILE"
+      else
+        echo -e "\n# FazAI aliases\n[ -f /etc/fazai/fzalias ] && source /etc/fazai/fzalias" | sudo tee -a "$BASHRC_FILE" > /dev/null
+      fi
+      success "Aliases serão carregados automaticamente em novas sessões"
+    else
+      success "Carregamento automático de aliases já configurado"
+    fi
+  else
+    warning "Não foi possível configurar carregamento automático (bashrc não encontrado)"
+  fi
 }
 
 # Configurar fazai.conf
