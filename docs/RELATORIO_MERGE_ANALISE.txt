@@ -1,0 +1,82 @@
+=============================================================================
+             RELATÓRIO DE ANÁLISE DE CONVERGÊNCIA DE BRANCHES
+=============================================================================
+Data: 2025-12-17
+Analista: Jules (AI Agent)
+Contexto: Repositório com desenvolvimento paralelo e branches "Split-Brain".
+
+1. RESUMO EXECUTIVO
+-----------------------------------------------------------------------------
+A branch 'master' é a candidata mais forte para ser a base unificada. Ela já
+contém a maior parte da lógica de orquestração e configurações recentes.
+No entanto, funcionalidades críticas de 'feature/spa-web-scraper' e
+'feat/opnsense-integration' estão mais evoluídas em suas respectivas branches
+e precisam ser portadas manualmente, pois o histórico git está desconexo.
+
+2. TABELA COMPARATIVA DE ESTADO (TIP COMPARISON)
+-----------------------------------------------------------------------------
+| Arquivo Chave                        | Master (Base) | Multi-Agent | Opnsense | SPA-Scraper | Vencedor      |
+|--------------------------------------|---------------|-------------|----------|-------------|---------------|
+| src/askAI.ts (Lógica Central)        | 255 linhas    | 176 linhas  | 255      | 255         | MASTER [1]    |
+| src/orchestrator/index.ts            | 62 linhas     | 62 linhas   | 62       | 62          | EMPATE (Igual)|
+| src/services/api-status-checker.ts   | 637 linhas    | AUSENTE     | 723 lin  | AUSENTE     | OPNSENSE [2]  |
+| src/research/web-crawler.ts          | 557 linhas    | 555 linhas  | 557      | 660 lin     | SPA-SCRAPER[3]|
+| fazai.conf.example                   | Completo      | Defasado    | -        | -           | MASTER        |
+| src/opnsense-manager.ts              | 241 linhas    | AUSENTE     | 241      | AUSENTE     | EMPATE (Igual)|
+
+[1] Master possui lógica de Fallback de Provider e System Messages centralizadas
+    que faltam na branch multi-agent.
+[2] Branch Opnsense contém implementação detalhada de 'checkOPNsenseStatus' que
+    falta na Master.
+[3] Branch SPA-Scraper contém lógica avançada de Playwright/Crawlee ausente na
+    Master.
+
+3. DETALHAMENTO DE CONFLITOS LÓGICOS (SPLIT-BRAIN)
+-----------------------------------------------------------------------------
+A. Orquestração (Multi-Agent vs Master)
+   - Situação: A branch 'feat-multi-agent' parece antiga em relação à 'master'.
+     O arquivo 'askAI.ts' da master já evoluiu para incluir sistemas de fallback
+     que não existem na feature branch.
+   - Ação: IGNORAR a branch 'feat-multi-agent' para fins de código. A lógica
+     útil já parece estar na master.
+
+B. Web Scraper (Master vs SPA-Scraper)
+   - Situação: 'Master' tem um crawler funcional, mas a branch 'feature/spa...'
+     tem uma versão muito mais robusta (+100 linhas) com suporte a SPAs.
+   - Risco: Sobrescrever correções de bugs da master.
+   - Ação: SOBRESCREVER 'src/research/web-crawler.ts' com a versão da branch
+     'feature/spa-web-scraper'.
+
+C. Monitoramento OPNsense (Master vs Opnsense)
+   - Situação: 'Master' tem o arquivo base, mas a branch 'feat/opnsense...' tem
+     a integração completa no 'api-status-checker.ts'.
+   - Ação: MERGE MANUAL (Patch) da função 'checkOPNsenseStatus' para dentro do
+     arquivo da master.
+
+4. PLANO DE AÇÃO RECOMENDADO
+-----------------------------------------------------------------------------
+ORDEM DE EXECUÇÃO:
+
+1. CHECKOUT na branch 'master' (Garantir que é a base).
+   $ git checkout master
+
+2. INTEGRAÇÃO OPNsense (Status Checker):
+   - Extrair 'src/services/api-status-checker.ts' de 'feat/opnsense-integration'.
+   - Mesclar a função 'checkOPNsenseStatus' preservando as outras checagens da master.
+
+3. INTEGRAÇÃO SPA Scraper:
+   - Substituir arquivo 'src/research/web-crawler.ts' pela versão de
+     'origin/feature/spa-web-scraper-16357137742063256395'.
+   - Verificar dependências novas em 'package.json' (crawlee, playwright).
+
+4. LIMPEZA:
+   - As branches 'feat-multi-agent' e 'analysis/architecture-evolution' podem ser
+     consideradas obsoletas/merged e removidas após verificação final.
+
+5. ARQUIVOS NOVOS A IMPORTAR (Cherry-Pick de Features):
+   Certifique-se de que estes arquivos existam na master:
+   - src/opnsense-manager.ts (Já existe, confirmar integridade)
+   - src/spamexperts-manager.ts (Verificar em origin/feat-spamexperts...)
+
+-----------------------------------------------------------------------------
+FIM DO RELATÓRIO
