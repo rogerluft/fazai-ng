@@ -1,5 +1,37 @@
 # FazAI Changelog
 
+## [3.6.23-beta] - 2025-12-18
+
+### FIX - Limpeza de Hardcodes e Melhorias no Sistema de Aliases
+
+#### Correções
+
+**Sistema de Aliases (`src/commands/alias.ts`):**
+- Fix: Criação do diretório de backup antes do copyFile
+- Fix: Verifica se backup dir existe antes de tentar copiar
+- Fix: Usa sudo automaticamente se permissão negada
+
+**Auto-load de Aliases (`install.sh`):**
+- Injeta source no `/etc/bashrc` (Fedora) ou `/etc/bash.bashrc` (Debian)
+- Não cria mais arquivo separado em `/etc/profile.d/`
+- Aliases carregam automaticamente em novas sessões
+
+#### Limpeza de Hardcodes
+
+- Removido `/home/rluft` hardcoded de `scripts/consolidate-fazai.sh`
+- Removido `scripts/execute-jules-tasks.ts` (script temporário)
+- Corrigido docs para usar `/opt/fazai` em vez de paths hardcoded
+- Removido `docs/history/` (arquivos temporários com hardcodes)
+
+#### Scripts de Teste Adicionados
+
+- `scripts/test-qdrant-collections.ts` - Testa collections Qdrant
+- `scripts/test-embedding-service.ts` - Testa serviço de embeddings
+- `scripts/test-semantic-cache.ts` - Testa cache semântico
+- `scripts/test-neural-flow.ts` - Testa Neural Flow (RAG)
+
+---
+
 ## [3.6.22-beta] - 2025-12-17
 
 ### REFACTOR - Unificacao da Configuracao Web e Instalacao

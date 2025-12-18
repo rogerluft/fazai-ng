@@ -59,12 +59,12 @@ main() {
     fi
 
     # List of known redundant paths based on our search
+    # Uses $HOME to avoid hardcoded usernames
     local redundant_paths=(
         "/usr/local/sbin/fazai"
         "/root/.local/bin/fazai"
-        "/home/rluft/.fazai/bin/fazai"
-        "/home/rluft/.fazai/fazai"
-        "/home/rluft/fazai-ng/fazai" # The script referenced as @fazai
+        "$HOME/.fazai/bin/fazai"
+        "$HOME/.fazai/fazai"
     )
     
     info "Searching for redundant executables to remove..."

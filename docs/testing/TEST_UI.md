@@ -5,7 +5,7 @@
 ### 1. Testar Demo Completa (Recomendado)
 
 ```bash
-cd /home/rluft/fazai-ng
+cd /opt/fazai
 npx tsx examples/ui-demo.ts
 ```
 
@@ -22,7 +22,7 @@ npx tsx examples/ui-demo.ts
 ### 2. Testar Modo CLI Interativo
 
 ```bash
-cd /home/rluft/fazai-ng
+cd /opt/fazai
 npm run dev -- --cli
 ```
 
@@ -233,7 +233,7 @@ time (echo "/quit" | npm run dev -- --cli)
 ## Exemplo de Sessão de Teste
 
 ```bash
-$ cd /home/rluft/fazai-ng
+$ cd /opt/fazai
 
 # 1. Build
 $ npm run build

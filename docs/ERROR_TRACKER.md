@@ -235,7 +235,7 @@ function analyzeErrors() {
 
 ## Testes
 
-Suite completa de testes em `/home/rluft/fazai-ng/tests/unit/error-tracker.test.ts`:
+Suite completa de testes em `/opt/fazai/tests/unit/error-tracker.test.ts`:
 
 ```bash
 npm run test:unit -- tests/unit/error-tracker.test.ts

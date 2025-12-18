@@ -11,7 +11,7 @@ Refatoração completa do sistema de gerenciamento de modelos, eliminando o sist
 
 ## 1. Arquivos Criados
 
-### `/home/rluft/fazai-ng/src/types/provider.ts`
+### `/opt/fazai/src/types/provider.ts`
 
 **Descrição**: Interface e classe base para todos os providers de IA.
 
@@ -34,7 +34,7 @@ Refatoração completa do sistema de gerenciamento de modelos, eliminando o sist
 
 ## 2. Arquivos Refatorados
 
-### `/home/rluft/fazai-ng/src/models.ts`
+### `/opt/fazai/src/models.ts`
 
 **Alterações principais**:
 
@@ -84,7 +84,7 @@ models.push({
 
 ---
 
-### `/home/rluft/fazai-ng/src/providers/perplexity-provider.ts`
+### `/opt/fazai/src/providers/perplexity-provider.ts`
 
 **Alterações principais**:
 
@@ -137,7 +137,7 @@ export class PerplexityProvider implements Provider {
 
 ---
 
-### `/home/rluft/fazai-ng/src/app.ts`
+### `/opt/fazai/src/app.ts`
 
 **Alterações principais**:
 
@@ -208,7 +208,7 @@ Examples:
 
 ---
 
-### `/home/rluft/fazai-ng/fazai.conf.example`
+### `/opt/fazai/fazai.conf.example`
 
 **Alterações principais**:
 
