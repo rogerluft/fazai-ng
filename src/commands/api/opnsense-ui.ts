@@ -14,7 +14,12 @@ export class OPNsenseUI {
   private manager: OPNsenseManager;
 
   constructor() {
-    this.manager = new OPNsenseManager();
+    try {
+      this.manager = new OPNsenseManager();
+    } catch (error: any) {
+      showError(`Falha ao inicializar OPNsense: ${error.message}`);
+      throw new Error("Inicialização do OPNsense falhou. Verifique as credenciais em /etc/fazai/fazai.conf");
+    }
   }
   /**
    * Menu principal do OPNsense

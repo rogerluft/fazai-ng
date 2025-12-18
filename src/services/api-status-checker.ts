@@ -8,6 +8,7 @@
  */
 
 import { CloudflareManager } from "../cloudflare-manager";
+import { OPNsenseManager } from "../opnsense-manager";
 import { loadConfig } from "../config";
 import { logger } from "../logger";
 import OpenAI from "openai";
@@ -530,6 +531,90 @@ async function checkPerplexityStatus(): Promise<APIStatusResult> {
 }
 
 /**
+ * Verifica status do OPNsense usando OPNsenseManager
+ */
+async function checkOPNsenseStatus(): Promise<APIStatusResult> {
+  const start = Date.now();
+  const config = loadConfig();
+
+  try {
+    // Verifica se credenciais estão configuradas
+    if (!config.opnsenseApiUrl || !config.opnsenseApiKey || !config.opnsenseApiSecret) {
+      return {
+        name: "OPNsense",
+        status: "not_configured",
+        error: "OPNSENSE_API_URL/KEY/SECRET não configuradas",
+      };
+    }
+
+    const manager = new OPNsenseManager();
+    // Tenta listar interfaces (chamada leve)
+    await Promise.race([
+      manager.listInterfaces(),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Timeout")), API_TIMEOUT)
+      ),
+    ]);
+
+    const elapsed = Date.now() - start;
+
+    // Classifica status baseado em tempo de resposta
+    let status: APIStatus;
+    if (elapsed < THRESHOLDS.ONLINE) {
+      status = "online";
+    } else if (elapsed < THRESHOLDS.DEGRADED) {
+      status = "degraded";
+    } else {
+      status = "offline";
+    }
+
+    logger.debug(`OPNsense: response received, ${elapsed}ms, status=${status}`);
+
+    return {
+      name: "OPNsense",
+      status,
+      responseTime: elapsed,
+    };
+  } catch (error: unknown) {
+    const elapsed = Date.now() - start;
+    const err = error instanceof Error ? error : new Error(String(error));
+
+    // Detecta tipo de erro
+    if (err.message.includes("Timeout")) {
+      return {
+        name: "OPNsense",
+        status: "offline",
+        responseTime: elapsed,
+        error: "Timeout após 5s",
+      };
+    }
+
+    if (err.message.includes("401") || err.message.includes("403")) {
+      return {
+        name: "OPNsense",
+        status: "unauthorized",
+        error: "Credenciais inválidas",
+      };
+    }
+
+    if (err.message.includes("ECONNREFUSED")) {
+      return {
+        name: "OPNsense",
+        status: "offline",
+        error: "Conexão recusada",
+      };
+    }
+
+    return {
+      name: "OPNsense",
+      status: "offline",
+      responseTime: elapsed,
+      error: err.message.substring(0, 50),
+    };
+  }
+}
+
+/**
  * Verifica status de todas as APIs configuradas em paralelo
  *
  * @returns Array de resultados de status de API
@@ -545,6 +630,7 @@ export async function checkAllAPIs(): Promise<APIStatusResult[]> {
     checkGoogleStatus(),
     checkOllamaStatus(),
     checkPerplexityStatus(),
+    checkOPNsenseStatus(),
   ]);
 
   // Log resumo
