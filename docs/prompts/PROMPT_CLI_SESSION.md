@@ -25,7 +25,7 @@ User → Terminal, cli e web → engenharia de orchestracao (talves longchains, 
 
 #### 1.1 Instalar Dependências Genkit
 ```bash
-cd /home/rluft/fazai-ng
+cd /opt/fazai
 
 # Core Genkit
 npm install @genkit-ai/core @genkit-ai/ai @genkit-ai/flow

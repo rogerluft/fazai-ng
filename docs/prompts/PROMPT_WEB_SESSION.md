@@ -28,7 +28,7 @@ Next.js 14+ (App Router)
 
 #### 1.1 Criar Projeto Next.js
 ```bash
-cd /home/rluft/fazai-ng
+cd /opt/fazai
 
 # Criar diretório web se não existir
 mkdir -p web

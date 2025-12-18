@@ -8,9 +8,18 @@ Wants=qdrant.service
 Type=simple
 User=%i
 WorkingDirectory=/opt/fazai/web
+
+# Ambiente de producao
 Environment=NODE_ENV=production
-Environment=PORT=3456
 Environment=PATH=/usr/bin:/usr/local/bin
+
+# Carregar variaveis de /etc/fazai/fazai.conf
+# WEB_HOST e WEB_PORT sao lidos pelo Next.js via config-loader.ts
+EnvironmentFile=-/etc/fazai/fazai.conf
+
+# Porta padrao 3000 (pode ser sobrescrita por WEB_PORT em fazai.conf)
+Environment=PORT=3000
+
 ExecStart=/usr/bin/npm start
 Restart=on-failure
 RestartSec=10

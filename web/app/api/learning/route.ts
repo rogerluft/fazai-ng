@@ -95,7 +95,7 @@ export async function POST(request: Request) {
 
     // Generate ID from learning_id hash
     const id = Math.abs(
-      learning_id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
+      learning_id.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     );
 
     await qdrant.upsert("fazai_learning", {

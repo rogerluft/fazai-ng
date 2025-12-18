@@ -1,13 +1,33 @@
-# 🖥️ FazAI v3.6.12-beta - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.6.22-beta - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
-**Administrador de Sistemas Linux Senior + Redes**  
+**Administrador de Sistemas Linux Senior + Redes**
 *AutoGPT · Genkit · RAG · Vector Store Qdrant*
 
 </div>
 
 <h3 align="center">Terminal inteligente que converte linguagem natural em comandos Linux seguros, com memória operacional, aprendizado contínuo e pesquisa assistida.</h3>
+
+---
+
+## 🆕 Mudanças Recentes (v3.6.20-22)
+
+| Recurso                    | Status      | Versão  | Descrição                                          |
+|----------------------------|-------------|---------|-----------------------------------------------------|
+| **Web Interface Next.js**  | ✅ Aplicado | v3.6.21 | Interface web migrada para Next.js 15 App Router   |
+| **Unified Build System**   | ✅ Aplicado | v3.6.21 | Build CLI + Web unificado, auth HTTP Basic         |
+| **Config Unification**     | ✅ Aplicado | v3.6.22 | Variáveis web unificadas (WEB_HOST, WEB_PORT)      |
+| **Cloudflare Integration** | ✅ Aplicado | v3.6.17 | 5 métodos novos, 8 interfaces, mocks removidos     |
+| **SpamExperts Manager**    | ✅ Aplicado | v3.6.18 | Arquivo criado (169L), axios integrado, 11 métodos |
+| **OPNsense Manager**       | ✅ Aplicado | v3.6.19 | Arquivo criado (241L), 15 métodos, IPsec VPN       |
+
+**Destaques:**
+- 🌐 **Interface Web Completa**: Next.js 15 com App Router, Server Components
+- 🔐 **Autenticação HTTP Basic**: Credenciais em fazai.conf, middleware robusto
+- 🏗️ **Build Unificado**: npm run build:all compila CLI + Web em sequência
+- 🎯 **3 APIs Reais Integradas**: Cloudflare, SpamExperts, OPNsense
+- 🗑️ **372 linhas de mocks removidas**: código real substituiu simulações
 
 ---
 
@@ -29,7 +49,46 @@
 - **OpenRouter**: Acesso a 100+ modelos open-source (muitos free)
 - **Perplexity**: Modelos com pesquisa web integrada
 
-### 🔄 Provider Fallback Chain (NEW v3.6.12)
+### 📊 Dashboard API Status com Credenciais Reais (NEW v3.6.14)
+- **Verificação Autenticada**: Status real das APIs usando credenciais dos Managers
+- **6 Providers Suportados**: Cloudflare, OpenAI, Anthropic, Google, Ollama, Perplexity
+- **5 Estados Possíveis**: online, degraded, offline, not_configured, unauthorized
+- **Thresholds Inteligentes**: <1s=online, 1-3s=degraded, >3s=offline
+- **Timeout Protection**: 5s timeout com graceful degradation
+- **Exemplo**:
+  ```bash
+  $ fazai /dashboard
+  ✅ Cloudflare: online (234ms)
+  ✅ OpenAI: online (891ms)
+  ⚠️  Google: degraded (2.1s)
+  ❌ Anthropic: unauthorized (invalid key)
+  ⚙️  Perplexity: not_configured
+  ```
+
+### 🛡️ Security Hardening (NEW v3.6.15)
+- **CORS Protection**: Whitelist-based origins (DNS rebinding prevention)
+- **Config Validation**: Input sanitization (command injection prevention)
+- **Zero TypeScript `any`**: Full type safety enforcement
+- **Hostname Validation**: Regex-based `/^[a-zA-Z0-9.-]+$/`
+- **Port Range Check**: 1024-65535 validation (non-root safe)
+
+### 🌐 Interface Web - Monitoramento e Integrações (NEW v3.6.21-22)
+- **Framework**: Next.js 15 com App Router e React Server Components
+- **Autenticação**: HTTP Basic Auth via middleware (credenciais em fazai.conf)
+- **Páginas Disponíveis**:
+  - `/integrations/cloudflare` - Gerenciamento Cloudflare (DNS, Firewall, SSL, Cache)
+  - `/integrations/spamexperts` - SpamExperts (Quarentena, Domínios, Relatórios)
+  - `/integrations/opnsense` - OPNsense (Firewall, NAT, VPN, DHCP, Status)
+- **Configuração**:
+  - `WEB_HOST=0.0.0.0` - Interface de escuta (todas as interfaces)
+  - `WEB_PORT=3000` - Porta do servidor web
+  - `WEB_UI_USERNAME=admin` - Usuário para autenticação
+  - `WEB_UI_PASSWORD=senha_segura` - Senha para autenticação
+- **Acesso**: http://localhost:3000 (configurável em `/etc/fazai/fazai.conf`)
+- **Build**: npm run build:all (CLI + Web) ou npm run build:web (somente Web)
+- **Deploy**: Systemd service disponível em `etc/fazai/fazai-web@.service`
+
+### 🔄 Provider Fallback Chain (v3.6.12)
 - **Resiliência Automática**: Se um provider falha, tenta próximo automaticamente
 - **Cadeia Inteligente**: ollama → openrouter → anthropic → openai → google
 - **Equivalência de Modelos**: Mapeia modelo equivalente ao fazer fallback
@@ -102,10 +161,26 @@ npx fazai
 git clone https://github.com/rogerluft/fazai-ng
 cd fazai-ng
 npm install
+
+# Build apenas CLI
 npm run build
+
+# Build CLI + Web Interface
+npm run build:all
+
+# Link para usar globalmente
 npm link
 fazai --help
 ```
+
+#### Comandos de Build Disponíveis
+
+- `npm run build` - Compila apenas o CLI (TypeScript → dist/app.cjs)
+- `npm run build:all` - Compila CLI + Interface Web (sequencial)
+- `npm run build:web` - Compila apenas Interface Web (Next.js)
+- `npm run dev` - Modo desenvolvimento CLI (tsx watch)
+- `npm run dev:web` - Modo desenvolvimento Web (Next.js dev server)
+- `npm run start:web` - Inicia Web em modo produção
 
 #### Auto-build para Desenvolvimento
 O launcher detecta alterações em `src/` e executa `npm run build` automaticamente.
@@ -279,6 +354,504 @@ O script:
 - ✅ Gera embeddings REAIS via Ollama (nomic-embed-text)
 - ✅ Popula `fazai_personality` com traços categorizados
 - ✅ Detecta: expertise (linux, docker, security), estilos (metódico, prático), abordagens (sequencial, flexível)
+
+---
+
+## 🌐 Interface Web FazAI (v3.6.21-22)
+
+A Interface Web FazAI oferece acesso visual às integrações de infraestrutura através de um dashboard Next.js moderno e responsivo.
+
+### Configuração da Interface Web
+
+**Arquivo de Configuração** (`/etc/fazai/fazai.conf` ou `~/.config/fazai/fazai.conf`):
+
+```bash
+# ============================================
+# WEB INTERFACE - Interface Web Next.js
+# ============================================
+
+# Interface de escuta (0.0.0.0 = todas as interfaces, localhost = apenas local)
+WEB_HOST=0.0.0.0
+
+# Porta do servidor web (padrão: 3000)
+WEB_PORT=3000
+
+# Credenciais de autenticação HTTP Basic
+WEB_UI_USERNAME=admin
+WEB_UI_PASSWORD=sua_senha_segura_aqui
+
+# IMPORTANTE: Altere a senha padrão em produção!
+# Gere senha forte: openssl rand -base64 32
+```
+
+### Instalação e Build
+
+```bash
+# Instalar dependências web
+cd /opt/fazai/web
+npm install
+
+# Build da interface web
+npm run build
+
+# Iniciar em modo desenvolvimento
+npm run dev
+
+# Iniciar em modo produção
+npm start
+```
+
+### Deploy com Systemd
+
+O FazAI inclui um serviço systemd para rodar a interface web em produção:
+
+```bash
+# Copiar arquivo de serviço
+sudo cp /opt/fazai/etc/fazai/fazai-web@.service /etc/systemd/system/
+
+# Habilitar e iniciar serviço (substituir usuario pelo seu usuário)
+sudo systemctl daemon-reload
+sudo systemctl enable fazai-web@usuario
+sudo systemctl start fazai-web@usuario
+
+# Verificar status
+sudo systemctl status fazai-web@usuario
+
+# Ver logs
+sudo journalctl -u fazai-web@usuario -f
+```
+
+### Autenticação
+
+A interface web utiliza **HTTP Basic Authentication** para proteger o acesso:
+
+- **Middleware**: `web/middleware.ts` valida credenciais em todas as rotas `/api/integrations/*`
+- **Credenciais**: Carregadas dinamicamente de `/etc/fazai/fazai.conf`
+- **Headers**: `Authorization: Basic <base64(username:password)>`
+- **Frontend**: Helper `web/lib/api-client.ts` injeta automaticamente as credenciais
+
+**Testando autenticação via curl:**
+
+```bash
+# Com credenciais (substituir admin:senha pelos valores do fazai.conf)
+curl -u admin:senha http://localhost:3000/api/integrations/cloudflare/zones
+
+# Sem credenciais (retorna 401 Unauthorized)
+curl http://localhost:3000/api/integrations/cloudflare/zones
+```
+
+### Páginas Disponíveis
+
+#### 1. Cloudflare Integration (`/integrations/cloudflare`)
+
+Gerenciamento completo da infraestrutura Cloudflare:
+
+- **Zonas DNS**: Listagem de domínios configurados
+- **Registros DNS**: Criar, editar e deletar registros (A, AAAA, CNAME, MX, TXT)
+- **Regras de Firewall**: Visualizar e gerenciar regras de segurança
+- **Configurações SSL/TLS**: Modos (Off, Flexible, Full, Strict)
+- **Cache**: Limpar cache (purge all ou por arquivos específicos)
+- **Analytics**: Requisições, bandwidth, ameaças bloqueadas (últimas 24h)
+
+**Requisitos de Configuração:**
+```bash
+CLOUDFLARE_API_KEY=your_cloudflare_api_token
+CLOUDFLARE_ACCOUNT_ID=your_account_id  # Opcional
+```
+
+#### 2. SpamExperts Integration (`/integrations/spamexperts`)
+
+Gerenciamento anti-spam e quarentena de emails:
+
+- **Domínios Protegidos**: Adicionar/remover proteção de domínios
+- **Quarentena**: Visualizar, liberar ou deletar emails bloqueados
+- **Relatórios**: Estatísticas de spam (total, bloqueado, limpo, quarentena)
+- **Whitelist/Blacklist**: Gerenciar listas de remetentes permitidos/bloqueados
+- **Configurações**: Threshold de spam, retenção de quarentena
+
+**Requisitos de Configuração:**
+```bash
+SPAMEXPERTS_API_URL=https://api.antispamcloud.com/
+SPAMEXPERTS_API_KEY=your_api_key_here
+# OU autenticação via username/password:
+SPAMEXPERTS_USERNAME=your_username
+SPAMEXPERTS_PASSWORD=your_password
+```
+
+#### 3. OPNsense Integration (`/integrations/opnsense`)
+
+Gerenciamento de firewall e rede OPNsense:
+
+- **Regras de Firewall**: Criar, editar e deletar regras (LAN, WAN, etc)
+- **Port Forwarding (NAT)**: Configurar redirecionamentos de porta
+- **VPN IPsec**: Listar túneis, conectar/desconectar
+- **Interfaces de Rede**: Status, IPs, MACs, velocidade
+- **DHCP Leases**: Leases ativos, IPs, MACs, hostnames
+- **Status do Sistema**: Uptime, CPU, memória, temperatura, disco
+- **Serviços**: Reiniciar serviços (nginx, unbound, dhcpd, etc)
+
+**Requisitos de Configuração:**
+```bash
+OPNSENSE_API_URL=https://opnsense.local
+OPNSENSE_API_KEY=your_api_key_here
+OPNSENSE_API_SECRET=your_api_secret_here
+OPNSENSE_SSL_VERIFY=false  # Desabilitar verificação SSL (dev/lab)
+```
+
+### Acesso Remoto
+
+Para acessar a interface web de outros dispositivos na rede:
+
+```bash
+# 1. Configurar WEB_HOST para aceitar conexões externas
+WEB_HOST=0.0.0.0
+
+# 2. Liberar porta no firewall
+sudo ufw allow 3000/tcp
+
+# 3. Acessar via IP da máquina
+http://192.168.1.100:3000
+# ou via hostname
+http://servidor.local:3000
+```
+
+### Segurança
+
+**Recomendações de Segurança:**
+
+1. **Altere as credenciais padrão** em produção
+2. **Use HTTPS** com reverse proxy (nginx, Caddy, Traefik)
+3. **Configure firewall** para limitar acesso à porta 3000
+4. **Rotate senhas** periodicamente
+5. **Use senha forte** (gere com: `openssl rand -base64 32`)
+
+**Exemplo de Reverse Proxy com Nginx:**
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name fazai.example.com;
+
+    ssl_certificate /etc/letsencrypt/live/fazai.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/fazai.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+### Troubleshooting
+
+**Porta já em uso:**
+```bash
+# Verificar processos usando porta 3000
+sudo lsof -i :3000
+sudo netstat -tulpn | grep :3000
+
+# Alterar porta em fazai.conf
+WEB_PORT=8080
+```
+
+**Credenciais não funcionam:**
+```bash
+# Verificar configuração
+grep -E "^WEB_UI_(USERNAME|PASSWORD)=" /etc/fazai/fazai.conf
+
+# Testar credenciais via curl
+curl -u admin:senha http://localhost:3000/api/integrations/cloudflare/zones
+```
+
+**Build falha:**
+```bash
+# Limpar cache e rebuildar
+cd /opt/fazai/web
+rm -rf .next node_modules
+npm install
+npm run build
+```
+
+---
+
+## 🚀 Como Usar as Novas Integrações (v3.6.17-19)
+
+### ☁️ Cloudflare Integration (v3.6.17)
+
+**Configuração** (`/etc/fazai/fazai.conf`):
+```bash
+CLOUDFLARE_API_KEY=your_cloudflare_api_token
+CLOUDFLARE_ACCOUNT_ID=your_account_id  # Opcional
+```
+
+**Comandos disponíveis:**
+```bash
+fazai cloudflare              # Menu principal Cloudflare
+fazai cf                      # Alias para cloudflare
+```
+
+**Exemplos práticos:**
+
+1. **Gerenciar Zonas DNS:**
+```bash
+# Listar todas as zonas
+fazai cloudflare
+# > Zonas DNS
+
+# Visualizar registros DNS de uma zona
+# > Registros DNS > Digite Zone ID
+```
+
+2. **Adicionar Registro DNS:**
+```bash
+# No menu Cloudflare:
+# > Registros DNS > Adicionar Registro
+# Tipo: A
+# Nome: app
+# Conteúdo: 192.168.1.100
+# Proxied: Sim
+```
+
+3. **Gerenciar Firewall:**
+```bash
+# No menu Cloudflare:
+# > Firewall
+# Lista regras ativas com ações (allow/block/challenge)
+```
+
+4. **Configurar SSL/TLS:**
+```bash
+# No menu Cloudflare:
+# > SSL/TLS
+# Modos disponíveis: off, flexible, full, strict
+# Mostra data de última modificação
+```
+
+5. **Limpar Cache:**
+```bash
+# No menu Cloudflare:
+# > Cache > Limpar Todo Cache
+# Confirmação obrigatória para segurança
+```
+
+6. **Visualizar Analytics:**
+```bash
+# No menu Cloudflare:
+# > Analytics > Digite Zone ID
+# Mostra: Requests, Bandwidth, Threats Blocked, Page Views (últimas 24h)
+# Formatação automática de números e bytes
+```
+
+**Métodos da API disponíveis:**
+- `listZones()` - Lista zonas DNS
+- `listDNSRecords(zoneId)` - Lista registros de uma zona
+- `createDNSRecord(zoneId, record)` - Adiciona registro DNS
+- `deleteDNSRecord(zoneId, recordId)` - Remove registro
+- `listFirewallRules(zoneId)` - Lista regras de firewall
+- `getSSLSettings(zoneId)` - Obtém configurações SSL/TLS
+- `updateSSLMode(zoneId, mode)` - Atualiza modo SSL
+- `purgeCache(zoneId, options)` - Limpa cache
+- `getAnalytics(zoneId)` - Obtém estatísticas
+
+---
+
+### 📧 SpamExperts Manager (v3.6.18)
+
+**Configuração** (`/etc/fazai/fazai.conf`):
+```bash
+SPAMEXPERTS_API_URL=https://api.antispamcloud.com/
+SPAMEXPERTS_API_KEY=your_api_key_here
+
+# OU autenticação via username/password:
+SPAMEXPERTS_USERNAME=your_username
+SPAMEXPERTS_PASSWORD=your_password
+```
+
+**Comandos disponíveis:**
+```bash
+fazai spamexperts             # Menu principal SpamExperts
+```
+
+**Exemplos práticos:**
+
+1. **Gerenciar Domínios Protegidos:**
+```bash
+# Listar domínios protegidos
+fazai spamexperts
+# > Domínios
+
+# Adicionar domínio
+# > Domínios > Adicionar
+# Domain: example.com
+# Destination: mail.example.com
+```
+
+2. **Visualizar Quarentena:**
+```bash
+# Ver emails em quarentena
+# > Quarentena > Digite domínio
+# Lista: messageId, subject, sender, date, score
+
+# Liberar email bloqueado
+# > Quarentena > Liberar > Digite messageId
+
+# Deletar email permanentemente
+# > Quarentena > Deletar > Digite messageId
+```
+
+3. **Relatórios de Spam:**
+```bash
+# Ver estatísticas
+# > Relatórios > Digite domínio
+# Mostra: total emails, spam blocked, clean delivered, quarantined
+```
+
+4. **Gerenciar Whitelist/Blacklist:**
+```bash
+# Adicionar à whitelist
+# > Whitelist/Blacklist > Whitelist > Adicionar
+# Email: friend@example.com
+
+# Adicionar à blacklist
+# > Whitelist/Blacklist > Blacklist > Adicionar
+# Email: spam@badsite.com
+
+# Remover da lista
+# > Whitelist/Blacklist > Whitelist > Remover
+```
+
+5. **Configurações do Sistema:**
+```bash
+# Ver configurações atuais
+# > Configurações
+# Mostra: spam threshold, quarantine retention, etc.
+```
+
+**Métodos da API disponíveis:**
+- `listDomains()` - Lista domínios protegidos
+- `addDomain(domain, destination)` - Adiciona proteção a domínio
+- `removeDomain(domain)` - Remove proteção
+- `listQuarantine(domain)` - Lista emails em quarentena
+- `releaseMessage(messageId)` - Libera email da quarentena
+- `deleteMessage(messageId)` - Deleta email permanentemente
+- `getReport(domain)` - Obtém relatório de estatísticas
+- `listList(type)` - Lista whitelist/blacklist
+- `addToList(type, entry)` - Adiciona à lista
+- `removeFromList(type, entry)` - Remove da lista
+- `getSettings()` / `updateSettings()` - Gerencia configurações
+
+---
+
+### 🔥 OPNsense Manager (v3.6.19)
+
+**Configuração** (`/etc/fazai/fazai.conf`):
+```bash
+OPNSENSE_API_URL=https://opnsense.local
+OPNSENSE_API_KEY=your_api_key_here
+OPNSENSE_API_SECRET=your_api_secret_here
+OPNSENSE_SSL_VERIFY=false  # Desabilitar verificação SSL (dev/lab)
+```
+
+**Comandos disponíveis:**
+```bash
+fazai opnsense                # Menu principal OPNsense
+```
+
+**Exemplos práticos:**
+
+1. **Gerenciar Regras de Firewall:**
+```bash
+# Listar regras de firewall
+fazai opnsense
+# > Firewall
+
+# Adicionar regra
+# > Firewall > Adicionar Regra
+# Interface: LAN
+# Source: 192.168.1.0/24
+# Destination: any
+# Port: 443
+# Action: pass (ou block/reject)
+# Description: Allow HTTPS from LAN
+
+# Deletar regra
+# > Firewall > Deletar Regra > Digite UUID da regra
+
+# Aplicar mudanças pendentes
+# > Firewall > Aplicar Mudanças
+```
+
+2. **Configurar Port Forwarding (NAT):**
+```bash
+# Listar regras de NAT
+# > NAT / Port Forwarding
+
+# Adicionar redirecionamento
+# > NAT > Adicionar Port Forward
+# Interface: WAN
+# Protocol: TCP
+# External Port: 8080
+# Internal IP: 192.168.1.10
+# Internal Port: 80
+# Description: Redirect HTTP to internal server
+
+# Aplicar mudanças de NAT
+# > NAT > Aplicar Mudanças
+```
+
+3. **Gerenciar VPN IPsec:**
+```bash
+# Listar túneis IPsec
+# > VPN
+
+# Conectar VPN
+# > VPN > Conectar > Digite IKE ID do túnel
+
+# Desconectar VPN
+# > VPN > Desconectar > Digite IKE ID
+```
+
+4. **Visualizar Interfaces de Rede:**
+```bash
+# Listar interfaces
+# > Interfaces
+# Mostra: name, ipv4, ipv6, mac, status, speed
+```
+
+5. **DHCP Leases Ativos:**
+```bash
+# Ver leases DHCP
+# > DHCP Leases
+# Lista: IP, MAC, hostname, lease start/end
+```
+
+6. **Status do Sistema:**
+```bash
+# Verificar status
+# > Status do Sistema
+# Mostra: uptime, CPU, memory, temperature, disk usage
+```
+
+**Métodos da API disponíveis:**
+- `listFirewallRules()` - Lista regras de firewall
+- `addFirewallRule(rule)` - Adiciona regra
+- `deleteFirewallRule(uuid)` - Remove regra
+- `applyFirewallChanges()` - Aplica mudanças pendentes
+- `listNATRules()` - Lista regras de port forwarding
+- `addPortForward(rule)` - Adiciona redirecionamento
+- `deletePortForward(uuid)` - Remove port forward
+- `applyNATChanges()` - Aplica mudanças de NAT
+- `listVPNTunnels()` - Lista túneis IPsec
+- `connectVPN(ikeid)` / `disconnectVPN(ikeid)` - Controla VPN
+- `listInterfaces()` - Lista interfaces de rede
+- `listDHCPLeases()` - Lista leases DHCP ativos
+- `getSystemStatus()` - Obtém status do sistema
+- `restartService(service)` - Reinicia serviço
+
+---
 
 ### Sistema de Aliases Global (fzalias)
 

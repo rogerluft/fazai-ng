@@ -11,6 +11,9 @@ import {
   BookOpen,
   Settings,
   LogOut,
+  Cloud,
+  Shield,
+  Mail,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +50,24 @@ const navigationItems = [
   },
 ];
 
+const integrationItems = [
+  {
+    label: "Cloudflare",
+    href: "/integrations/cloudflare",
+    icon: Cloud,
+  },
+  {
+    label: "SpamExperts",
+    href: "/integrations/spamexperts",
+    icon: Mail,
+  },
+  {
+    label: "OPNsense",
+    href: "/integrations/opnsense",
+    icon: Shield,
+  },
+];
+
 export function Sidebar() {
   const pathname = usePathname();
 
@@ -64,6 +85,36 @@ export function Sidebar() {
 
       <nav className="flex flex-col gap-2">
         {navigationItems.map((item) => {
+          const Icon = item.icon;
+          const isActive = pathname === item.href ||
+            (item.href !== "/" && pathname.startsWith(item.href));
+
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              className={cn(
+                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                isActive
+                  ? "bg-primary text-primary-foreground"
+                  : "text-foreground hover:bg-accent hover:text-accent-foreground"
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {item.label}
+            </Link>
+          );
+        })}
+      </nav>
+
+      <div className="mt-6 mb-2">
+        <p className="px-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          Integrations
+        </p>
+      </div>
+
+      <nav className="flex flex-col gap-2">
+        {integrationItems.map((item) => {
           const Icon = item.icon;
           const isActive = pathname === item.href ||
             (item.href !== "/" && pathname.startsWith(item.href));

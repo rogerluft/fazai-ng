@@ -75,7 +75,7 @@ export async function POST(request: Request) {
 
     // Generate ID from rule_id hash
     const id = Math.abs(
-      rule_id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
+      rule_id.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     );
 
     await upsertPoint("fazai_inference", id, {
@@ -125,7 +125,7 @@ export async function DELETE(request: Request) {
     }
 
     const id = Math.abs(
-      rule_id.split("").reduce((a, b) => a + b.charCodeAt(0), 0)
+      rule_id.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
     );
 
     await deletePoint("fazai_inference", id);

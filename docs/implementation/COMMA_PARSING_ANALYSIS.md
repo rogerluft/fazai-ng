@@ -104,7 +104,7 @@ LinuxCommand[] → Execução
 
 ### 3.2 Onde o Prompt é Construído
 
-**Arquivo:** `/home/rluft/fazai-ng/src/linux-prompt.ts`
+**Arquivo:** `/opt/fazai/src/linux-prompt.ts`
 
 ```typescript
 export const linuxAdminPrompt = (task: string) => `Task: ${task}
@@ -568,7 +568,7 @@ describe('Task Normalizer - Comma Disambiguation', () => {
 
 ## 10. REFERÊNCIAS
 
-- **Problema original:** `/home/rluft/fazai-ng/TODO.md` linha 11
+- **Problema original:** `/opt/fazai/TODO.md` linha 11
 - **Arquivos afetados:**
   - `src/app.ts` (entrada de comandos)
   - `src/linux-prompt.ts` (construção do prompt)
