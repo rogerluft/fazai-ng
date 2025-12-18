@@ -232,7 +232,18 @@ export async function createAlias(
 
   logger.info(chalk.green(`✓ Alias '${name}' created successfully`));
   logger.info(chalk.gray(`  Command: ${command}`));
-  logger.info(chalk.cyan("\nℹ  Run 'source /etc/fazai/fzalias' to load aliases in current shell"));
+
+  // Verifica se /etc/profile.d/fazai-aliases.sh existe (instalação completa)
+  const profileScript = "/etc/profile.d/fazai-aliases.sh";
+  const profileExists = await fs.access(profileScript).then(() => true).catch(() => false);
+
+  if (profileExists) {
+    logger.info(chalk.gray("  Alias disponível em novas sessões de terminal"));
+  } else {
+    // Se não tiver o profile.d configurado, mostra instrução manual
+    logger.info(chalk.cyan("\n  Para usar agora: source /etc/fazai/fzalias"));
+    logger.info(chalk.gray("  Ou abra um novo terminal"));
+  }
 }
 
 /**

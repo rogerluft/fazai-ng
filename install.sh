@@ -367,7 +367,7 @@ setup_path() {
 # Instalar fzalias
 install_fzalias_system() {
   info "Instalando fzalias (sistema de aliases global)..."
-  
+
   if [ -f "$INSTALL_DIR/scripts/fzalias" ]; then
     if [ "$EUID" -eq 0 ]; then
       bash "$INSTALL_DIR/scripts/fzalias" install
@@ -379,6 +379,31 @@ install_fzalias_system() {
   else
     warning "Script fzalias não encontrado em $INSTALL_DIR/scripts/"
   fi
+
+  # Criar script em /etc/profile.d/ para carregar aliases automaticamente
+  local PROFILE_SCRIPT="/etc/profile.d/fazai-aliases.sh"
+  info "Configurando carregamento automático de aliases..."
+
+  if [ "$EUID" -eq 0 ]; then
+    cat > "$PROFILE_SCRIPT" << 'EOFPROFILE'
+# FazAI Global Aliases - Auto-load
+# Carrega aliases do FazAI em todas as sessões bash/zsh
+if [ -f /etc/fazai/fzalias ]; then
+  source /etc/fazai/fzalias
+fi
+EOFPROFILE
+    chmod 644 "$PROFILE_SCRIPT"
+  else
+    sudo tee "$PROFILE_SCRIPT" > /dev/null << 'EOFPROFILE'
+# FazAI Global Aliases - Auto-load
+# Carrega aliases do FazAI em todas as sessões bash/zsh
+if [ -f /etc/fazai/fzalias ]; then
+  source /etc/fazai/fzalias
+fi
+EOFPROFILE
+    sudo chmod 644 "$PROFILE_SCRIPT"
+  fi
+  success "Aliases serão carregados automaticamente em novas sessões"
 }
 
 # Configurar fazai.conf
