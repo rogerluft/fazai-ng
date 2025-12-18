@@ -120,10 +120,10 @@ export interface NeuralQueryOptions {
  * Baseados na relevância típica de cada collection
  */
 const DEFAULT_WEIGHTS = {
-  personality: 0.15, // Como responder
+  personality: 0.0, // Desabilitado para busca geral (foco em fatos)
   memory: 0.20, // Contexto histórico
-  learning: 0.30, // Padrões aprendidos (mais importante)
-  kb: 0.25, // Conhecimento técnico
+  learning: 0.40, // Padrões aprendidos (mais importante)
+  kb: 0.30, // Conhecimento técnico
   inference: 0.10, // Regras operacionais
 } as const;
 

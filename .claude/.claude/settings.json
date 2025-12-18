@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "ai-ml-toolkit@claude-code-templates": true,
+    "project-management-suite@claude-code-templates": true,
+    "supabase-toolkit@claude-code-templates": true
+  }
+}

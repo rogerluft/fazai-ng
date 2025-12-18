@@ -261,6 +261,23 @@ ENABLE_PREVIEW_FEATURES=false
 # SPAMEXPERTS_PASSWORD=your_password
 
 # =============================================================================
+# OPNSENSE INTEGRATION
+# =============================================================================
+
+# OPNsense API Configuration
+# URL: Base URL for OPNsense API (e.g., https://192.168.1.1)
+# OPNSENSE_API_URL=https://192.168.1.1
+
+# API Key and Secret
+# Create at: System > Access > Users > [User] > API Keys
+# OPNSENSE_API_KEY=your_api_key
+# OPNSENSE_API_SECRET=your_api_secret
+
+# SSL Verification
+# Set to false if using self-signed certificates
+# OPNSENSE_SSL_VERIFY=false
+
+# =============================================================================
 # WEB INTERFACE - Configuracao da Interface Web FazAI
 # =============================================================================
 #

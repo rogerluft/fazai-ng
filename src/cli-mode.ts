@@ -509,8 +509,12 @@ export async function runCliMode(): Promise<void> {
           const spamUI = new SpamExpertsUI();
           await spamUI.showMainMenu();
         } else if (choice === "opnsense") {
-          const opsUI = new OPNsenseUI();
-          await opsUI.showMainMenu();
+          try {
+            const opsUI = new OPNsenseUI();
+            await opsUI.showMainMenu();
+          } catch (error: any) {
+            logger.error(chalk.red(`\n❌ ${error.message}`));
+          }
         }
       } else if (line === "/cloudflare" || line === "/cf") {
         // Cloudflare UI
@@ -522,8 +526,12 @@ export async function runCliMode(): Promise<void> {
         await spamUI.showMainMenu();
       } else if (line === "/opnsense" || line === "/ops") {
         // OPNsense UI
-        const opsUI = new OPNsenseUI();
-        await opsUI.showMainMenu();
+        try {
+          const opsUI = new OPNsenseUI();
+          await opsUI.showMainMenu();
+        } catch (error: any) {
+          logger.error(chalk.red(`\n❌ ${error.message}`));
+        }
       } else if (line === "/history") {
         if (!historyBuffer.length) {
           logger.info(chalk.gray("Sem histórico registrado nesta sessão."));
