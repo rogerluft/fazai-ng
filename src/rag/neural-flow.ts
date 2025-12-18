@@ -196,10 +196,20 @@ export async function neuralQuery(
     const weight = weights[collectionName as keyof typeof weights] ?? 0.1;
 
     for (const point of result.points) {
-      // Score fusionado = vector_similarity * collection_weight * recency_boost
+      // ECOA Logic: Check contextual legitimacy (Hop mechanism)
+      const isLegitimate = checkLegitimacy(point.payload, options.context || "general");
+      
+      // Score fusionado = vector_similarity * collection_weight * recency_boost * resonance
       const vectorScore = point.score;
       const recencyBoost = calculateRecencyBoost(point.payload);
-      const fusedScore = vectorScore * weight * recencyBoost;
+      
+      // Resonância Cognitiva (ECOA): Baseada na intensidade emocional (dor/viviência)
+      const resonance = calculateResonance(point.payload);
+      
+      // Se não for legítimo, o peso é reduzido drasticamente (acesso temporário/restrito)
+      const contextualWeight = isLegitimate ? weight : weight * 0.2;
+      
+      const fusedScore = vectorScore * contextualWeight * recencyBoost * resonance;
 
       // Filtrar por score mínimo
       if (fusedScore < minScore) {
@@ -208,7 +218,7 @@ export async function neuralQuery(
 
       fusedResults.push({
         collection: result.collection,
-        content: extractContent(point.payload),
+        content: extractContent(point.payload, isLegitimate),
         score: fusedScore,
         metadata: point.payload,
         id: point.id,
@@ -217,6 +227,25 @@ export async function neuralQuery(
       });
     }
   }
+
+/**
+ * ECOA: Verifica legitimidade para o mecanismo de Hop
+ */
+function checkLegitimacy(payload: Record<string, any>, currentContext: string): boolean {
+  if (!payload.legitimate_contexts || !Array.isArray(payload.legitimate_contexts)) {
+    return true; // Se não definido, assume legítimo para retrocompatibilidade
+  }
+  return payload.legitimate_contexts.includes(currentContext) || payload.legitimate_contexts.includes("*");
+}
+
+/**
+ * ECOA: Calcula ressonância baseada na camada emocional (dor/viviência)
+ */
+function calculateResonance(payload: Record<string, any>): number {
+  const intensity = payload.emotional_layer ?? 0.5;
+  // Itens com maior carga emocional (experiências fortes/dor) têm maior ressonância
+  return 1.0 + (intensity * 0.2); 
+}
 
   // 3. Re-ranking por score fusionado (descendente)
   fusedResults.sort((a, b) => b.score - a.score);
@@ -333,37 +362,35 @@ function calculateRecencyBoost(payload: Record<string, any>): number {
 }
 
 /**
- * Extrai conteúdo textual relevante do payload
+ * ECOA: Extrai conteúdo textual relevante do payload (Array Auto-Informativo)
  *
- * Prioriza campos com conteúdo semântico rico.
- *
- * @param payload Payload do ponto Qdrant
- * @returns String de conteúdo para apresentação
+ * Se legítimo, entrega o fragmento vivo. Se ilegítimo, entrega acesso restrito.
  */
-function extractContent(payload: Record<string, any>): string {
-  // Ordem de prioridade para extração de conteúdo
+function extractContent(payload: Record<string, any>, isLegitimate: boolean = true): string {
+  // Se não for legítimo, retorna apenas uma referência/sombra
+  if (!isLegitimate) {
+    return `[Acesso Restrito] Inode: ${payload.semantic_id || "desconhecido"}. Ressonância insuficiente para hop completo.`;
+  }
+
+  // Ordem de prioridade para extração de conteúdo (Arrays Auto-Informativos)
   const contentFields = [
-    "content",
-    "description",
-    "summary",
-    "problem",
-    "solution",
-    "title",
+    "content",      // Fragmento vivo
+    "action_taken", // Caminho direto
+    "commands",     // Sequência imediata
+    "summary",      // Auto-indexação
     "value",
-    "name",
+    "description",
   ];
 
   for (const field of contentFields) {
     if (payload[field] && typeof payload[field] === "string") {
-      // Limita a 500 caracteres para evitar resultados gigantes
       const content = payload[field];
-      return content.length > 500 ? content.substring(0, 500) + "..." : content;
+      // Limita a 1000 caracteres para permitir fragmentos maiores no ECOA
+      return content.length > 1000 ? content.substring(0, 1000) + "..." : content;
     }
   }
 
-  // Fallback: serializa payload completo (limitado)
-  const fallback = JSON.stringify(payload);
-  return fallback.length > 200 ? fallback.substring(0, 200) + "..." : fallback;
+  return JSON.stringify(payload).substring(0, 200);
 }
 
 /**
