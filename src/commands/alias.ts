@@ -70,16 +70,44 @@ async function ensureAliasDir(): Promise<void> {
  */
 async function backupAliasFile(): Promise<void> {
   try {
-    const exists = await fs.access(ALIAS_FILE).then(() => true).catch(() => false);
-
-    if (!exists) {
+    // Verifica se arquivo de alias existe
+    const aliasExists = await fs.access(ALIAS_FILE).then(() => true).catch(() => false);
+    if (!aliasExists) {
       return; // Nada para fazer backup
+    }
+
+    // Garante que diretório de backup existe
+    const backupDirExists = await fs.access(BACKUP_DIR).then(() => true).catch(() => false);
+    if (!backupDirExists) {
+      try {
+        await fs.mkdir(BACKUP_DIR, { recursive: true, mode: 0o755 });
+      } catch (mkdirError: any) {
+        // Se não conseguir criar (permissão), tenta com sudo
+        if (mkdirError.code === "EACCES") {
+          const { execSync } = await import("child_process");
+          execSync(`sudo mkdir -p ${BACKUP_DIR} && sudo chmod 755 ${BACKUP_DIR}`);
+        } else {
+          logger.debug(`Could not create backup dir: ${mkdirError.message}`);
+          return; // Pula backup silenciosamente
+        }
+      }
     }
 
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
     const backupPath = path.join(BACKUP_DIR, `fzalias.${timestamp}.bak`);
 
-    await fs.copyFile(ALIAS_FILE, backupPath);
+    // Tenta copiar, se falhar por permissão usa sudo
+    try {
+      await fs.copyFile(ALIAS_FILE, backupPath);
+    } catch (copyError: any) {
+      if (copyError.code === "EACCES") {
+        const { execSync } = await import("child_process");
+        execSync(`sudo cp ${ALIAS_FILE} ${backupPath}`);
+      } else {
+        throw copyError;
+      }
+    }
+
     logger.debug(`Backup created: ${backupPath}`);
 
     // Manter apenas últimos 10 backups
@@ -90,10 +118,15 @@ async function backupAliasFile(): Promise<void> {
       .reverse();
 
     for (const old of sorted.slice(10)) {
-      await fs.unlink(path.join(BACKUP_DIR, old));
+      try {
+        await fs.unlink(path.join(BACKUP_DIR, old));
+      } catch {
+        // Ignora erro ao limpar backups antigos
+      }
     }
   } catch (error: any) {
-    logger.warn(`Backup failed: ${error.message}`);
+    // Backup é opcional, não deve interromper operação principal
+    logger.debug(`Backup skipped: ${error.message}`);
   }
 }
 
