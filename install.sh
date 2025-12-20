@@ -24,7 +24,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configurações
-FAZAI_VERSION="3.6.23-beta"
+FAZAI_VERSION="3.8.0-ecoa"
 # SEMPRE instala em /opt/fazai (centralizado)
 INSTALL_DIR="/opt/fazai"
 BIN_DIR="/usr/local/bin"
@@ -44,9 +44,9 @@ print_banner() {
 ║   ██║     ██║  ██║███████╗██║  ██║██║              ║
 ║   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝              ║
 ║                                                       ║
-║   Terminal FazAI v3.6.23-beta                        ║
+║   Terminal FazAI v3.8.0-ecoa                         ║
 ║   Administrador Linux Senior + Redes                 ║
-║   AutoGPT + Genkit + RAG                             ║
+║   Metacognição + ECOA Architecture                   ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 EOF

@@ -44,6 +44,23 @@ export interface VectorValidationResult {
   errors: ValidationError[];
 }
 
+/**
+ * PADRÃO VETORIAL ECOA (LEI 1536)
+ * ----------------------------------------------------------------------------
+ * Definimos 1536 como a dimensão padrão para TODAS as collections.
+ * Motivo: Compatibilidade nativa com o modelo `text-embedding-3-small` (OpenAI).
+ * 
+ * E se eu usar um modelo local (Ollama) com dimensões menores?
+ * - mxbai-embed-large (1024 dim)
+ * - nomic-embed-text (768 dim)
+ * 
+ * SOLUÇÃO (Zero Padding):
+ * O serviço de embeddings (`src/services/embeddings.ts`) detecta automaticamente
+ * se o vetor gerado é menor que 1536 e preenche o restante com ZEROS.
+ * Isso garante que o banco Qdrant nunca quebre por incompatibilidade de dimensão,
+ * permitindo migração fluida entre Cloud (GPU) e Local (CPU).
+ * ----------------------------------------------------------------------------
+ */
 const DEFAULT_VECTOR_DIMENSION = 1536; // Padrão ECOA Unificado (OpenAI compatible)
 const DEFAULT_DISTANCE: VectorDistance = "Cosine";
 
@@ -121,6 +138,27 @@ const COLLECTION_SCHEMAS: CollectionSchema[] = [
       { name: "priority", type: "int", description: "Resonância/Prioridade" },
       { name: "enabled", type: "bool", description: "Ativo" },
       { name: "tags", type: "string", description: "Tags", array: true, maxLength: 32, optional: true },
+    ],
+  },
+  {
+    name: "fazai_source",
+    description: "ECOA Metacognition: Índice do próprio código-fonte para auto-análise e evolução.",
+    metadataFields: [
+      { name: "semantic_id", type: "string", description: "ID único do chunk (hash path+index)", maxLength: 96 },
+      { name: "path", type: "string", description: "Caminho do arquivo", maxLength: 256 },
+      { name: "filename", type: "string", description: "Nome do arquivo", maxLength: 128 },
+      { name: "fazai_version", type: "string", description: "Versão do sistema na indexação", maxLength: 32 },
+      { name: "content", type: "text", description: "Conteúdo do código ou JSDoc" },
+      { name: "is_jsdoc", type: "bool", description: "Se é documentação extraída" },
+      { name: "chunk_index", type: "int", description: "Índice sequencial do chunk" },
+      { name: "category", type: "string", description: "Categoria (core, service, ui...)", maxLength: 64 },
+      { name: "importance_weight", type: "float", description: "Prioridade de busca (0.0-1.0)" },
+      { name: "legitimate_contexts", type: "string", description: "Contextos de uso", array: true, maxLength: 32 },
+      { name: "functions", type: "string", description: "Funções detectadas", array: true, maxLength: 128, optional: true },
+      { name: "classes", type: "string", description: "Classes detectadas", array: true, maxLength: 128, optional: true },
+      { name: "imports", type: "string", description: "Imports detectados", array: true, maxLength: 128, optional: true },
+      { name: "hash", type: "string", description: "Hash do arquivo original", maxLength: 64 },
+      { name: "indexed_at", type: "int", description: "Timestamp da indexação" },
     ],
   },
 ];

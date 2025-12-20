@@ -88,6 +88,27 @@ try {
   console.warn(`[fazai] ⚠️  Could not regenerate completions: ${error instanceof Error ? error.message : String(error)}`);
 }
 
+// Auto-Index Source Code (Metacognition)
+try {
+  const { execSync } = await import("node:child_process");
+  console.log("[fazai] 📚 Indexando código fonte (Metacognição)...");
+  
+  // Executa o indexador (non-blocking para o usuário final seria melhor, mas aqui garantimos consistência)
+  // O indexador é incremental, então deve ser rápido na maioria das vezes
+  // [SAFETY] Desabilitado temporariamente para evitar bloqueio no build inicial.
+  // Execute manualmente: fazai index
+  // execSync("node dist/app.cjs index", { 
+  //   cwd: projectRoot,
+  //   stdio: "inherit", // Mostra logs do indexador
+  //   timeout: 60000 // 1 min timeout para não travar build
+  // });
+  console.log("[fazai] ℹ️  Auto-indexação pausada. Execute 'fazai index' para atualizar a Metacognição.");
+  
+} catch (error) {
+  // Não falha o build se o Qdrant estiver offline ou não configurado
+  console.warn(`[fazai] ⚠️  Indexação falhou ou foi pulada: ${error.message}`);
+}
+
 /**
  * Auto-install bash completion to system directory
  * Detects CI environment and permission issues, with graceful fallback

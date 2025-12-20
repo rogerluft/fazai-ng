@@ -456,6 +456,16 @@ async function main() {
     process.exit(0);
   }
 
+  // Source Indexer command (Metacognition)
+  if (inputs[0] === "index") {
+    const { runSourceIndexer } = await import("./services/source-indexer");
+    const force = inputs.includes("--force") || inputs.includes("-f");
+    const verbose = inputs.includes("--verbose") || inputs.includes("-v") || debugFlag || verboseFlag;
+    
+    await runSourceIndexer({ force, verbose });
+    process.exit(0);
+  }
+
   // Cloudflare command
   if (inputs[0] === "cf" || inputs[0] === "cloudflare") {
     const { handleCloudflare } = await import("./commands/cloudflare");
