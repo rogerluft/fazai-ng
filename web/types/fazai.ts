@@ -1,100 +1,25 @@
 /**
- * Type definitions for Terminal Jarvis Qdrant collections
+ * Type definitions for FazAI Qdrant collections
  */
 
-export type Trait = {
-  trait_name: string;
-  category: "comunicação" | "decisão" | "ética";
-  value: string;
-  intensity: number; // 0.0-1.0
-  context?: string;
-  tags?: string[];
-};
+// ... (existing types)
 
-export type Personality = {
-  id: string;
-  traits: Trait[];
-  updated_at: string;
-};
-
-export type Memory = {
-  conversation_id: string;
-  message_id: number;
-  role: "user" | "assistant" | "system" | "autonomous";
-  timestamp: string;
+export type SourceCode = {
+  semantic_id: string;
+  path: string;
+  filename: string;
+  fazai_version: string;
   content: string;
-  summary?: string;
-  emotional_context?: string;
-  importance?: number; // 0.0-1.0
-  tags?: string[];
-};
-
-export type Learning = {
-  learning_id: string;
-  type: "erro" | "acerto" | "padrão" | "otimização";
-  title: string;
-  description: string;
-  context: string;
-  action_taken?: string;
-  outcome: "sucesso" | "falha" | "parcial";
-  confidence: number; // 0.0-1.0
-  category: "linux" | "network" | "security" | "social";
-  timestamp: string;
-  applied_count?: number;
-  tags?: string[];
-};
-
-export type KnowledgeBase = {
-  slug: string;
-  title: string;
-  summary: string;
-  category: "networking" | "storage" | "security";
-  scope?: "cluster" | "host" | "container";
-  linux_distribution?: string;
-  component?: string;
-  commands?: string;
-  source?: string;
-  confidence?: number; // 0.0-1.0
-  validated?: boolean;
-  tags?: string[];
-};
-
-export type InferenceRule = {
-  rule_id: string;
-  title: string;
-  description: string;
-  condition: string;
-  action: string;
-  priority: number;
-  enabled: boolean;
-  created_by: "user" | "autonomous";
-  created_at: string;
-  last_applied?: string;
-  apply_count?: number;
-  tags?: string[];
-};
-
-export type AgentStatus = {
-  status: "online" | "offline" | "paused";
-  uptime_seconds: number;
-  actions_per_minute: number;
-  success_rate: number; // 0.0-1.0
-  last_action?: string;
-  total_actions: number;
-  errors_count: number;
-  memory_usage_mb: number;
-  cpu_usage_percent: number;
-};
-
-export type Action = {
-  action_id: string;
-  timestamp: string;
-  type: string;
-  description: string;
-  status: "pending" | "executing" | "completed" | "failed";
-  result?: string;
-  error?: string;
-  duration_ms?: number;
+  is_jsdoc: boolean;
+  chunk_index: number;
+  category: string;
+  importance_weight: number;
+  legitimate_contexts: string[];
+  functions?: string[];
+  classes?: string[];
+  imports?: string[];
+  hash: string;
+  indexed_at: number;
 };
 
 export const COLLECTIONS = [
@@ -103,6 +28,7 @@ export const COLLECTIONS = [
   "fazai_learning",
   "fazai_kb",
   "fazai_inference",
+  "fazai_source",
 ] as const;
 
 export type CollectionName = (typeof COLLECTIONS)[number];

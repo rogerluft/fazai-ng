@@ -1140,16 +1140,19 @@ print_success() {
   echo -e "  ${BLUE}4.${NC} Inicie o Qdrant (se ainda não estiver rodando):"
   echo -e "     ${CYAN}docker run -d -p 6333:6333 qdrant/qdrant${NC}"
   echo ""
-  echo -e "  ${BLUE}5.${NC} Crie as collections:"
-  echo -e "     ${CYAN}fazai vector validate${NC}"
-  echo ""
-  echo -e "  ${BLUE}6.${NC} Execute o FazAI:"
-  echo -e "     ${CYAN}fazai${NC}                    # Modo admin Linux"
-  echo -e "     ${CYAN}fazai --cli${NC}              # Modo CLI interativo"
-  echo -e "     ${CYAN}fazai ask \"pergunta\"${NC}    # Perguntas gerais"
-  echo ""
-  echo -e "  ${BLUE}7.${NC} Acesse a interface web (se instalada):"
-  echo -e "     ${CYAN}http://localhost:3000${NC}    # Interface web"
+  ${BLUE}5.${NC} Crie as collections:
+     ${CYAN}fazai vector validate${NC}
+
+  ${BLUE}6.${NC} Indexe seu código fonte (Metacognição):
+     ${CYAN}fazai index${NC}
+
+  ${BLUE}7.${NC} Execute o FazAI:
+     ${CYAN}fazai${NC}                    # Modo admin Linux
+     ${CYAN}fazai --cli${NC}              # Modo CLI interativo
+     ${CYAN}fazai ask \"pergunta\"${NC}    # Perguntas gerais
+
+  ${BLUE}8.${NC} Acesse a interface web (se instalada):
+     ${CYAN}http://localhost:3000${NC}    # Interface web
   echo ""
   echo -e "${CYAN}📖 Documentação:${NC} $INSTALL_DIR/README.md"
   echo -e "${CYAN}🐛 Issues:${NC} https://github.com/rogerluft/fazai-ng/issues"

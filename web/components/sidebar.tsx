@@ -14,6 +14,7 @@ import {
   Cloud,
   Shield,
   Mail,
+  Code,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -44,6 +45,11 @@ const navigationItems = [
     icon: BookOpen,
   },
   {
+    label: "Source Code",
+    href: "/source",
+    icon: Code,
+  },
+  {
     label: "Inference Rules",
     href: "/inference",
     icon: Settings,
@@ -51,35 +57,16 @@ const navigationItems = [
 ];
 
 const integrationItems = [
-  {
-    label: "Cloudflare",
-    href: "/integrations/cloudflare",
-    icon: Cloud,
-  },
-  {
-    label: "SpamExperts",
-    href: "/integrations/spamexperts",
-    icon: Mail,
-  },
-  {
-    label: "OPNsense",
-    href: "/integrations/opnsense",
-    icon: Shield,
-  },
-];
-
-export function Sidebar() {
-  const pathname = usePathname();
-
+// ... (rest of the file)
   return (
     <aside className="fixed left-0 top-0 h-screen w-64 border-r border-border bg-card p-6">
       <div className="mb-8 flex items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <span className="text-sm font-bold text-primary-foreground">J</span>
+          <span className="text-sm font-bold text-primary-foreground">F</span>
         </div>
         <div className="flex flex-col">
-          <h1 className="text-lg font-bold">Jarvis</h1>
-          <p className="text-xs text-muted-foreground">Terminal Interface</p>
+          <h1 className="text-lg font-bold">FazAI</h1>
+          <p className="text-xs text-muted-foreground">ECOA Interface</p>
         </div>
       </div>
 

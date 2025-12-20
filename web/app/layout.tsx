@@ -3,9 +3,9 @@ import React from "react";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Terminal Jarvis - Web Interface",
+  title: "FazAI - Web Interface",
   description:
-    "Web interface for autonomous Linux administration agent based on FazAI",
+    "Web interface for autonomous Linux administration agent based on ECOA architecture",
 };
 
 export default function RootLayout({
