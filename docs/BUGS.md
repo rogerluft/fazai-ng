@@ -44,6 +44,7 @@ Além de corrigir o loop infinito no crawler, **implementar o seguinte Fluxo de 
 **3. Consultas de Contexto e Pesquisa (Knowledge Fallback):**
    - **Nível 3 (Context7):** Consultar MCP Context7 para documentação técnica/libs.
    - **Nível 4 (Perplexity/Web):** Consultar Perplexity ou Web Search para informações externas.
+   - **⚠️ Regra de Robustez (Pesquisa Manual):** Se a pesquisa manual for solicitada, o sistema deve tentar todas as fontes disponíveis (Internet, Perplexity, Crawlers). **A falha de uma fonte específica NÃO deve interromper o processo.** O erro deve ser registrado (log/debug) e o sistema deve prosseguir para a próxima fonte.
 
 **4. Falha Crítica:**
    - Se todos os níveis falharem:
