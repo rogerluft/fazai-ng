@@ -203,7 +203,7 @@ function getPrompt(): string {
   );
 }
 
-export async function runCliMode(): Promise<void> {
+export async function runCliMode(semanticSearchEnabled: boolean = false): Promise<void> {
   const defaultModel = models[0];
 
   // Exibe logo visual
@@ -247,6 +247,18 @@ export async function runCliMode(): Promise<void> {
 
   rl.prompt();
 
+  let inactivityTimeout: NodeJS.Timeout;
+
+  const resetInactivityTimeout = () => {
+      clearTimeout(inactivityTimeout);
+      inactivityTimeout = setTimeout(() => {
+          logger.info(chalk.yellow('\nInatividade detectada, encerrando a sessão.'));
+          rl.close();
+      }, 300000); // 5 minutes
+  };
+
+  resetInactivityTimeout();
+
   const handleChat = async (message: string) => {
     conversationHistory.push({ role: "user", content: message });
     appendConversationEntry({
@@ -264,7 +276,8 @@ export async function runCliMode(): Promise<void> {
         prompt,
         defaultModel.name,
         defaultModel.provider,
-        true
+        true,
+        semanticSearchEnabled
       );
 
       for await (const chunk of stream) {
@@ -299,7 +312,8 @@ export async function runCliMode(): Promise<void> {
       systemInfo,
       task,
       defaultModel.name,
-      defaultModel.provider
+      defaultModel.provider,
+      semanticSearchEnabled
     );
 
     const collectedCommands: LinuxCommand[] = [];
@@ -321,6 +335,7 @@ export async function runCliMode(): Promise<void> {
   };
 
   rl.on("line", async (input) => {
+    resetInactivityTimeout();
     const line = input.trim();
     if (line.length > 0) {
       historyBuffer.push(line);

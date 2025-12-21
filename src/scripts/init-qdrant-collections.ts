@@ -19,7 +19,7 @@ import { logger } from "../logger";
 import chalk from "chalk";
 
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
-const EMBEDDING_DIM = 1024; // mxbai-embed-large
+const EMBEDDING_DIM = 1536; // Modelo 'text-embedding-3-large' da OpenAI
 
 interface CollectionConfig {
   name: string;

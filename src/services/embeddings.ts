@@ -135,6 +135,12 @@ class OllamaEmbeddingService implements EmbeddingService {
                 );
               }
 
+              const data = await response.json();
+
+              if (!data.embedding || !Array.isArray(data.embedding)) {
+                throw new Error("Invalid response from Ollama API");
+              }
+
               const rawEmbedding = data.embedding as number[];
               
               // ECOA Logic: Zero Padding para padronização de dimensões

@@ -1,6 +1,20 @@
 # FazAI TODO List
 
+## 🚨 Prioridade Crítica (Pós-Jules)
+
+### 1. Documentar Sub-Helps Faltantes
+- **Status:** Aberto
+- **Descrição:** Vários subcomandos não têm uma tela de `--help` dedicada.
+- **Ações:**
+  - Criar documentação de ajuda para:
+    - `fazai ask --help`
+    - `fazai alias --help`
+    - `fazai vector --help`
+    - `fazai index --help`
+  - **Delegação:** Pode ser uma tarefa para o agente `documentation-expert` do Claude.
+
 ## 🔴 Prioridade Alta (Infraestrutura)
+
 
 ### 1. Remover suporte Milvus
 - **Status:** Pendente

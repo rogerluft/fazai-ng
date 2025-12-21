@@ -312,20 +312,79 @@ export class AgenticWebCrawler {
   }
 
   /**
-   * Parse DevDocs results using Playwright/Crawlee
+   * Check if Context7 MCP is available
+   */
+  private async checkContext7Availability(): Promise<boolean> {
+    try {
+      const { getConfigValue } = await import("../config");
+      const context7Url = getConfigValue("MCP_CONTEXT7_URL");
+      
+      if (!context7Url) return false;
+      
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+      
+      const response = await fetch(context7Url, {
+        method: 'HEAD',
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      return response.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Parse DevDocs results using Context7 (preferred) or Playwright/Crawlee (fallback)
    */
   private async parseDevDocs(searchUrl: string): Promise<SearchResult[]> {
-    // Use a unique dataset name to avoid collisions if concurrent
+    // STRATEGY: Try Context7 MCP first (Option D)
+    const context7Available = await this.checkContext7Availability();
+    
+    if (context7Available) {
+      try {
+        logger.debug("Using Context7 MCP for documentation search");
+        const { getConfigValue } = await import("../config");
+        const context7Url = getConfigValue("MCP_CONTEXT7_URL");
+        const apiKey = getConfigValue("MCP_CONTEXT7_API_KEY");
+        
+        // Extract query from searchUrl (simplified)
+        const query = searchUrl.split('q=')[1] || '';
+        
+        const response = await fetch(`${context7Url}?q=${query}&source=devdocs`, {
+          headers: apiKey ? { 'Authorization': `Bearer ${apiKey}` } : {}
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          // Map Context7 format to SearchResult
+          return data.results.map((item: any) => ({
+            title: item.title,
+            link: item.url,
+            snippet: item.content,
+            source: 'DevDocs (via Context7)',
+            category: 'docs'
+          }));
+        }
+      } catch (e) {
+        logger.warn("Context7 search failed, falling back to scraper");
+      }
+    }
+
+    // FALLBACK: Playwright Scraping with strict timeout (Option C)
     const datasetName = `devdocs-${randomUUID()}`;
     const dataset = await Dataset.open(datasetName);
+    let crawler: PlaywrightCrawler | null = null;
 
     try {
-      const crawler = new PlaywrightCrawler({
+      crawler = new PlaywrightCrawler({
         maxRequestsPerCrawl: 1, // só uma página por vez aqui, mas escalável
-        maxConcurrency: 5, // ajusta pra tua máquina/servidor
-        requestHandlerTimeoutSecs: 60,
+        maxConcurrency: 1, // ajusta pra tua máquina/servidor
+        requestHandlerTimeoutSecs: 30,
         headless: true,
-        navigationTimeoutSecs: 30,
+        navigationTimeoutSecs: 15,
         requestHandler: async ({ page, request }) => {
           // Bloqueia lixo pra velocidade máxima
           await page.route('**/*', (route) => {
@@ -338,12 +397,9 @@ export class AgenticWebCrawler {
           });
 
           // Wait for selector - DevDocs specific
-          // Note: devdocs.io/#q=... might redirect or load content dynamically
-          // .entry selector is commonly used in devdocs list
           try {
-            await page.waitForSelector('.entry', { timeout: 15000 });
+            await page.waitForSelector('.entry', { timeout: 10000 });
           } catch (e) {
-            // If timeout, maybe no results or different layout
             return;
           }
 
@@ -389,7 +445,13 @@ export class AgenticWebCrawler {
         }
       });
 
-      await crawler.run([searchUrl]);
+      // TIMEOUT WRAPPER
+      await Promise.race([
+        crawler.run([searchUrl]),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('DevDocs scraping timed out')), 45000)
+        )
+      ]);
 
       // Pega os dados salvos
       const { items } = await dataset.getData();
@@ -403,7 +465,8 @@ export class AgenticWebCrawler {
       logger.error(`Error parsing DevDocs: ${error.message}`);
       return [];
     } finally {
-      // Clean up dataset
+      // CLEANUP
+      if (crawler) await crawler.teardown();
       await dataset.drop();
     }
   }

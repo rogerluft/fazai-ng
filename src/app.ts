@@ -89,6 +89,7 @@ Options:
   --log-file <path>        Define caminho explícito para o arquivo de log
   --auto-research          Reativar pesquisa automática após falhas
   --yolo, -y               Execute all commands without confirmation (DANGEROUS!)
+  --semantic               Enable semantic search (default: false)
   --help, -h               Show this help message
 
 Examples:
@@ -423,9 +424,10 @@ async function main() {
   });
 
   let inputs = process.argv.slice(2);
+  const semanticSearchEnabled = inputs.includes('--semantic');
 
   if (inputs.includes("--cli")) {
-    await runCliMode();
+    await runCliMode(semanticSearchEnabled);
     // runCliMode() handles its own exit (interactive mode)
     return;
   }

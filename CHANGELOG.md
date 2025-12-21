@@ -20,6 +20,11 @@
   - Integração de prompts de sistema dinâmicos baseados em contexto emocional.
   - Ajuste de pesos no `neural-flow`: Personalidade removida da busca de fatos (peso 0.0) para evitar alucinação, mantida apenas para injeção de estilo no chat.
 
+### 🐛 HOTFIXES
+
+- **Embedding Service Regression:** Corrigido erro crítico `data is not defined` em `src/services/embeddings.ts` que causava loop infinito ao tentar gerar embeddings com modelos locais. A variável `data` agora é corretamente definida antes de ser acessada.
+- **Web Crawler Loop:** Corrigido loop infinito em buscas DevDocs com timeout rígido e cleanup de recursos.
+
 #### Files Modified
 - `src/vector-store.ts` - Schemas atualizados e dimensão 1536 fixada.
 - `src/rag/neural-flow.ts` - Lógica de Hop, Ressonância e Extração de Conteúdo.

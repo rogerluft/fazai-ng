@@ -105,30 +105,40 @@ export const FazaiMemorySchema = z.object({
 export type FazaiMemoryPayload = z.infer<typeof FazaiMemorySchema>;
 
 /**
- * fazai_kb: Knowledge Base
+ * fazai_kb: Knowledge Base (V2)
  *
- * Linux/network documentation and technical knowledge
+ * Linux/network documentation and technical knowledge.
+ * Schema V2 introduces stricter validation and new fields for ECOA compatibility.
  */
-export const FazaiKBSchema = z.object({
+export const FazaiKBSchemaV2 = z.object({
   /**
-   * Unique slug (URL-friendly ID)
+   * Unique slug (URL-friendly ID), must be lowercase with dashes
    */
-  slug: z.string().max(96).trim(),
+  slug: z
+    .string()
+    .max(96)
+    .trim()
+    .regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with dashes"),
 
   /**
    * Knowledge title
    */
-  title: z.string().min(1).max(MAX_TITLE_LENGTH).trim(),
+  title: z.string().min(5).max(MAX_TITLE_LENGTH).trim(),
 
   /**
    * Brief summary
    */
-  summary: z.string().min(10).max(MAX_SUMMARY_LENGTH),
+  summary: z.string().min(20).max(MAX_SUMMARY_LENGTH),
+
+  /**
+   * Full content in Markdown format
+   */
+  content_markdown: z.string().min(50).max(MAX_CONTENT_LENGTH),
 
   /**
    * Category (e.g., "networking", "security", "troubleshooting")
    */
-  category: z.string().max(64).trim(),
+  category: z.string().min(3).max(64).trim(),
 
   /**
    * Scope (e.g., "linux", "debian", "redhat", "general")
@@ -146,9 +156,17 @@ export const FazaiKBSchema = z.object({
   component: z.string().max(64).optional(),
 
   /**
-   * Related commands
+   * Related commands with explanations
    */
-  commands: z.array(z.string().max(MAX_COMMAND_LENGTH)).max(MAX_COMMANDS).optional(),
+  commands: z
+    .array(
+      z.object({
+        command: z.string().max(MAX_COMMAND_LENGTH),
+        description: z.string().max(500),
+      })
+    )
+    .max(MAX_COMMANDS)
+    .optional(),
 
   /**
    * Source URL (if from external docs)
@@ -156,22 +174,37 @@ export const FazaiKBSchema = z.object({
   source: urlSchema.optional(),
 
   /**
-   * Confidence score (0-1)
+   * Confidence score (0-1), indicating reliability
    */
-  confidence: z.number().min(0).max(1).optional(),
+  confidence: z.number().min(0).max(1).default(0.8),
 
   /**
-   * Whether this knowledge has been validated
+   * Whether this knowledge has been validated by an expert
    */
-  validated: z.boolean().optional(),
+  validated: z.boolean().default(false),
 
   /**
-   * Tags
+   * Version of the knowledge entry
+   */
+  version: z.number().int().positive().default(1),
+
+  /**
+   * Timestamp of creation
+   */
+  created_at: timestampSchema.default(() => new Date().toISOString()),
+
+  /**
+   * Timestamp of last update
+   */
+  updated_at: timestampSchema.default(() => new Date().toISOString()),
+
+  /**
+   * Tags for discoverability
    */
   tags: tagsSchema,
 });
 
-export type FazaiKBPayload = z.infer<typeof FazaiKBSchema>;
+export type FazaiKBPayload = z.infer<typeof FazaiKBSchemaV2>;
 
 /**
  * fazai_learning: Learned patterns and solutions
@@ -370,7 +403,7 @@ export type FazaiInferencePayload = z.infer<typeof FazaiInferenceSchema>;
  */
 export const COLLECTION_SCHEMAS = {
   fazai_memory: FazaiMemorySchema,
-  fazai_kb: FazaiKBSchema,
+  fazai_kb: FazaiKBSchemaV2,
   fazai_learning: FazaiLearningSchema,
   fazai_personality: FazaiPersonalitySchema,
   fazai_inference: FazaiInferenceSchema,

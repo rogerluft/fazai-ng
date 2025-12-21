@@ -208,3 +208,15 @@ session-context-*.md
 *.bak
 *.bak-*
 .claude.backup-*
+
+# --- FAZAI VEU (RESTRICTED MODULES) ---
+src/veu/
+src/restricted/
+docs/restricted/
+scripts/restricted/
+etc/fazai/mods/restricted/
+.veu-secrets/
+
+
+.gemini/
+gha-creds-*.json

@@ -419,13 +419,14 @@ export async function* getLinuxCommandsFromAI(
   systemInfo: string,
   task: string,
   model: string,
-  provider: Provider
+  provider: Provider,
+  semanticSearchEnabled: boolean = true
 ): LinuxCommandGenerator {
   let commandsYielded = false;
   const triedProviders: Provider[] = [];
 
   // 🧠 NEURAL FLOW: Tenta buscar padrão aprendido primeiro
-  const learnedCommands = await consultNeuralFlow(task, systemInfo);
+  const learnedCommands = semanticSearchEnabled ? await consultNeuralFlow(task, systemInfo) : null;
 
   let enhancedSystemInfo = systemInfo;
 
@@ -447,7 +448,7 @@ export async function* getLinuxCommandsFromAI(
   }
 
   // 🧠 RAG ENRICHMENT: Enriquece prompt com contexto se ainda não foi feito
-  if (!learnedCommands || learnedCommands.length === 0) {
+  if (semanticSearchEnabled && (!learnedCommands || learnedCommands.length === 0)) {
     const ragContext = await enrichContextWithRAG(task, systemInfo);
     enhancedSystemInfo = ragContext
       ? `${systemInfo}\n\n${ragContext}`

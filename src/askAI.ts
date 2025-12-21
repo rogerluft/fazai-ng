@@ -195,23 +195,26 @@ export async function* askAI(
   question: string,
   model: string,
   provider: (typeof models)[number]["provider"],
-  isGeneralQuestion: boolean = false
+  isGeneralQuestion: boolean = false,
+  semanticSearchEnabled: boolean = true
 ): AsyncGenerator<string, void, undefined> {
   const prompt = isGeneralQuestion ? generalAskPrompt(question) : askPrompt(question);
 
   // Try semantic cache first
-  try {
-    const cache = await SemanticCache.getInstance();
-    const cachedResponse = await cache.lookup(prompt, model, provider);
+  if (semanticSearchEnabled) {
+    try {
+      const cache = await SemanticCache.getInstance();
+      const cachedResponse = await cache.lookup(prompt, model, provider);
 
-    if (cachedResponse) {
-      logger.info("🎯 Using cached response (semantic match)");
-      yield cachedResponse;
-      return;
+      if (cachedResponse) {
+        logger.info("🎯 Using cached response (semantic match)");
+        yield cachedResponse;
+        return;
+      }
+    } catch (error: any) {
+      logger.debug(`Cache lookup failed: ${error.message}`);
+      // Continue with provider call on cache error
     }
-  } catch (error: any) {
-    logger.debug(`Cache lookup failed: ${error.message}`);
-    // Continue with provider call on cache error
   }
 
   const systemMessage = isGeneralQuestion
