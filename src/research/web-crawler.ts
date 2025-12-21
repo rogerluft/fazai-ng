@@ -252,7 +252,13 @@ export class AgenticWebCrawler {
       return results;
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`Failed to fetch from ${source.name}: ${err.message}`);
+      // Log detailed error for debugging but always return an empty array to ensure robustness.
+      // This prevents a single failed source from stopping the entire multi-source search.
+      logger.error(`[ROBUSTNESS] Failed to fetch from ${source.name}: ${err.message}`, {
+        stack: err.stack,
+        source: source.name,
+        query: query,
+      });
       return [];
     }
   }

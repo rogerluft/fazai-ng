@@ -5,59 +5,41 @@
 
 ---
 
-## BUG-001: Loop infinito no CLI durante busca web e Implementação de Fluxo de Resiliência
+## BUG-001: Colapso Sistêmico por Exaustão de Recursos (Memória/Qdrant) - DIAGNÓSTICO INFRAESTRUTURA
 
-**Data:** 2025-12-20
-**Severidade:** Alta
-**Status:** ⚠️ Em Análise / Aguardando Refatoração Jules
-**Componente:** `src/research/web-crawler.ts` e Fluxo Principal (`src/app.ts`, `src/orchestrator/`)
+**Data:** 2025-12-21
+**Severidade:** CRÍTICA (System Freeze / 300GB Swap Consumed)
+**Status:** 🚨 AÇÃO IMEDIATA REQUERIDA
+**Componente:** Infraestrutura / Gestão de Memória / Qdrant Integration
+**Diagnóstico (Infra Team):** O problema **NÃO É O CRAWLER**. Trata-se de uma falha sistêmica na consulta/conexão com as Collections (Qdrant), gerando um loop de retentativa não tratado que consome toda a memória disponível e swap, travando o servidor host.
 
-### Descrição do Problema
-O comando `fazai --cli` entra em loop/trava quando o usuário faz uma busca que aciona o `AgenticWebCrawler` com fonte "docs" (DevDocs). Além disso, o sistema atual carece de um fluxo robusto de tentativa e erro (fallback) para garantir a execução de tarefas complexas.
+### 🛡️ Solução Definitiva: Criação do `fzagent` (Proactive Bastion)
 
-### Reprodução
-```bash
-fazai --cli
-> pesquise sobre "qualquer termo"
-# Processo trava indefinidamente
-```
+Implementar um subsistema de defesa proativa e autocura, inspirado em conceitos de "TraumaZero", "Kaseya" e "ZeroTrust".
+
+**Especificações do `fzagent`:**
+
+1.  **Monitoramento Ativo (Sentinela):**
+    *   Monitorar consumo de RAM e Swap do processo `fazai` em tempo real.
+    *   Monitorar saúde e latência do serviço Qdrant.
+    *   **Circuit Breaker:** Se o consumo de memória ultrapassar limites seguros (ex: 80% do container/host) ou se o Qdrant falhar consecutivamente, **CORTAR** a conexão com a memória imediatamente.
+
+2.  **Autocura (Self-Healing):**
+    *   **Qdrant Down/Corrupt:** Tentar reiniciar o serviço Qdrant. Se falhar, isolar o módulo de memória.
+    *   **Collections Inválidas:** Detectar se uma collection não está populada ou tem schema inválido. Em vez de tentar ler infinitamente, **ignorar** a collection e alertar.
+    *   **Fallback Seguro:** Em caso de erro crítico na memória, o FazAI deve entrar automaticamente em **"Modo Amnésico Seguro"**: continuar atendendo a ordem natural do usuário sem acessar o banco vetorial, garantindo que a tarefa principal seja cumprida.
+
+3.  **Gestão de Crise:**
+    *   Nunca permitir que uma falha de subsistema (como DB) derrube o sistema operacional.
+    *   Logs de infraestrutura claros para auditoria.
 
 ### 🎯 Objetivo da Refatoração (Instruções para o Jules)
 
-Além de corrigir o loop infinito no crawler, **implementar o seguinte Fluxo de Resiliência e Fallback** no núcleo do FazAI:
+**PRIORIDADE 1:** Criar o `fzagent` ou integrar sua lógica ao núcleo (`src/app.ts` / `src/services/`).
+**PRIORIDADE 2:** Refatorar a integração com Qdrant para ser "Fault Tolerant". O código deve prever que o banco pode não estar lá.
+**PRIORIDADE 3:** Implementar o fluxo de resiliência de tarefa (descrito anteriormente), mas subordinado à saúde do sistema garantida pelo `fzagent`.
 
-**1. Entrada e Decomposição:**
-   - Receber Ordem Natural + Contexto (usuário, diretório, sistema).
-   - Quebrar em pequenas subtarefas (Task Decomposition).
-   - Gerar fluxo de dependências.
-
-**2. Fluxo de Execução com Tentativas (Retry Logic):**
-   - **Nível 1 (Modelo Local/Preferencial):**
-     - Tentar executar a subtarefa até 3 vezes.
-     - Sucesso: Salvar em Cache -> Próxima subtarefa.
-     - Falha: Registrar erro, aprender com a falha -> Ir para Nível 2.
-   - **Nível 2 (Fallback Endpoint - ex: Cloud/Outro Modelo):**
-     - Tentar executar até 3 vezes.
-     - Sucesso: Salvar em Cache -> Próxima subtarefa.
-     - Falha: Registrar erro -> Ir para Nível 3.
-
-**3. Consultas de Contexto e Pesquisa (Knowledge Fallback):**
-   - **Nível 3 (Context7):** Consultar MCP Context7 para documentação técnica/libs.
-   - **Nível 4 (Perplexity/Web):** Consultar Perplexity ou Web Search para informações externas.
-   - **⚠️ Regra de Robustez (Pesquisa Manual):** Se a pesquisa manual for solicitada, o sistema deve tentar todas as fontes disponíveis (Internet, Perplexity, Crawlers). **A falha de uma fonte específica NÃO deve interromper o processo.** O erro deve ser registrado (log/debug) e o sistema deve prosseguir para a próxima fonte.
-
-**4. Falha Crítica:**
-   - Se todos os níveis falharem:
-     - **Salvar o estado atual da tarefa** (onde parou).
-     - **Gerar sugestão de resolução** para o usuário.
-     - Abrir prompt para intervenção manual ou nova ordem.
-
-**Referência Visual:** Ver `docs/fluxo.png` (diagrama de fluxo).
-
-### Soluções Técnicas Esperadas
-1. **Correção do Crawler:** Timeout rígido, cleanup de recursos (Playwright), preferência por Context7.
-2. **Orquestrador de Tarefas:** Implementar a lógica de retry/fallback descrita acima.
-3. **Gestão de Erros:** Logs detalhados de cada tentativa para aprendizado do sistema.
+---
 
 ---
 

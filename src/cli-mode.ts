@@ -7,8 +7,7 @@ import { collectSystemInfo } from "./system-info";
 import { LinuxCommand } from "./types-linux";
 import { LinuxCommandExecutor } from "./linux-executor";
 import { ResearchCoordinator } from "./research";
-import { AgenticWebCrawler } from "./research/web-crawler";
-import { QueryAnalyzer } from "./research/query-analyzer";
+import { ResilienceOrchestrator } from "./orchestrator/resilience-orchestrator";
 import { checkAPIKey, getAndSetAPIKey } from "./apiKeyUtils-fazai";
 import { logger } from "./logger";
 import {
@@ -372,76 +371,29 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         return;
       }
 
-      logger.info(chalk.cyan(`\n🔍 Iniciando busca multi-fonte: "${query}"\n`));
+      logger.info(chalk.cyan(`\n🚀 Executando com fluxo de resiliência: "${query}"\n`));
 
       try {
-        const crawler = new AgenticWebCrawler();
-        const analyzer = new QueryAnalyzer();
+        const orchestrator = new ResilienceOrchestrator();
+        const result = await orchestrator.executeTaskWithResilience(query);
 
-        // Classifica a query
-        const classification = analyzer.classifyQuery(query);
-        const { type, strategy } = classification;
-
-        logger.info(chalk.gray(`📊 Tipo detectado: ${type}`));
-        logger.info(chalk.gray(`📚 Estratégia: ${strategy.description}`));
-        logger.info(chalk.gray(`🎯 Fontes: ${strategy.sources.join(", ")}\n`));
-
-        // Busca multi-fonte
-        const results = await crawler.searchMultiSource(query, {
-          sources: strategy.sources,
-          maxResults: strategy.maxResults,
-        });
-
-        if (results.length === 0) {
-          logger.warn(chalk.yellow("⚠️  Nenhum resultado encontrado."));
-          logger.info(chalk.gray("\nTente refinar sua busca ou use termos diferentes."));
-          rl.prompt();
-          return;
-        }
-
-        // Cruza dados
-        const consolidated = await crawler.crossReference(results);
-
-        // Exibe resultados
-        logger.info(chalk.green(`\n✅ Encontrados ${results.length} resultados de ${consolidated.sources.join(", ")}\n`));
-
-        if (consolidated.consensus.length > 0) {
-          logger.info(chalk.bold("📊 CONSENSO:"));
-          for (const point of consolidated.consensus) {
-            logger.info(chalk.cyan(`  • ${point}`));
+        if (result.success) {
+          logger.info(chalk.green(`✅ Tarefa concluída no nível: ${result.level}`));
+          logger.info(chalk.bold("\n💡 Resposta Final:"));
+          logger.info(chalk.cyan(result.finalAnswer));
+        } else {
+          logger.warn(chalk.yellow(`⚠️  Não foi possível concluir a tarefa após todos os níveis de fallback.`));
+          if (result.finalAnswer) {
+            logger.info(chalk.bold("\n💡 Resposta Final:"));
+            logger.info(chalk.cyan(result.finalAnswer));
           }
-          logger.info("");
-        }
-
-        if (consolidated.contradictions.length > 0) {
-          logger.info(chalk.yellow("⚠️  CONTRADIÇÕES:"));
-          for (const conflict of consolidated.contradictions) {
-            logger.info(chalk.yellow(`  • ${conflict}`));
+          if (result.error) {
+             logger.error(chalk.red(`\n❌ Motivo da falha final: ${result.error}`));
           }
-          logger.info("");
         }
-
-        logger.info(chalk.bold("📝 TOP RESULTADOS:"));
-        for (const result of results.slice(0, 5)) {
-          logger.info(chalk.bold(`\n  ${result.title}`));
-          logger.info(chalk.gray(`  ${result.link}`));
-          if (result.snippet) {
-            logger.info(chalk.dim(`  ${result.snippet.substring(0, 150)}...`));
-          }
-          logger.info(chalk.gray(`  [${result.source} - ${result.category}]`));
-        }
-
-        logger.info("");
-        logger.info(chalk.bold("💡 RESUMO:"));
-        logger.info(chalk.cyan(`  ${consolidated.summary}`));
-        logger.info("");
-
-        // Cache em Qdrant
-        await crawler.cacheInQdrant(query, results);
-
       } catch (error: unknown) {
         const err = error instanceof Error ? error : new Error(String(error));
-        logger.error(chalk.red(`\n❌ Erro na busca: ${err.message}`));
+        logger.error(chalk.red(`\n❌ Erro crítico no orquestrador: ${err.message}`));
       }
 
       rl.prompt();
