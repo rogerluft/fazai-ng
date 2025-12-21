@@ -17,10 +17,10 @@ O sistema entra em loop infinito de retentativa quando ocorre uma falha na consu
 
 ### 🎯 Objetivo da Correção (Instruções para o Jules)
 
-1.  **Tratamento de Erro no Qdrant:**
-    *   Identificar onde a falha de conexão ou consulta ao banco vetorial não está sendo capturada.
-    *   Implementar um limite rígido de tentativas (máximo 3) para qualquer operação de memória.
-    *   Se a memória falhar, o sistema **DEVE** logar o erro e **SEGUIR O FLUXO** para atender a ordem do usuário usando os outros provedores (Context7, Perplexity, etc).
+1.  **Tratamento de Erro no Qdrant (CRÍTICO - REINCIDÊNCIA):**
+    *   **Problema:** Mesmo com o patch anterior, os testes de integração entram em loop de erro massivo (`Operation failed after 4 attempts`) quando o Qdrant está offline, estourando logs e timeout.
+    *   **Correção:** O Circuit Breaker deve impedir **imediatamente** novas chamadas ao `withRetry` se estiver aberto. A lógica de retry não pode ser acionada se o disjuntor já estiver disparado.
+    *   **Testes:** Os testes de integração (`tests/integration/*.ts`) devem detectar se o Qdrant está offline e **PULAR (SKIP)** os testes, em vez de falhar catastroficamente ou tentar conectar em loop.
 
 2.  **Parada de Emergência (Circuit Breaker):**
     *   Se for detectado um comportamento de loop ou consumo anômalo de recursos durante uma tarefa, o processo deve ser abortado ou a tarefa suspensa.

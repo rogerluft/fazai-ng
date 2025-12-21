@@ -2,16 +2,11 @@
  * Qdrant Connection Pool Module
  *
  * Provides a singleton QdrantClient instance with:
- * - Connection pooling
+ * - Connection pooling and retry logic
+ * - Circuit breaker to prevent infinite retries
  * - Health checks (periodic validation)
  * - Automatic reconnection on failure
  * - Metrics tracking (connections, queries, errors)
- *
- * Best Practices:
- * - Single shared client instance (reduces overhead)
- * - Validates connection every 5 minutes
- * - Auto-reconnects on health check failure
- * - Tracks usage metrics for monitoring
  */
 
 import { QdrantClient } from "@qdrant/js-client-rest";
@@ -23,29 +18,10 @@ import { withRetry } from "../utils/retry";
  * Connection pool metrics
  */
 interface PoolMetrics {
-  /**
-   * Total number of queries executed
-   */
   totalQueries: number;
-
-  /**
-   * Total number of connection errors
-   */
   totalErrors: number;
-
-  /**
-   * Last successful health check timestamp
-   */
   lastHealthCheck: Date | null;
-
-  /**
-   * Number of reconnection attempts
-   */
   reconnectionAttempts: number;
-
-  /**
-   * Current connection state
-   */
   state: "disconnected" | "connecting" | "connected" | "error";
 }
 
@@ -53,11 +29,11 @@ interface PoolMetrics {
  * Qdrant Connection Pool
  *
  * Singleton pattern for managing a single shared QdrantClient instance.
+ * Implements a circuit breaker to avoid memory exhaustion on repeated failures.
  */
 class QdrantConnectionPool {
   private client: QdrantClient | null = null;
   private healthCheckInterval: NodeJS.Timeout | null = null;
-  private lastHealthCheck: Date | null = null;
   private metrics: PoolMetrics = {
     totalQueries: 0,
     totalErrors: 0,
@@ -66,119 +42,90 @@ class QdrantConnectionPool {
     state: "disconnected",
   };
 
-  /**
-   * Health check interval in milliseconds (5 minutes)
-   */
-  private readonly HEALTH_CHECK_INTERVAL = 5 * 60 * 1000;
+  // State for retry and circuit breaker logic
+  private isInitializing = false;
+  private lastErrorTimestamp: number | null = null;
+
+  private readonly HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
+  private readonly COOL_DOWN_PERIOD = 30 * 1000; // 30 seconds circuit breaker
 
   /**
-   * Get or create the Qdrant client instance
+   * Get or create the Qdrant client instance with robust error handling.
    *
    * @returns Promise<QdrantClient>
-   *
-   * @example
-   * const client = await qdrantPool.getClient();
-   * const collections = await client.getCollections();
    */
   async getClient(): Promise<QdrantClient> {
-    // If client exists and is healthy, return it
-    if (this.client && await this.isHealthy()) {
+    // 1. Circuit Breaker: If in error state, fail fast during cooldown
+    if (this.metrics.state === "error" && this.lastErrorTimestamp && Date.now() - this.lastErrorTimestamp < this.COOL_DOWN_PERIOD) {
+      throw new Error(`Qdrant connection in cooldown state. Last error at ${new Date(this.lastErrorTimestamp).toISOString()}`);
+    }
+
+    // 2. If client exists and is healthy, return it
+    if (this.client) {
       return this.client;
     }
 
-    // Otherwise, initialize new connection
-    await this.initialize();
-    return this.client!;
+    // 3. Prevent concurrent initialization attempts (race condition)
+    if (this.isInitializing) {
+      logger.warn("Blocked concurrent Qdrant initialization attempt.");
+      throw new Error("Qdrant initialization is already in progress.");
+    }
+
+    // 4. Initialize new connection with retry logic
+    this.isInitializing = true;
+    try {
+      await withRetry(() => this._initialize(), {
+        provider: "qdrant",
+        maxRetries: 3, // Max 3 retries as per BUG-001
+        initialDelay: 500,
+        onRetry: (attempt, error) => logger.warn(`Qdrant connection retry #${attempt} failed: ${error.message}`),
+      });
+      if (!this.client) {
+        throw new Error("Client is null after successful initialization attempt. This should not happen.");
+      }
+      return this.client;
+    } catch (error: any) {
+      // Set circuit breaker state on final failure
+      this.lastErrorTimestamp = Date.now();
+      logger.error(`Qdrant connection failed after all retries: ${error.message}`);
+      throw error; // Re-throw the final error to the caller
+    } finally {
+      this.isInitializing = false;
+    }
   }
 
   /**
-   * Initialize the Qdrant client
+   * Internal method to initialize the Qdrant client. Designed to be retried by getClient.
    */
-  private async initialize(): Promise<void> {
+  private async _initialize(): Promise<void> {
+    this.metrics.state = "connecting";
+    logger.debug("Attempting to initialize Qdrant connection...");
+
+    const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
+    const apiKey = getConfigValue("QDRANT_API_KEY");
+
+    this.client = new QdrantClient({
+      url,
+      apiKey: apiKey || undefined,
+      timeout: 10000, // 10s timeout for each attempt
+    });
+
     try {
-      this.metrics.state = "connecting";
-      logger.debug("Initializing Qdrant connection pool...");
-
-      const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
-      const apiKey = getConfigValue("QDRANT_API_KEY");
-
-      // Create new client
-      this.client = new QdrantClient({
-        url,
-        apiKey: apiKey || undefined,
-        timeout: 30000, // 30s timeout
-      });
-
-      // Validate connection
-      await this.validateConnection();
-
+      // Simple health check: list collections
+      await this.client.getCollections();
+      
       this.metrics.state = "connected";
+      this.lastErrorTimestamp = null; // Clear circuit breaker on success
+      this.metrics.lastHealthCheck = new Date();
       logger.info(`✓ Qdrant connection pool initialized: ${url}`);
 
-      // Start health check interval
       this.startHealthCheckInterval();
     } catch (error: any) {
       this.metrics.state = "error";
       this.metrics.totalErrors++;
-      logger.error(`Failed to initialize Qdrant connection pool: ${error.message}`);
-      this.client = null;
-      throw new Error(`Qdrant connection failed: ${error.message}`);
-    }
-  }
-
-  /**
-   * Validate that the connection is working
-   */
-  private async validateConnection(): Promise<void> {
-    if (!this.client) {
-      throw new Error("Client not initialized");
-    }
-
-    try {
-      // Simple health check: list collections
-      await withRetry(
-        () => this.client!.getCollections(),
-        {
-          provider: "qdrant",
-          maxRetries: 2,
-        }
-      );
-
-      this.lastHealthCheck = new Date();
-      this.metrics.lastHealthCheck = this.lastHealthCheck;
-      logger.debug("✓ Qdrant connection validated");
-    } catch (error: any) {
-      logger.error(`Qdrant connection validation failed: ${error.message}`);
-      throw error;
-    }
-  }
-
-  /**
-   * Check if the connection is healthy
-   *
-   * Returns true if:
-   * - Client exists
-   * - Last health check was within HEALTH_CHECK_INTERVAL
-   */
-  private async isHealthy(): Promise<boolean> {
-    if (!this.client) {
-      return false;
-    }
-
-    // Check if health check is recent enough
-    if (
-      this.lastHealthCheck &&
-      Date.now() - this.lastHealthCheck.getTime() < this.HEALTH_CHECK_INTERVAL
-    ) {
-      return true;
-    }
-
-    // Perform health check
-    try {
-      await this.validateConnection();
-      return true;
-    } catch {
-      return false;
+      this.client = null; // Ensure client is null on failure
+      // Re-throw to signal failure to the withRetry wrapper
+      throw new Error(`Qdrant health check failed: ${error.message}`);
     }
   }
 
@@ -191,113 +138,47 @@ class QdrantConnectionPool {
     }
 
     this.healthCheckInterval = setInterval(async () => {
+      if (!this.client) {
+        logger.warn("Health check skipped: client not connected.");
+        return;
+      }
       logger.debug("Running periodic Qdrant health check...");
-
       try {
-        await this.validateConnection();
+        await this.client.getCollections();
+        this.metrics.lastHealthCheck = new Date();
         logger.debug("✓ Periodic health check passed");
       } catch (error: any) {
-        logger.warn(`⚠️  Periodic health check failed: ${error.message}`);
-        this.metrics.reconnectionAttempts++;
-
-        // Attempt reconnection
-        logger.info("Attempting to reconnect to Qdrant...");
-        try {
-          this.client = null; // Force reinitialization
-          await this.initialize();
-          logger.info("✓ Reconnection successful");
-        } catch (reconnectError: any) {
-          logger.error(`Failed to reconnect: ${reconnectError.message}`);
-          this.metrics.state = "error";
-        }
+        logger.warn(`⚠️ Periodic health check failed: ${error.message}`);
+        this.client = null; // Invalidate client to force re-initialization on next getClient call
+        this.metrics.state = "disconnected";
       }
     }, this.HEALTH_CHECK_INTERVAL);
   }
 
-  /**
-   * Record a query execution
-   */
+  // --- Public Methods for Management ---
+
   recordQuery(): void {
     this.metrics.totalQueries++;
   }
 
-  /**
-   * Record an error
-   */
   recordError(): void {
     this.metrics.totalErrors++;
   }
 
-  /**
-   * Get connection pool metrics
-   *
-   * @returns PoolMetrics
-   */
   getMetrics(): PoolMetrics {
     return { ...this.metrics };
   }
 
-  /**
-   * Get a formatted metrics summary
-   *
-   * @returns String with formatted metrics
-   */
-  getMetricsSummary(): string {
-    const uptime = this.lastHealthCheck
-      ? Math.floor((Date.now() - this.lastHealthCheck.getTime()) / 1000)
-      : null;
-
-    return `
-📊 Qdrant Connection Pool Metrics:
-  State: ${this.metrics.state}
-  Total Queries: ${this.metrics.totalQueries.toLocaleString()}
-  Total Errors: ${this.metrics.totalErrors}
-  Last Health Check: ${this.lastHealthCheck?.toISOString() || "Never"}
-  Uptime: ${uptime !== null ? `${uptime}s` : "N/A"}
-  Reconnection Attempts: ${this.metrics.reconnectionAttempts}
-    `.trim();
-  }
-
-  /**
-   * Close the connection pool
-   *
-   * Stops health checks and clears the client.
-   * Should be called on application shutdown.
-   */
   async close(): Promise<void> {
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
     }
-
     if (this.client) {
       logger.info("Closing Qdrant connection pool...");
       this.client = null;
       this.metrics.state = "disconnected";
-      logger.info("✓ Qdrant connection pool closed");
     }
-  }
-
-  /**
-   * Force a reconnection
-   *
-   * Useful for testing or manual recovery.
-   */
-  async reconnect(): Promise<void> {
-    logger.info("Forcing Qdrant reconnection...");
-    this.client = null;
-    this.metrics.reconnectionAttempts++;
-    await this.initialize();
-  }
-
-  /**
-   * Reset metrics
-   */
-  resetMetrics(): void {
-    this.metrics.totalQueries = 0;
-    this.metrics.totalErrors = 0;
-    this.metrics.reconnectionAttempts = 0;
-    logger.debug("✓ Qdrant pool metrics reset");
   }
 }
 
@@ -308,14 +189,6 @@ export const qdrantPool = new QdrantConnectionPool();
 
 /**
  * Helper function to get Qdrant client
- *
- * Convenience wrapper that automatically tracks queries.
- *
- * @returns Promise<QdrantClient>
- *
- * @example
- * const client = await getQdrantClient();
- * const collections = await client.getCollections();
  */
 export async function getQdrantClient(): Promise<QdrantClient> {
   const client = await qdrantPool.getClient();
@@ -325,22 +198,13 @@ export async function getQdrantClient(): Promise<QdrantClient> {
 
 /**
  * Execute a Qdrant operation with automatic error tracking
- *
- * @param fn Function that uses QdrantClient
- * @returns Promise with function result
- *
- * @example
- * const collections = await withQdrantClient(async (client) => {
- *   return await client.getCollections();
- * });
  */
 export async function withQdrantClient<T>(
   fn: (client: QdrantClient) => Promise<T>
 ): Promise<T> {
   try {
     const client = await getQdrantClient();
-    const result = await fn(client);
-    return result;
+    return await fn(client);
   } catch (error) {
     qdrantPool.recordError();
     throw error;
