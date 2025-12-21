@@ -75,10 +75,10 @@ class OllamaEmbeddingService implements EmbeddingService {
 
   /**
    * Trunca texto para caber no contexto do modelo
+   * Reduzido para margem de segurança (3 chars/token)
    */
   private truncateText(text: string): string {
-    // Aproximação: ~4 chars por token
-    const maxChars = this.MAX_TOKENS * 4;
+    const maxChars = 1500; // Conservative limit (was ~2048)
     if (text.length <= maxChars) {
       return text;
     }
@@ -130,6 +130,13 @@ class OllamaEmbeddingService implements EmbeddingService {
 
               if (!response.ok) {
                 const errorText = await response.text().catch(() => "");
+                
+                // NON-RETRYABLE ERROR: Context Length Exceeded
+                if (response.status === 500 && errorText.includes("context length")) {
+                   logger.warn(`⚠️  Ollama context exceeded for text ${i+1}. Using zero vector.`);
+                   return new Array(1536).fill(0); // Return zero vector to break loop
+                }
+
                 throw new Error(
                   `Ollama API error ${response.status}: ${errorText}`
                 );
@@ -158,6 +165,8 @@ class OllamaEmbeddingService implements EmbeddingService {
               return rawEmbedding;
             } catch (error: any) {
               clearTimeout(timeoutId);
+              // Pass through the zero vector if we caught it above (it's not an error anymore)
+              if (Array.isArray(error)) return error; 
               throw error;
             }
           },
@@ -374,7 +383,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
       );
 
       if (hasPreferredModel) {
-        logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1024 dim)`);
+        logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1536 dim [padded])`);
         return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 1024);
       }
 
@@ -385,7 +394,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
       );
 
       if (hasAlternativeModel) {
-        logger.info(`✓ Using Ollama for embeddings (${alternativeModel}, 768 dim)`);
+        logger.info(`✓ Using Ollama for embeddings (${alternativeModel}, 1536 dim [padded])`);
         return new OllamaEmbeddingService(ollamaBaseUrl, alternativeModel, 768);
       }
 
