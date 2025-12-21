@@ -5,39 +5,33 @@
 
 ---
 
-## BUG-001: Colapso Sistêmico por Exaustão de Recursos (Memória/Qdrant) - DIAGNÓSTICO INFRAESTRUTURA
+## BUG-001: Loop infinito no CLI por falha na gestão de memória/Qdrant
 
 **Data:** 2025-12-21
-**Severidade:** CRÍTICA (System Freeze / 300GB Swap Consumed)
-**Status:** 🚨 AÇÃO IMEDIATA REQUERIDA
-**Componente:** Infraestrutura / Gestão de Memória / Qdrant Integration
-**Diagnóstico (Infra Team):** O problema **NÃO É O CRAWLER**. Trata-se de uma falha sistêmica na consulta/conexão com as Collections (Qdrant), gerando um loop de retentativa não tratado que consome toda a memória disponível e swap, travando o servidor host.
+**Severidade:** CRÍTICA (System Freeze)
+**Status:** ⚠️ Em Análise / Aguardando Correção Jules
+**Componente:** `src/orchestrator/`, `src/services/embeddings.ts`, `src/vector-store.ts`
 
-### 🛡️ Solução Definitiva: Criação do `fzagent` (Proactive Bastion)
+### Descrição do Problema
+O sistema entra em loop infinito de retentativa quando ocorre uma falha na consulta ou conexão com as collections do Qdrant. Em vez de reconhecer a falha e seguir o fluxo, o código incrementa a busca exaustivamente, consumindo toda a RAM e Swap (300GB+) até travar o servidor.
 
-Implementar um subsistema de defesa proativa e autocura, inspirado em conceitos de "TraumaZero", "Kaseya" e "ZeroTrust".
+### 🎯 Objetivo da Correção (Instruções para o Jules)
 
-**Especificações do `fzagent`:**
+1.  **Tratamento de Erro no Qdrant:**
+    *   Identificar onde a falha de conexão ou consulta ao banco vetorial não está sendo capturada.
+    *   Implementar um limite rígido de tentativas (máximo 3) para qualquer operação de memória.
+    *   Se a memória falhar, o sistema **DEVE** logar o erro e **SEGUIR O FLUXO** para atender a ordem do usuário usando os outros provedores (Context7, Perplexity, etc).
 
-1.  **Monitoramento Ativo (Sentinela):**
-    *   Monitorar consumo de RAM e Swap do processo `fazai` em tempo real.
-    *   Monitorar saúde e latência do serviço Qdrant.
-    *   **Circuit Breaker:** Se o consumo de memória ultrapassar limites seguros (ex: 80% do container/host) ou se o Qdrant falhar consecutivamente, **CORTAR** a conexão com a memória imediatamente.
+2.  **Parada de Emergência (Circuit Breaker):**
+    *   Se for detectado um comportamento de loop ou consumo anômalo de recursos durante uma tarefa, o processo deve ser abortado ou a tarefa suspensa.
 
-2.  **Autocura (Self-Healing):**
-    *   **Qdrant Down/Corrupt:** Tentar reiniciar o serviço Qdrant. Se falhar, isolar o módulo de memória.
-    *   **Collections Inválidas:** Detectar se uma collection não está populada ou tem schema inválido. Em vez de tentar ler infinitamente, **ignorar** a collection e alertar.
-    *   **Fallback Seguro:** Em caso de erro crítico na memória, o FazAI deve entrar automaticamente em **"Modo Amnésico Seguro"**: continuar atendendo a ordem natural do usuário sem acessar o banco vetorial, garantindo que a tarefa principal seja cumprida.
+3.  **Robustez na Decomposição de Tarefas:**
+    *   Garantir que falhas em sub-tarefas de memória não comprometam a execução da tarefa principal.
 
-3.  **Gestão de Crise:**
-    *   Nunca permitir que uma falha de subsistema (como DB) derrube o sistema operacional.
-    *   Logs de infraestrutura claros para auditoria.
+---
 
-### 🎯 Objetivo da Refatoração (Instruções para o Jules)
-
-**PRIORIDADE 1:** Criar o `fzagent` ou integrar sua lógica ao núcleo (`src/app.ts` / `src/services/`).
-**PRIORIDADE 2:** Refatorar a integração com Qdrant para ser "Fault Tolerant". O código deve prever que o banco pode não estar lá.
-**PRIORIDADE 3:** Implementar o fluxo de resiliência de tarefa (descrito anteriormente), mas subordinado à saúde do sistema garantida pelo `fzagent`.
+### 🚀 Próxima Feature Relacionada (Ver TODO.md): `fzagent`
+*Nota: A implementação do agente proativo de monitoramento `fzagent` é uma nova funcionalidade e será tratada separadamente após a correção deste bug crítico.*
 
 ---
 

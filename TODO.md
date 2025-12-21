@@ -2,7 +2,15 @@
 
 ## 🚨 Prioridade Crítica (Pós-Jules)
 
-### 1. Documentar Sub-Helps Faltantes
+### 1. Implementar fzagent (Proactive Bastion)
+- **Status:** Planejado
+- **Descrição:** Novo agente de infraestrutura (TraumaZero + Kaseya + ZeroTrust) para monitoramento proativo.
+- **Ações:**
+  - Criar daemon de monitoramento de recursos (RAM, Swap, Qdrant).
+  - Implementar Circuit Breaker sistêmico para proteger o Host.
+  - Garantir modo de operação seguro (Safe Mode) em caso de falha de subsistemas.
+
+### 2. Documentar Sub-Helps Faltantes
 - **Status:** Aberto
 - **Descrição:** Vários subcomandos não têm uma tela de `--help` dedicada.
 - **Ações:**
