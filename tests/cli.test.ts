@@ -193,7 +193,8 @@ describe('FazAI CLI Tests', () => {
             expect.any(Object), // systemInfo
             task,
             expect.any(String), // model name
-            expect.any(String)  // model provider
+            expect.any(String), // model provider
+            expect.any(Boolean) // semanticSearchEnabled
         );
         expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Gerando comandos para:'), expect.stringContaining(task));
         expect(executeCommandSpy).toHaveBeenCalledWith({ command: 'ls -la', explanation: 'list files', risk: 'LOW' });
@@ -228,7 +229,8 @@ describe('FazAI CLI Tests', () => {
             expect.any(Object),
             task,
             expect.any(String),
-            expect.any(String)
+            expect.any(String),
+            expect.any(Boolean)
         );
     });
 });
@@ -431,7 +433,7 @@ describe('FazAI CLI Tests', () => {
             await vi.advanceTimersByTimeAsync(50);
 
             // Assert 2: Check command execution
-            expect(getLinuxCommandsFromAISpy).toHaveBeenCalledWith(expect.any(Object), 'test command', expect.any(String), expect.any(String));
+            expect(getLinuxCommandsFromAISpy).toHaveBeenCalledWith(expect.any(Object), 'test command', expect.any(String), expect.any(String), expect.any(Boolean));
             expect(executeCommandSpy).toHaveBeenCalled();
 
             // Act 3: Simulate user inactivity and trigger timeout

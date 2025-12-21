@@ -20,6 +20,11 @@
   - Integração de prompts de sistema dinâmicos baseados em contexto emocional.
   - Ajuste de pesos no `neural-flow`: Personalidade removida da busca de fatos (peso 0.0) para evitar alucinação, mantida apenas para injeção de estilo no chat.
 
+### 🧪 Stability & Testing
+
+- **CLI Tests:** Full test suite implemented (`tests/cli.test.ts`) covering `/exec`, `/help`, search, and timeout handling. All 14 tests passing.
+- **Jules Integration:** Resolved merge conflicts in `src/linux-admin.ts` and `src/memory.ts`. Verified `updatePersonalityTrait` and `--semantic` flag integration.
+
 ### 🐛 HOTFIXES
 
 - **Embedding Service Regression:** Corrigido erro crítico `data is not defined` em `src/services/embeddings.ts` que causava loop infinito ao tentar gerar embeddings com modelos locais. A variável `data` agora é corretamente definida antes de ser acessada.
