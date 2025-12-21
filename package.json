@@ -37,7 +37,7 @@
     "zod": "^4.1.12"
   },
   "scripts": {
-    "build": "bash scripts/setup-env.sh && tsup",
+    "build": "bash scripts/setup-env.sh && npm test && tsup",
     "build:all": "npm run build && npm run build:web",
     "build:web": "cd web && npm run build",
     "postbuild": "node scripts/postbuild.js",
@@ -48,7 +48,7 @@
     "start:web": "cd web && npm run start",
     "deploy": "npm run build && bash scripts/deploy.sh",
     "deploy:all": "npm run build:all && bash scripts/deploy.sh",
-    "test": "vitest",
+    "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
     "test:watch": "vitest watch",

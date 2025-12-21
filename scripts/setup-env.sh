@@ -66,7 +66,33 @@ add_to_profile() {
 info "Checking for 'repo' alias..."
 add_to_profile "$HOME/.bashrc" "alias repo=" "alias repo='cd ${FAZAI_REPO_PATH}'"
 add_to_profile "$HOME/.zshrc" "alias repo=" "alias repo='cd ${FAZAI_REPO_PATH}'"
-info "Alias check complete. You may need to source your shell profile (e.g., 'source ~/.bashrc') or restart your shell for changes to take effect."
+
+# --- Dev Command Link (Fix: Immediate Execution) ---
+info "Linking 'fazai' command for immediate development use..."
+TARGET_BIN="/usr/local/bin/fazai"
+SOURCE_BIN="${FAZAI_REPO_PATH}/bin/fazai"
+
+if [ -f "$SOURCE_BIN" ]; then
+    # Make executable
+    chmod +x "$SOURCE_BIN"
+    
+    # Create symlink
+    if [ -L "$TARGET_BIN" ] && [ "$(readlink "$TARGET_BIN")" == "$SOURCE_BIN" ]; then
+        info "Symlink $TARGET_BIN already points to repo. Skipping."
+    else
+        info "Creating symlink: $TARGET_BIN -> $SOURCE_BIN"
+        sudo ln -sf "$SOURCE_BIN" "$TARGET_BIN"
+        if [ $? -eq 0 ]; then
+            success "Command 'fazai' linked! You can run it immediately."
+        else
+            warn "Failed to link 'fazai' to /usr/local/bin. Sudo required."
+        fi
+    fi
+else
+    warn "Source binary not found at $SOURCE_BIN"
+fi
+
+info "Alias check complete."
 
 # Add global environment variable FAZAI_REPO
 info "Checking for FAZAI_REPO environment variable..."
