@@ -5,27 +5,60 @@
 
 ---
 
-## BUG-001: Loop infinito no CLI durante busca web (DevDocs/Playwright)
+## BUG-001: Loop infinito no CLI durante busca web e Implementação de Fluxo de Resiliência
 
 **Data:** 2025-12-20
 **Severidade:** Alta
-**Status:** ✅ Resolvido (v3.8.1)
-**Componente:** `src/research/web-crawler.ts`
+**Status:** ⚠️ Em Análise / Aguardando Refatoração Jules
+**Componente:** `src/research/web-crawler.ts` e Fluxo Principal (`src/app.ts`, `src/orchestrator/`)
 
-### Resolução
-Implementada estratégia híbrida de mitigação:
-1. **Preferência por Context7:** Se disponível, usa MCP Context7 em vez de scraping direto.
-2. **Timeout Rígido:** `Promise.race` força aborto do crawler após 45s.
-3. **Resource Cleanup:** `crawler.teardown()` garantido no bloco `finally`.
-4. **Concurrency:** Reduzido para 1 thread para estabilidade em low-resource.
+### Descrição do Problema
+O comando `fazai --cli` entra em loop/trava quando o usuário faz uma busca que aciona o `AgenticWebCrawler` com fonte "docs" (DevDocs). Além disso, o sistema atual carece de um fluxo robusto de tentativa e erro (fallback) para garantir a execução de tarefas complexas.
 
-**Fix Merge:** Commit `feature/spa-web-scraper` (v3.8.0-ecoa)
-**Build:** Validado em 2025-12-20T15:50Z
+### Reprodução
+```bash
+fazai --cli
+> pesquise sobre "qualquer termo"
+# Processo trava indefinidamente
+```
+
+### 🎯 Objetivo da Refatoração (Instruções para o Jules)
+
+Além de corrigir o loop infinito no crawler, **implementar o seguinte Fluxo de Resiliência e Fallback** no núcleo do FazAI:
+
+**1. Entrada e Decomposição:**
+   - Receber Ordem Natural + Contexto (usuário, diretório, sistema).
+   - Quebrar em pequenas subtarefas (Task Decomposition).
+   - Gerar fluxo de dependências.
+
+**2. Fluxo de Execução com Tentativas (Retry Logic):**
+   - **Nível 1 (Modelo Local/Preferencial):**
+     - Tentar executar a subtarefa até 3 vezes.
+     - Sucesso: Salvar em Cache -> Próxima subtarefa.
+     - Falha: Registrar erro, aprender com a falha -> Ir para Nível 2.
+   - **Nível 2 (Fallback Endpoint - ex: Cloud/Outro Modelo):**
+     - Tentar executar até 3 vezes.
+     - Sucesso: Salvar em Cache -> Próxima subtarefa.
+     - Falha: Registrar erro -> Ir para Nível 3.
+
+**3. Consultas de Contexto e Pesquisa (Knowledge Fallback):**
+   - **Nível 3 (Context7):** Consultar MCP Context7 para documentação técnica/libs.
+   - **Nível 4 (Perplexity/Web):** Consultar Perplexity ou Web Search para informações externas.
+
+**4. Falha Crítica:**
+   - Se todos os níveis falharem:
+     - **Salvar o estado atual da tarefa** (onde parou).
+     - **Gerar sugestão de resolução** para o usuário.
+     - Abrir prompt para intervenção manual ou nova ordem.
+
+**Referência Visual:** Ver `docs/fluxo.png` (diagrama de fluxo).
+
+### Soluções Técnicas Esperadas
+1. **Correção do Crawler:** Timeout rígido, cleanup de recursos (Playwright), preferência por Context7.
+2. **Orquestrador de Tarefas:** Implementar a lógica de retry/fallback descrita acima.
+3. **Gestão de Erros:** Logs detalhados de cada tentativa para aprendizado do sistema.
 
 ---
-
-### Descrição
-O comando `fazai --cli` entra em loop/trava quando o usuário faz uma busca que aciona o `AgenticWebCrawler` com fonte "docs" (DevDocs).
 
 ### Reprodução
 ```bash
