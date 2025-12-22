@@ -49,11 +49,11 @@ export interface VectorValidationResult {
  * ----------------------------------------------------------------------------
  * Definimos 1536 como a dimensão padrão para TODAS as collections.
  * Motivo: Compatibilidade nativa com o modelo `text-embedding-3-small` (OpenAI).
- * 
+ *
  * E se eu usar um modelo local (Ollama) com dimensões menores?
  * - mxbai-embed-large (1024 dim)
  * - nomic-embed-text (768 dim)
- * 
+ *
  * SOLUÇÃO (Zero Padding):
  * O serviço de embeddings (`src/services/embeddings.ts`) detecta automaticamente
  * se o vetor gerado é menor que 1536 e preenche o restante com ZEROS.

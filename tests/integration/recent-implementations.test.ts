@@ -79,8 +79,9 @@ describe('System Messages - Commit e645de5', () => {
 
     const content = await fs.readFile(askAIPath, 'utf-8');
 
-    // Conta ocorrências de "You are assisting Roginho"
-    const matches = content.match(/You are assisting Roginho/g);
+    // Conta ocorrências de menção a Roginho (EN ou PT)
+    // Pattern: "assisting Roginho" OR "assistindo Roginho"
+    const matches = content.match(/(assisting|assistindo) Roginho/g);
 
     // Deve aparecer apenas 2 vezes (na constante SYSTEM_MESSAGES)
     // - 1 vez em general

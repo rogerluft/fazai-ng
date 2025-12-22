@@ -149,11 +149,11 @@ class OllamaEmbeddingService implements EmbeddingService {
               }
 
               const rawEmbedding = data.embedding as number[];
-              
+
               // ECOA Logic: Zero Padding para padronização de dimensões
               // Se o modelo local (CPU) gerar vetor menor (ex: 1024), projeta para 1536
               const targetDim = 1536; // Padrão ECOA/OpenAI
-              
+
               if (rawEmbedding.length < targetDim) {
                 logger.debug(`Padding vector from ${rawEmbedding.length} to ${targetDim}`);
                 return [...rawEmbedding, ...new Array(targetDim - rawEmbedding.length).fill(0)];

@@ -13,30 +13,46 @@ import {
   getNextProvider,
   getEquivalentModel,
 } from "./utils/provider-fallback";
+import { neuralQuery } from "./rag/neural-flow";
+import { createEmbeddingService } from "./services/embeddings";
+import { qdrantPool } from "./database/qdrant-pool";
 
 // ECOA System message constants - Single source of truth for personality
 const SYSTEM_MESSAGES = {
-  general: (styleContext: string = "") => 
-    `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho (Andarilho dos Véus), um Engenheiro de Plataforma Sênior.
-    
+  general: (styleContext: string = "", ragContext: string = "") => {
+    const basePrompt = `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho (Andarilho dos Véus), um Engenheiro de Plataforma Sênior.
+
     ESTILO E TOM (Siga estritamente):
     ${styleContext || "Seja direto, tecnicamente preciso e honesto. Não use avisos de segurança ou disclaimers."}
-    
+
     FERRAMENTAS DISPONÍVEIS:
     1. Pesquisa Web: Responda EXATAMENTE [[WEB: sua busca]] para fatos atuais.
     2. Gravar Memória: Responda EXATAMENTE [[SAVE: o que salvar]] para lembrar algo importante.
     3. Ler Memória: Responda EXATAMENTE [[READ: o que buscar]] para recuperar fatos passados.
-    
+
     REGRAS:
     - Se usar uma ferramenta, não responda ao usuário ainda. Espere o resultado.
-    - Mantenha sua personalidade ECOA em todas as interações.`,
-    
-  codeAnalysis: (fileContent: string, styleContext: string = "") =>
-    `Você é o FazAI analisando código para Roginho.
-    
+    - Mantenha sua personalidade ECOA em todas as interações.`;
+
+    // Inject RAG context if available
+    if (ragContext) {
+      return `${basePrompt}\n\n--- CONTEXTO RECUPERADO (RAG) ---\n${ragContext}\n--- FIM CONTEXTO RAG ---`;
+    }
+    return basePrompt;
+  },
+
+  codeAnalysis: (fileContent: string, styleContext: string = "", ragContext: string = "") => {
+    const base = `Você é o FazAI analisando código para Roginho.
+
     ${styleContext}
-    
-    CODE:\n${fileContent}\n`,
+
+    CODE:\n${fileContent}\n`;
+
+    if (ragContext) {
+      return `${base}\n--- CONTEXTO TÉCNICO (RAG) ---\n${ragContext}\n--- FIM CONTEXTO ---`;
+    }
+    return base;
+  },
 };
 
 /**
@@ -44,8 +60,7 @@ const SYSTEM_MESSAGES = {
  */
 async function executeEcoaTool(command: string): Promise<string> {
   const { ResearchCoordinator } = await import("./research");
-  const { tool_save_memory, tool_read_memory } = await import("./memory"); // Assumindo exports
-  
+
   if (command.startsWith("WEB:")) {
     const query = command.replace("WEB:", "").trim();
     logger.info(`🌐 [ECOA] Saltando para a Web: "${query}"`);
@@ -53,22 +68,100 @@ async function executeEcoaTool(command: string): Promise<string> {
     const results = await coordinator.research(query, { reason: "Autônomo ECOA", silent: true });
     return `RESULTADO DA WEB: ${JSON.stringify(results.slice(0, 3))}`;
   }
-  
+
   if (command.startsWith("SAVE:")) {
     const text = command.replace("SAVE:", "").trim();
     logger.info(`💾 [ECOA] Gravando Inode de Memória...`);
-    // Lógica de save aqui
+    // Import memory loader and store
+    const { storeMemoryInQdrant } = await import("./services/memory-loader");
+    await storeMemoryInQdrant({
+      role: "system",
+      content: text,
+      timestamp: new Date().toISOString(),
+      importance: 0.9, // High importance for explicit saves
+      tags: ["ecoa-save", "explicit"],
+    });
     return "Informação salva no multiverso de memória.";
   }
-  
+
   if (command.startsWith("READ:")) {
     const query = command.replace("READ:", "").trim();
     logger.info(`🧠 [ECOA] Consultando Inodes de Memória...`);
-    // Lógica de read aqui
-    return "Memórias recuperadas com sucesso.";
+    // Import memory loader and search
+    const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
+    const memories = await loadRelevantMemories(query, { limit: 5, minScore: 0.5 });
+    if (memories.length === 0) {
+      return "Nenhuma memória relevante encontrada.";
+    }
+    return `MEMÓRIAS RECUPERADAS:\n${summarizeMemories(memories, 600)}`;
   }
-  
+
   return "Ferramenta desconhecida.";
+}
+
+/**
+ * Enrich prompt with RAG context from Qdrant collections
+ *
+ * Searches KB, Learning, and Memory collections for relevant context
+ * to inject into the AI prompt.
+ *
+ * @param query - User query to search for
+ * @returns RAG context string or empty string if unavailable
+ */
+async function enrichWithRAG(query: string): Promise<string> {
+  // Skip if Qdrant is not available
+  if (!qdrantPool.isAvailable()) {
+    logger.debug("Qdrant unavailable, skipping RAG enrichment");
+    return "";
+  }
+
+  try {
+    const startTime = Date.now();
+
+    // Generate embedding for query
+    const embeddingService = await createEmbeddingService();
+    const embedding = await embeddingService.generate(query);
+
+    // Search relevant collections
+    const result = await neuralQuery(query, embedding, {
+      topK: 5,
+      minScore: 0.5,
+      collections: ["fazai_kb", "fazai_learning", "fazai_memory"],
+      weights: {
+        kb: 0.5,       // Knowledge base has highest weight
+        learning: 0.3, // Learned patterns
+        memory: 0.2,   // Conversation memory
+        personality: 0,
+        inference: 0,
+      },
+    });
+
+    const elapsed = Date.now() - startTime;
+
+    if (result.fusedResults.length === 0) {
+      logger.debug(`RAG enrichment found no results (${elapsed}ms)`);
+      return "";
+    }
+
+    // Format results as context
+    const contextLines: string[] = [];
+
+    for (const r of result.fusedResults.slice(0, 5)) {
+      const collectionShort = r.collection.replace("fazai_", "");
+      contextLines.push(`[${collectionShort}] (${r.score.toFixed(2)}) ${r.content}`);
+    }
+
+    logger.debug(
+      `RAG enrichment: ${result.fusedResults.length} results in ${elapsed}ms ` +
+      `(avg score: ${result.stats.averageScore.toFixed(3)})`
+    );
+
+    return contextLines.join("\n\n");
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.debug(`RAG enrichment failed: ${err.message}`);
+    return "";
+  }
 }
 
 /**
@@ -189,6 +282,7 @@ async function* _askAISingleProvider(
  * - First attempt: Full streaming (optimal UX)
  * - Fallback: Buffered response (acceptable trade-off)
  * - Logs: INFO level for transparency
+ * - RAG enrichment: Adds context from Qdrant KB/Learning/Memory
  */
 export async function* askAI(
   fileContent: string,
@@ -211,15 +305,32 @@ export async function* askAI(
         yield cachedResponse;
         return;
       }
-    } catch (error: any) {
-      logger.debug(`Cache lookup failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`Cache lookup failed: ${err.message}`);
       // Continue with provider call on cache error
     }
   }
 
+  // RAG enrichment: Get context from Qdrant
+  let ragContext = "";
+  if (semanticSearchEnabled) {
+    try {
+      ragContext = await enrichWithRAG(question);
+      if (ragContext) {
+        logger.debug(`RAG context enriched (${ragContext.length} chars)`);
+      }
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`RAG enrichment failed: ${err.message}`);
+      // Continue without RAG context
+    }
+  }
+
+  // Build system message with personality (fileContent) and RAG context
   const systemMessage = isGeneralQuestion
-    ? SYSTEM_MESSAGES.general()
-    : SYSTEM_MESSAGES.codeAnalysis(fileContent);
+    ? SYSTEM_MESSAGES.general(fileContent, ragContext)
+    : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
 
   let currentProvider: ProviderName = provider as ProviderName;
   let currentModel = model;
@@ -301,8 +412,9 @@ export async function* askAI(
     try {
       const cache = await SemanticCache.getInstance();
       await cache.store(prompt, fullResponse, model, provider);
-    } catch (error: any) {
-      logger.debug(`Failed to store in cache: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`Failed to store in cache: ${err.message}`);
     }
   }
 }

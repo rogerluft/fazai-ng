@@ -76,6 +76,7 @@ Usage:
   fazai search "query"                               # Manual research via Context7/Web (supports SPAs)
   fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
+  fazai qdrant <command>                             # Qdrant management (status, metrics, backup, etc)
   fazai cloudflare <action>                          # Manage Cloudflare (zones, dns, workers)
   fazai cf zones                                     # Cloudflare: list zones
   fazai cf dns list <zoneId>                         # Cloudflare: manage DNS
@@ -481,6 +482,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Qdrant command
+  if (inputs[0] === "qdrant") {
+    const { handleQdrantCommand } = await import("./commands/qdrant");
+    await handleQdrantCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   // Alias command
   if (inputs[0] === "alias") {
     const { handleAliasCommand } = await import("./commands/alias");
@@ -501,6 +509,7 @@ async function main() {
       "cf",
       "cloudflare",
       "github",
+      "qdrant",
       "--debug",
       "--verbose",
       "--log-file",

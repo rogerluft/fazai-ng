@@ -58,6 +58,12 @@
      } from './copilot-client';
      export type { CopilotShellRequest, CopilotGitRequest, CopilotResponse } from './copilot-client';
 
+     // Qdrant Management
+     export * from './qdrant-backup';
+     export * from './qdrant-metrics';
+     export * from './qdrant-import-export';
+     export * from './qdrant-container';
+
      /**
       * Exemplo de uso:
       *

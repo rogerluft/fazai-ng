@@ -28,6 +28,19 @@ import { SemanticCache } from "./services/semantic-cache";
 import { exec } from "child_process";
 import { promisify } from "util";
 
+// Memory persistence imports
+import {
+  loadPersonalityFromQdrant,
+  buildPersonalitySystemPrompt,
+  PersonalityTraits,
+} from "./services/personality-loader";
+import {
+  loadRelevantMemories,
+  storeMemoryInQdrant,
+  summarizeMemories,
+  MemoryEntry,
+} from "./services/memory-loader";
+
 const execAsync = promisify(exec);
 
 type ConversationTurn = {
@@ -222,6 +235,21 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   }
   logger.info(chalk.green(`✅ API key configurada (${defaultModel.provider})`));
 
+  // Load personality from Qdrant (or fallback)
+  let personality: PersonalityTraits | null = null;
+  try {
+    logger.debug("Loading personality traits...");
+    personality = await loadPersonalityFromQdrant();
+    logger.info(chalk.cyan(`🧠 Personalidade carregada (${personality.loadedFrom}): ` +
+      `${personality.expertise.length} expertise, ${personality.behavior.length} behavior traits`));
+  } catch (error: unknown) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    logger.debug(`Personality loading failed (continuing without): ${err.message}`);
+  }
+
+  // Generate session ID for memory grouping
+  const sessionId = `cli-${Date.now()}`;
+
   const storedConversation = loadConversationHistory();
   const conversationHistory: ConversationTurn[] = storedConversation.map((entry) => ({
     role: entry.role,
@@ -259,19 +287,63 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   resetInactivityTimeout();
 
   const handleChat = async (message: string) => {
+    const timestamp = new Date().toISOString();
+
+    // 1. Add to local conversation history
     conversationHistory.push({ role: "user", content: message });
     appendConversationEntry({
       role: "user",
       content: message,
-      timestamp: new Date().toISOString(),
+      timestamp,
     });
-    const prompt = buildChatPrompt(conversationHistory);
+
+    // 2. Store user message in Qdrant memory (async, non-blocking)
+    const userMemoryEntry: MemoryEntry = {
+      role: "user",
+      content: message,
+      timestamp,
+      sessionId,
+    };
+    storeMemoryInQdrant(userMemoryEntry).catch((err) => {
+      logger.debug(`Failed to store user memory: ${err.message}`);
+    });
+
+    // 3. Load relevant memories from Qdrant (semantic search)
+    let memoryContext = "";
+    try {
+      const relevantMemories = await loadRelevantMemories(message, {
+        limit: 3,
+        minScore: 0.6,
+        maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
+      });
+
+      if (relevantMemories.length > 0) {
+        memoryContext = summarizeMemories(relevantMemories, 500);
+        logger.debug(`Loaded ${relevantMemories.length} relevant memories for context`);
+      }
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`Memory loading failed (continuing without): ${err.message}`);
+    }
+
+    // 4. Build enhanced prompt with memory context
+    let prompt = buildChatPrompt(conversationHistory);
+    if (memoryContext) {
+      prompt = `${memoryContext}\n\n${prompt}`;
+    }
+
+    // 5. Build personality context (if loaded)
+    let personalityContext = "";
+    if (personality) {
+      personalityContext = buildPersonalitySystemPrompt(personality);
+    }
+
     logger.info(chalk.blueBright("\n🤖 FazAI:"));
 
     let response = "";
     try {
       const stream = askAI(
-        "",
+        personalityContext, // Pass personality as fileContent (used in system message)
         prompt,
         defaultModel.name,
         defaultModel.provider,
@@ -287,14 +359,30 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
     } catch (error) {
       logger.error(chalk.red("\n❌ Erro ao conversar com o modelo:"), error);
     } finally {
+      const assistantTimestamp = new Date().toISOString();
+      const responseContent = response.trim() || "(sem resposta)";
+
+      // 6. Add assistant response to local history
       conversationHistory.push({
         role: "assistant",
-        content: response.trim() || "(sem resposta)",
+        content: responseContent,
       });
       appendConversationEntry({
         role: "assistant",
-        content: response.trim() || "(sem resposta)",
-        timestamp: new Date().toISOString(),
+        content: responseContent,
+        timestamp: assistantTimestamp,
+      });
+
+      // 7. Store assistant response in Qdrant memory (async, non-blocking)
+      const assistantMemoryEntry: MemoryEntry = {
+        role: "assistant",
+        content: responseContent,
+        timestamp: assistantTimestamp,
+        sessionId,
+        context: message.substring(0, 200), // Store user message as context
+      };
+      storeMemoryInQdrant(assistantMemoryEntry).catch((err) => {
+        logger.debug(`Failed to store assistant memory: ${err.message}`);
       });
     }
   };

@@ -1,0 +1,425 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Qdrant Collection Schemas for FazAI",
+  "description": "Optimized schemas for each collection with proper distance metrics and payloads",
+  "collections": {
+    "fazai_personality": {
+      "description": "AI personality traits, expertise, and communication style",
+      "vectorConfig": {
+        "size": 768,
+        "distance": "Dot",
+        "on_disk": false
+      },
+      "optimizersConfig": {
+        "default_segment_number": 2,
+        "indexing_threshold": 10000
+      },
+      "replicationFactor": 1,
+      "payloadSchema": {
+        "type": "object",
+        "required": ["trait", "example", "semantic_id"],
+        "properties": {
+          "trait": {
+            "type": "string",
+            "description": "Personality trait identifier (e.g., 'direct_technical_communication')",
+            "index": "keyword"
+          },
+          "style": {
+            "type": "string",
+            "description": "Communication style (e.g., 'roginho_style', 'sarcastic')",
+            "index": "keyword"
+          },
+          "expertise": {
+            "type": "string",
+            "description": "Domain expertise (e.g., 'linux_networking', 'kubernetes')",
+            "index": "keyword"
+          },
+          "tone": {
+            "type": "string",
+            "description": "Tone of voice (e.g., 'informal', 'empathetic', 'technical')",
+            "index": "keyword"
+          },
+          "example": {
+            "type": "string",
+            "description": "Example utterance demonstrating the trait"
+          },
+          "emotional_layer": {
+            "type": "number",
+            "description": "ECOA: Emotional intensity (0-1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "legitimate_contexts": {
+            "type": "array",
+            "description": "ECOA: Contexts where this trait is legitimate (Hop mechanism)",
+            "items": {
+              "type": "string"
+            }
+          },
+          "semantic_id": {
+            "type": "string",
+            "description": "ECOA: Inode semantic identifier"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "indexConfig": {
+        "trait": "keyword",
+        "expertise": "keyword",
+        "tone": "keyword"
+      },
+      "cleanupStrategy": "immutable_versioned"
+    },
+    "fazai_memory": {
+      "description": "Conversation history and operational memory",
+      "vectorConfig": {
+        "size": 1024,
+        "distance": "Cosine",
+        "on_disk": false
+      },
+      "optimizersConfig": {
+        "default_segment_number": 4,
+        "indexing_threshold": 20000
+      },
+      "replicationFactor": 1,
+      "payloadSchema": {
+        "type": "object",
+        "required": ["conversation_id", "turn", "timestamp", "semantic_id"],
+        "properties": {
+          "conversation_id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Unique conversation identifier",
+            "index": "keyword"
+          },
+          "turn": {
+            "type": "integer",
+            "description": "Turn number within conversation",
+            "minimum": 0
+          },
+          "user_message": {
+            "type": "string",
+            "description": "User's message in this turn"
+          },
+          "assistant_message": {
+            "type": "string",
+            "description": "Assistant's response in this turn"
+          },
+          "timestamp": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Timestamp of the turn",
+            "index": "range"
+          },
+          "context_tags": {
+            "type": "array",
+            "description": "Contextual tags (e.g., ['debugging', 'nginx'])",
+            "items": {
+              "type": "string"
+            }
+          },
+          "emotional_layer": {
+            "type": "number",
+            "description": "ECOA: Intensity of the interaction (0-1)",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "legitimate_contexts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "semantic_id": {
+            "type": "string"
+          },
+          "important": {
+            "type": "boolean",
+            "description": "Mark conversation as important (exempt from TTL)",
+            "default": false
+          }
+        }
+      },
+      "indexConfig": {
+        "conversation_id": "keyword",
+        "timestamp": "range"
+      },
+      "cleanupStrategy": "ttl_90_days_with_exceptions"
+    },
+    "fazai_learning": {
+      "description": "Auto-learning patterns, commands, and solutions",
+      "vectorConfig": {
+        "size": 1024,
+        "distance": "Dot",
+        "on_disk": false
+      },
+      "optimizersConfig": {
+        "default_segment_number": 4,
+        "indexing_threshold": 20000
+      },
+      "replicationFactor": 1,
+      "payloadSchema": {
+        "type": "object",
+        "required": ["command", "context", "confidence", "learned_at"],
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Shell command or action (e.g., 'systemctl restart nginx')"
+          },
+          "context": {
+            "type": "string",
+            "description": "When to use this command"
+          },
+          "action_taken": {
+            "type": "string",
+            "description": "Detailed action description"
+          },
+          "success_rate": {
+            "type": "number",
+            "description": "Success rate (0-1)",
+            "minimum": 0,
+            "maximum": 1,
+            "default": 1.0
+          },
+          "confidence": {
+            "type": "number",
+            "description": "Confidence score (0-1, decays over time)",
+            "minimum": 0,
+            "maximum": 1,
+            "index": "range"
+          },
+          "learned_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "last_applied": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category (e.g., 'networking', 'systemd')",
+            "index": "keyword"
+          },
+          "validated": {
+            "type": "boolean",
+            "description": "Human-validated pattern",
+            "default": false,
+            "index": "keyword"
+          },
+          "emotional_layer": {
+            "type": "number",
+            "description": "ECOA: Pain/success intensity of the learning experience",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "legitimate_contexts": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "indexConfig": {
+        "category": "keyword",
+        "validated": "keyword",
+        "confidence": "range"
+      },
+      "cleanupStrategy": "confidence_decay",
+      "cleanupRules": {
+        "decay_rate": 0.95,
+        "decay_interval_days": 30,
+        "min_confidence_threshold": 0.3,
+        "keep_if_validated": true
+      },
+      "notes": "CRITICAL: Should use Hybrid Search (BM25 + Vector) for command matching when Qdrant supports it."
+    },
+    "fazai_kb": {
+      "description": "Knowledge base - Linux/network documentation",
+      "vectorConfig": {
+        "size": 1024,
+        "distance": "Cosine",
+        "on_disk": false
+      },
+      "optimizersConfig": {
+        "default_segment_number": 8,
+        "indexing_threshold": 50000
+      },
+      "replicationFactor": 1,
+      "payloadSchema": {
+        "type": "object",
+        "required": ["title", "content", "category", "semantic_id"],
+        "properties": {
+          "title": {
+            "type": "string",
+            "description": "Document title"
+          },
+          "content": {
+            "type": "string",
+            "description": "Semantic chunk (300-600 chars)"
+          },
+          "category": {
+            "type": "string",
+            "description": "Category (e.g., 'networking', 'security')",
+            "index": "keyword"
+          },
+          "tags": {
+            "type": "array",
+            "description": "Tags (e.g., ['nginx', 'reverse-proxy', 'ssl'])",
+            "items": {
+              "type": "string"
+            }
+          },
+          "doc_type": {
+            "type": "string",
+            "description": "Document type (e.g., 'manpage', 'tutorial', 'troubleshooting')",
+            "index": "keyword"
+          },
+          "version": {
+            "type": "string",
+            "description": "Version (e.g., 'nginx-1.24')",
+            "index": "keyword"
+          },
+          "source": {
+            "type": "string",
+            "description": "URL or file path"
+          },
+          "chunk_index": {
+            "type": "integer",
+            "description": "Chunk order within document",
+            "minimum": 0
+          },
+          "total_chunks": {
+            "type": "integer",
+            "description": "Total chunks in document",
+            "minimum": 1
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "semantic_id": {
+            "type": "string",
+            "description": "ECOA: Inode ID (same for all chunks of same document)"
+          }
+        }
+      },
+      "indexConfig": {
+        "category": "keyword",
+        "tags": "keyword",
+        "version": "keyword",
+        "semantic_id": "keyword"
+      },
+      "cleanupStrategy": "versioned_keep_last_3"
+    },
+    "fazai_inference": {
+      "description": "Security policies and operational rules",
+      "vectorConfig": {
+        "size": 0,
+        "distance": "Dot",
+        "on_disk": false,
+        "note": "WARNING: This collection should NOT use embeddings. Migrate to payload-only or PostgreSQL."
+      },
+      "optimizersConfig": {
+        "default_segment_number": 1,
+        "indexing_threshold": 5000
+      },
+      "replicationFactor": 1,
+      "payloadSchema": {
+        "type": "object",
+        "required": ["rule_id", "policy", "condition", "action", "active"],
+        "properties": {
+          "rule_id": {
+            "type": "string",
+            "description": "Unique rule identifier (e.g., 'SEC-001')",
+            "index": "keyword"
+          },
+          "policy": {
+            "type": "string",
+            "description": "Policy name"
+          },
+          "condition": {
+            "type": "string",
+            "description": "Logical condition (e.g., 'user is not root AND command contains rm')"
+          },
+          "action": {
+            "type": "string",
+            "description": "Action to take (e.g., 'deny', 'warn', 'log')"
+          },
+          "priority": {
+            "type": "integer",
+            "description": "Priority (1-100, higher = more important)",
+            "minimum": 1,
+            "maximum": 100,
+            "index": "range"
+          },
+          "active": {
+            "type": "boolean",
+            "description": "Whether rule is active",
+            "default": true,
+            "index": "keyword"
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "created_by": {
+            "type": "string",
+            "description": "User who created the rule"
+          },
+          "audit_log": {
+            "type": "array",
+            "description": "Audit trail of rule activations",
+            "items": {
+              "type": "object",
+              "properties": {
+                "timestamp": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "event": {
+                  "type": "string"
+                },
+                "user": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "indexConfig": {
+        "rule_id": "keyword",
+        "active": "keyword",
+        "priority": "range"
+      },
+      "cleanupStrategy": "immutable_audit_trail",
+      "notes": "CRITICAL: Migrate to payload-only Qdrant collection or PostgreSQL. Vector search is overhead for boolean rules."
+    }
+  },
+  "migration_notes": {
+    "breaking_changes": [
+      "All collections will have different vector dimensions (768/1024 vs 1536)",
+      "Existing data must be re-embedded with new models",
+      "fazai_personality and fazai_learning will use Dot distance instead of Cosine",
+      "fazai_inference should be migrated to payload-only or relational DB"
+    ],
+    "migration_steps": [
+      "1. Backup all collections using `fazai qdrant backup`",
+      "2. Run migration script to recreate collections with new schemas",
+      "3. Re-embed all data using new embedding strategies",
+      "4. Verify data integrity with sample queries",
+      "5. Update neural-flow.ts to use collection-specific dimensions",
+      "6. Test end-to-end RAG pipeline"
+    ],
+    "rollback_plan": "Keep backup for 30 days. Can restore from backup if migration fails."
+  }
+}
