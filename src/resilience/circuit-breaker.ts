@@ -199,6 +199,13 @@ export class CircuitBreaker {
   }
 
   /**
+   * Get current circuit state
+   */
+  getState(): CircuitState {
+    return this.state;
+  }
+
+  /**
    * Get current circuit breaker metrics
    */
   getMetrics(): CircuitBreakerMetrics {

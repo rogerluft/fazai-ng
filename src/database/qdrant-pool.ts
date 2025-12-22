@@ -52,10 +52,10 @@ class QdrantConnectionPool {
   constructor() {
     // Configurar CircuitBreaker com limites seguros
     this.circuitBreaker = new CircuitBreaker({
-      failureThreshold: 3,      // Abre após 3 falhas
-      resetTimeout: 30000,      // 30s antes de tentar novamente
-      halfOpenMaxAttempts: 1,   // 1 tentativa no estado half-open
-      timeout: 10000,           // 10s timeout por operação
+      serviceName: "qdrant",
+      failureThreshold: 3,        // Abre após 3 falhas
+      resetTimeout: 30000,        // 30s antes de tentar novamente
+      operationTimeout: 10000,    // 10s timeout por operação
     });
   }
 
