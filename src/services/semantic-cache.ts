@@ -39,8 +39,9 @@
 
 import { randomUUID } from "crypto";
 import { logger } from "../logger";
-import { getQdrantClient } from "../database/qdrant-pool";
+import { getQdrantClient, qdrantPool } from "../database/qdrant-pool";
 import { createEmbeddingService } from "./embeddings";
+import { CircuitState } from "../resilience/circuit-breaker";
 
 /**
  * Cache entry stored in Qdrant
@@ -93,6 +94,7 @@ export interface CacheStats {
 
 /**
  * Semantic Cache using Qdrant for similarity search
+ * Com fallback em memória quando Qdrant está offline (BUG-002)
  *
  * Singleton pattern - use getInstance() to access.
  */
@@ -107,12 +109,18 @@ export class SemanticCache {
   private readonly MAX_CACHE_SIZE = 10000; // Maximum entries
   private readonly CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes
 
+  // Fallback: cache em memória quando Qdrant está offline
+  private memoryCache: Map<string, { response: string; timestamp: number }> = new Map();
+  private readonly MEMORY_CACHE_MAX_SIZE = 100;
+
   // Metrics
   private metrics = {
     hits: 0,
     misses: 0,
     stores: 0,
     evictions: 0,
+    memoryHits: 0,
+    memoryStores: 0,
   };
 
   private cleanupTimer: NodeJS.Timeout | null = null;
@@ -126,7 +134,15 @@ export class SemanticCache {
   private constructor() {}
 
   /**
+   * Verifica se Qdrant está disponível
+   */
+  private isQdrantAvailable(): boolean {
+    return qdrantPool.isAvailable();
+  }
+
+  /**
    * Get or create singleton instance
+   * Não falha se Qdrant estiver offline - usa fallback em memória
    */
   static async getInstance(): Promise<SemanticCache> {
     if (!SemanticCache.instance) {
@@ -138,9 +154,18 @@ export class SemanticCache {
 
   /**
    * Initialize Qdrant collection for semantic cache
+   * Graceful degradation: continua funcionando mesmo sem Qdrant
    */
   async initialize(): Promise<void> {
     if (this.initialized) {
+      return;
+    }
+
+    // Tentar inicializar Qdrant, mas não falhar se não conseguir
+    if (!this.isQdrantAvailable()) {
+      logger.warn("⚠️ Qdrant unavailable - semantic cache running in memory-only mode");
+      this.initialized = true;
+      this.startCleanupTimer();
       return;
     }
 
@@ -186,18 +211,50 @@ export class SemanticCache {
       }
 
       this.initialized = true;
-      logger.info("✓ Semantic cache initialized");
+      logger.info("✓ Semantic cache initialized (Qdrant mode)");
 
       // Start periodic cleanup
       this.startCleanupTimer();
     } catch (error: any) {
-      logger.error(`Failed to initialize semantic cache: ${error.message}`);
-      throw error;
+      // Fallback para modo memória
+      logger.warn(`Qdrant init failed, using memory fallback: ${error.message}`);
+      this.initialized = true;
+      this.startCleanupTimer();
     }
   }
 
   /**
+   * Gera chave para o cache em memória
+   */
+  private getMemoryCacheKey(query: string, model: string, provider: string): string {
+    return `${provider}:${model}:${query.toLowerCase().trim()}`;
+  }
+
+  /**
+   * Lookup no cache em memória (fallback)
+   */
+  private lookupMemory(query: string, model: string, provider: string): string | null {
+    const key = this.getMemoryCacheKey(query, model, provider);
+    const entry = this.memoryCache.get(key);
+
+    if (!entry) {
+      return null;
+    }
+
+    // Verificar TTL
+    if (Date.now() - entry.timestamp > this.DEFAULT_TTL) {
+      this.memoryCache.delete(key);
+      return null;
+    }
+
+    this.metrics.memoryHits++;
+    logger.debug(`Memory cache HIT for "${query.substring(0, 30)}..."`);
+    return entry.response;
+  }
+
+  /**
    * Lookup query in cache by semantic similarity
+   * Com fallback para cache em memória quando Qdrant offline
    *
    * @param query User query text
    * @param model Model name (e.g., "qwen2.5:7b")
@@ -213,6 +270,15 @@ export class SemanticCache {
   ): Promise<string | null> {
     if (!this.initialized) {
       await this.initialize();
+    }
+
+    // Se Qdrant não está disponível, usar cache em memória
+    if (!this.isQdrantAvailable()) {
+      const memResult = this.lookupMemory(query, model, provider);
+      if (!memResult) {
+        this.metrics.misses++;
+      }
+      return memResult;
     }
 
     try {
@@ -289,13 +355,41 @@ export class SemanticCache {
       return payload.response;
     } catch (error: any) {
       logger.warn(`Cache lookup error: ${error.message}`);
-      this.metrics.misses++;
-      return null; // Treat errors as cache miss
+      // Fallback para cache em memória
+      const memResult = this.lookupMemory(query, model, provider);
+      if (!memResult) {
+        this.metrics.misses++;
+      }
+      return memResult;
     }
   }
 
   /**
+   * Store no cache em memória (fallback)
+   */
+  private storeMemory(query: string, response: string, model: string, provider: string): void {
+    const key = this.getMemoryCacheKey(query, model, provider);
+
+    // LRU: remover entradas antigas se necessário
+    if (this.memoryCache.size >= this.MEMORY_CACHE_MAX_SIZE) {
+      const oldestKey = this.memoryCache.keys().next().value;
+      if (oldestKey) {
+        this.memoryCache.delete(oldestKey);
+      }
+    }
+
+    this.memoryCache.set(key, {
+      response,
+      timestamp: Date.now(),
+    });
+
+    this.metrics.memoryStores++;
+    logger.debug(`Memory cache STORE for "${query.substring(0, 30)}..."`);
+  }
+
+  /**
    * Store response in semantic cache
+   * Com fallback para cache em memória quando Qdrant offline
    *
    * @param query User query text
    * @param response Provider response
@@ -312,6 +406,14 @@ export class SemanticCache {
   ): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
+    }
+
+    // Sempre armazenar no cache em memória também (backup)
+    this.storeMemory(query, response, model, provider);
+
+    // Se Qdrant não está disponível, apenas o cache em memória é usado
+    if (!this.isQdrantAvailable()) {
+      return;
     }
 
     try {
@@ -355,7 +457,8 @@ export class SemanticCache {
       // Check if we need to evict old entries
       await this.evictIfNeeded();
     } catch (error: any) {
-      logger.warn(`Failed to store in cache: ${error.message}`);
+      logger.warn(`Failed to store in Qdrant cache: ${error.message}`);
+      // Já armazenado em memória, então ok
     }
   }
 
