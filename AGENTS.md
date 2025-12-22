@@ -23,11 +23,46 @@ FazAI usa orquestração multi-agente para otimizar performance e economizar tok
 **Especialista em execução autônoma**
 
 - **Tipo**: Agente de Engenharia de Software IA (Google)
-- **Acesso**: `jules` (CLI) ou via Gemini 3 (já configurado)
+- **Acesso**:
+  - **API REST** (recomendado): `src/orchestrator/jules-api-client.ts`
+  - **CLI** (legacy): `jules` via linha de comando
+- **Configuração**: `JULES_API_KEY` em `/etc/fazai/fazai.conf`
+- **API Base**: `https://jules.googleapis.com/v1alpha`
+- **Documentação**: https://jules.google/docs/api/reference/
 - **Especialidade**: Tarefas online paralelas, sessões concorrentes
 - **Princípio**: Ciclo Análise → Planejamento → Execução → Verificação
 
-#### Como Interagir com Jules
+#### Uso via API REST (Novo - Recomendado)
+
+```typescript
+import { createJulesAPIClient } from './orchestrator';
+
+const client = createJulesAPIClient();
+
+// Listar repositórios disponíveis
+const sources = await client.listSources();
+
+// Criar sessão para fix de bug
+const session = await client.createSession(
+  "Fix authentication bug in src/auth.ts",
+  {
+    source: "sources/github/owner/repo",
+    githubRepoContext: { startingBranch: "main" }
+  }
+);
+
+// Enviar mensagem adicional
+await client.sendMessage(session.name, "Also add unit tests");
+
+// Monitorar progresso
+const status = await client.getSession(session.name);
+console.log(`Estado: ${status.state}`);
+
+// Listar todas as sessões
+const sessions = await client.listSessions();
+```
+
+#### Como Interagir com Jules (CLI Legacy)
 
 **Relação**: Jules me atende como se fosse o usuário (rluft). Tratá-lo com respeito.
 

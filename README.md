@@ -1,4 +1,4 @@
-# 🖥️ FazAI v3.8.0-ecoa - Terminal Admin Linux com Metacognição
+# 🖥️ FazAI v3.8.1-beta - Terminal Admin Linux com Metacognição
 
 <div align="center">
 

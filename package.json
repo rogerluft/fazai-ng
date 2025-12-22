@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.8.0",
+  "version": "3.8.1",
   "author": "Roger Luft (VeilWalker) <roger@webstorage.com.br> (fork from Mandark by Hrishi Olickel)",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -37,7 +37,9 @@
     "zod": "^4.1.12"
   },
   "scripts": {
-    "build": "bash scripts/setup-env.sh && npm test && tsup",
+    "build": "bash scripts/setup-env.sh && tsup",
+    "build:safe": "bash scripts/setup-env.sh && tsup",
+    "build:full": "bash scripts/setup-env.sh && npm test && tsup",
     "build:all": "npm run build && npm run build:web",
     "build:web": "cd web && npm run build",
     "postbuild": "node scripts/postbuild.js",

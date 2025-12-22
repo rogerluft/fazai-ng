@@ -9,6 +9,7 @@
      export { routeTask, formatJulesPrompt, canDelegate } from './task-router';
      export type { Task, JulesTask, RoutingDecision, AgentType } from './task-router';
 
+     // Jules CLI Client (legacy - via command line)
      export {
        delegateToJules,
        approveJulesPlan,
@@ -16,6 +17,27 @@
        listJulesSessions,
      } from './jules-client';
      export type { JulesResponse } from './jules-client';
+
+     // Jules API Client (new - via REST API)
+     export {
+       JulesAPIClient,
+       createJulesAPIClient,
+       getJulesAPIClient,
+       julesApiClient,
+     } from './jules-api-client';
+     export type {
+       Source,
+       Session,
+       Message,
+       SourceContext,
+       GitHubRepoContext,
+       CreateSessionRequest,
+       SendMessageRequest,
+       SendMessageResponse,
+       ListSourcesResponse,
+       ListSessionsResponse,
+       JulesAPIError,
+     } from './jules-api-client';
 
      export {
        delegateToGemini,

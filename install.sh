@@ -586,6 +586,14 @@ VECTOR_DIMENSION=1536
 VECTOR_DISTANCE=Cosine
 
 # ============================================
+# Jules API (Google AI Coding Agent)
+# ============================================
+# Jules é o agente de IA do Google para mudanças de código autônomas
+# Obter em: https://jules.google/settings (seção API Keys)
+# Documentação: https://jules.google/docs/api/reference/
+JULES_API_KEY=
+
+# ============================================
 # MCP Context7 Research (Opcional)
 # ============================================
 # URL do serviço Context7 (se disponível)

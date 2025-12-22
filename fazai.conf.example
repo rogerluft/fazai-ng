@@ -159,6 +159,22 @@ MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
 # OPENAI_API_KEY=your_optional_api_key
 
 # =============================================================================
+# JULES API (Google AI Coding Agent)
+# =============================================================================
+#
+# Jules is Google's AI coding agent for autonomous code changes.
+# The API allows programmatic access to create sessions, send tasks, and monitor progress.
+#
+# Get your API key at: https://jules.google/settings (API Keys section)
+# Documentation: https://jules.google/docs/api/reference/
+#
+# Requirements:
+# - Jules GitHub App must be installed on your repositories
+# - Maximum 3 API keys per account
+#
+# JULES_API_KEY=AQ.xxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+
+# =============================================================================
 # GITHUB INTEGRATION
 # =============================================================================
 #

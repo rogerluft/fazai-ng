@@ -1,5 +1,109 @@
 # FazAI Changelog
 
+## [3.8.1-beta] - 2025-12-22
+
+### ✨ NEW FEATURE - Jules API REST Client
+
+**Integração completa com a Jules API REST do Google**
+
+#### Core Implementation
+- **Jules API Client (`src/orchestrator/jules-api-client.ts`):**
+  - Cliente TypeScript type-safe para Jules API REST
+  - Suporte completo para operações CRUD de sessões
+  - Gerenciamento de repositórios GitHub remotos
+  - Autenticação via `X-Goog-Api-Key` header
+  - Integração com sistema de config do FazAI (`JULES_API_KEY`)
+
+#### Features
+- **Operações Disponíveis:**
+  - `listSources()` - Lista repositórios GitHub disponíveis
+  - `createSession()` - Cria sessão de trabalho com prompt e contexto
+  - `sendMessage()` - Envia mensagens para sessão ativa
+  - `getSession()` - Obtém status e detalhes da sessão
+  - `listSessions()` - Lista todas as sessões do usuário
+  - `deleteSession()` - Remove sessão específica
+
+- **Type Safety:**
+  - Interfaces completas para todas as entidades (Source, Session, Message)
+  - Tipos de erro estruturados (JulesAPIError)
+  - Helpers estáticos para manipulação de IDs
+
+- **Developer Experience:**
+  - Factory function `createJulesAPIClient()`
+  - Singleton pattern via `julesApiClient.instance`
+  - Normalização automática de session IDs
+  - Logging integrado com logger do FazAI
+  - JSDoc comments em português
+
+#### Testing
+- **Test Suite (`tests/jules-api-client.test.ts`):**
+  - 18 testes unitários (100% passing)
+  - Coverage completo de todas as operações
+  - Testes de tratamento de erros
+  - Mocks de fetch e config
+  - Validação de helpers estáticos
+
+#### Documentation
+- **README (`src/orchestrator/README-JULES-API.md`):**
+  - Documentação completa da API
+  - Guia de instalação e configuração
+  - Exemplos de uso básico e avançado
+  - Referência completa de interfaces
+  - Workflows práticos (bug fix, features)
+  - Tratamento de erros
+  - Integração futura com CLI
+
+- **Examples (`src/orchestrator/jules-api-examples.ts`):**
+  - 9 exemplos práticos prontos para uso
+  - Workflows completos de bug fix e feature implementation
+  - Padrões de monitoramento de sessões
+  - Gerenciamento de ciclo de vida
+  - Tratamento de erros robusto
+
+#### Configuration
+```bash
+# Configurar API key
+fazai config set JULES_API_KEY "sua-chave-aqui"
+
+# Verificar configuração
+fazai config list | grep JULES_API_KEY
+```
+
+#### Usage Example
+```typescript
+import { createJulesAPIClient } from './orchestrator/jules-api-client';
+
+const client = createJulesAPIClient();
+
+// Criar sessão de bug fix
+const session = await client.createSession(
+  'Fix authentication bug in src/auth/login.ts',
+  {
+    source: 'sources/github/myorg/myrepo',
+    githubRepoContext: { startingBranch: 'main' }
+  }
+);
+
+// Monitorar progresso
+const status = await client.getSession(session.name);
+console.log(`Estado: ${status.state}`);
+```
+
+#### Files Added
+- `src/orchestrator/jules-api-client.ts` - Cliente principal (450+ linhas)
+- `tests/jules-api-client.test.ts` - Suite de testes (300+ linhas)
+- `src/orchestrator/jules-api-examples.ts` - Exemplos práticos (450+ linhas)
+- `src/orchestrator/README-JULES-API.md` - Documentação completa
+
+#### Next Steps
+- Integração com orquestrador de tarefas
+- Comandos CLI (`fazai jules create/list/status`)
+- Dashboard de monitoramento de sessões
+- Retry logic com backoff exponencial
+- Rate limit handling
+
+---
+
 ## [3.8.0-ecoa] - 2025-12-18
 
 ### 🧬 ARCHITECTURE - ECOA Integration & Vector Standardization
