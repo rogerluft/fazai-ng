@@ -218,7 +218,7 @@ export async function* askAI(
   }
 
   const systemMessage = isGeneralQuestion
-    ? SYSTEM_MESSAGES.general
+    ? SYSTEM_MESSAGES.general()
     : SYSTEM_MESSAGES.codeAnalysis(fileContent);
 
   let currentProvider: ProviderName = provider as ProviderName;
