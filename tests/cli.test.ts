@@ -193,8 +193,7 @@ describe('FazAI CLI Tests', () => {
             expect.any(Object), // systemInfo
             task,
             expect.any(String), // model name
-            expect.any(String), // model provider
-            expect.any(Boolean) // semanticSearchEnabled
+            expect.any(String)  // model provider
         );
         expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Gerando comandos para:'), expect.stringContaining(task));
         expect(executeCommandSpy).toHaveBeenCalledWith({ command: 'ls -la', explanation: 'list files', risk: 'LOW' });
@@ -229,8 +228,7 @@ describe('FazAI CLI Tests', () => {
             expect.any(Object),
             task,
             expect.any(String),
-            expect.any(String),
-            expect.any(Boolean)
+            expect.any(String)
         );
     });
 });
@@ -390,33 +388,6 @@ describe('FazAI CLI Tests', () => {
             expect(mockRl.prompt).toHaveBeenCalledTimes(1);
         });
     });
-    describe('Resilience and Error Handling', () => {
-        it('should continue gracefully when embedding service fails with context length error', async () => {
-            // Arrange
-            const task = 'list files';
-            const mockCommandStream = Readable.from([
-                { type: 'command', command: { command: 'ls', explanation: 'list', risk: 'LOW' } },
-                { type: 'allcommands' }
-            ]);
-            
-            // Mock getLinuxCommandsFromAI to simulate the behavior where RAG fails but command gen succeeds
-            // In a real integration test we'd mock the network, but here we trust linux-admin.ts handles the empty RAG context
-            // So we just ensure the CLI flow completes
-            getLinuxCommandsFromAISpy.mockReturnValue(mockCommandStream);
-
-            // Act
-            mockRl.emit('line', `/exec ${task}`);
-            await new Promise(resolve => setTimeout(resolve, 50));
-
-            // Assert
-            expect(getLinuxCommandsFromAISpy).toHaveBeenCalled();
-            expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Gerando comandos para:'), expect.stringContaining(task));
-            // Should still execute
-            expect(LinuxCommandExecutor.prototype.executeCommand).toHaveBeenCalled();
-            expect(mockRl.prompt).toHaveBeenCalled();
-        });
-    });
-
     describe('Full Session Integration and Timeout', () => {
         beforeEach(() => {
             // Use fake timers to control timeouts in tests
@@ -460,7 +431,7 @@ describe('FazAI CLI Tests', () => {
             await vi.advanceTimersByTimeAsync(50);
 
             // Assert 2: Check command execution
-            expect(getLinuxCommandsFromAISpy).toHaveBeenCalledWith(expect.any(Object), 'test command', expect.any(String), expect.any(String), expect.any(Boolean));
+            expect(getLinuxCommandsFromAISpy).toHaveBeenCalledWith(expect.any(Object), 'test command', expect.any(String), expect.any(String));
             expect(executeCommandSpy).toHaveBeenCalled();
 
             // Act 3: Simulate user inactivity and trigger timeout
