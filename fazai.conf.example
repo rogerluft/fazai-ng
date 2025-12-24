@@ -135,6 +135,11 @@ MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
 # MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
 # ANTHROPIC_API_KEY=sk-ant-xxxxx
 
+# Perplexity AI models (cloud, max 3, requires API key)
+# Get API key: https://docs.perplexity.ai/docs/getting-started
+# MODELS_PERPLEXITY=llama-3-sonar-large-32k-online,llama-3-sonar-small-32k-online
+# PERPLEXITY_API_KEY=your_perplexity_api_key
+
 # =============================================================================
 # CLOUDFLARE GEMINI INTEGRATION
 # =============================================================================
@@ -208,17 +213,12 @@ OLLAMA_BASE_URL=http://192.168.0.101:11434
 # Web search fallback provider (currently DuckDuckGo)
 # WEB_SEARCH_PROVIDER=duckduckgo
 
-# Vector store integration (Qdrant or Milvus/Zilliz)
+# Vector store integration (Qdrant)
 # VECTOR_PROVIDER=qdrant
 # VECTOR_DIMENSION=1536
 # VECTOR_DISTANCE=cosine
 # QDRANT_URL=http://localhost:6333
 # QDRANT_API_KEY=coloque_seu_token
-# MILVUS_ADDRESS=localhost:19530
-# MILVUS_USERNAME=root
-# MILVUS_PASSWORD=Milvus
-# MILVUS_SSL=false
-# MILVUS_TOKEN=token_opcional_para_zilliz
 
 # Disable research if running offline (set to true/1)
 # FAZAI_DISABLE_RESEARCH=true

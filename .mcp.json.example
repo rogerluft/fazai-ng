@@ -14,7 +14,7 @@
         "@modelcontextprotocol/server-github"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "YOUR_GITHUB_PERSONAL_ACCESS_TOKEN"
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
       }
     },
     "filesystem": {
@@ -22,7 +22,7 @@
       "args": [
         "-y",
         "@modelcontextprotocol/server-filesystem",
-        "/path/to/project"
+        "/home/rluft/fazai-ng"
       ]
     },
     "memory-bank": {
