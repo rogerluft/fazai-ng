@@ -26,6 +26,7 @@
 
 import { exec } from "child_process";
 import { promisify } from "util";
+import { existsSync, mkdirSync } from "fs";
 import { logger } from "../logger";
 import { getConfigValue } from "../config";
 
@@ -50,37 +51,99 @@ const CONTAINER_NAME = "qdrant";
 const CONTAINER_IMAGE = "docker.io/qdrant/qdrant:latest";
 const QDRANT_HTTP_PORT = 6333;
 const QDRANT_GRPC_PORT = 6334;
-const QDRANT_DATA_DIR = "/var/lib/qdrant";
+// Use user home directory for data (no root needed)
+const QDRANT_DATA_DIR = process.env.HOME
+  ? `${process.env.HOME}/.local/share/qdrant/storage`
+  : "/var/lib/qdrant";
 
 /**
- * Execute podman command
+ * Execute container runtime command (podman or docker)
  */
-async function runPodmanCommand(command: string): Promise<string> {
+async function runContainerCommand(command: string): Promise<string> {
+  const runtime = await detectContainerRuntime();
+
+  if (!runtime) {
+    throw new Error("No container runtime found. Install podman or docker.");
+  }
+
   try {
-    logger.debug(`[Podman] Executing: podman ${command}`);
-    const { stdout, stderr } = await execAsync(`podman ${command}`);
+    logger.debug(`[${runtime}] Executing: ${runtime} ${command}`);
+    const { stdout, stderr } = await execAsync(`${runtime} ${command}`);
 
     if (stderr && !stderr.includes("Warning")) {
-      logger.debug(`[Podman] stderr: ${stderr}`);
+      logger.debug(`[${runtime}] stderr: ${stderr}`);
     }
 
     return stdout.trim();
   } catch (error: any) {
-    logger.error(`[Podman] Command failed: ${error.message}`);
-    throw new Error(`Podman command failed: ${error.message}`);
+    logger.error(`[${runtime}] Command failed: ${error.message}`);
+    throw new Error(`${runtime} command failed: ${error.message}`);
   }
 }
 
 /**
- * Check if Podman is installed
+ * Execute podman command (legacy alias)
  */
-async function isPodmanInstalled(): Promise<boolean> {
+async function runPodmanCommand(command: string): Promise<string> {
+  return runContainerCommand(command);
+}
+
+/**
+ * Container runtime type
+ */
+type ContainerRuntime = "podman" | "docker" | null;
+
+/**
+ * Cached container runtime
+ */
+let detectedRuntime: ContainerRuntime | undefined;
+
+/**
+ * Detect available container runtime (Podman preferred)
+ */
+async function detectContainerRuntime(): Promise<ContainerRuntime> {
+  if (detectedRuntime !== undefined) {
+    return detectedRuntime;
+  }
+
+  // Prefer Podman (rootless)
   try {
     await execAsync("which podman");
-    return true;
+    detectedRuntime = "podman";
+    logger.debug("[Container] Using Podman runtime");
+    return "podman";
   } catch {
-    return false;
+    // Podman not found
   }
+
+  // Fallback to Docker
+  try {
+    await execAsync("which docker");
+    detectedRuntime = "docker";
+    logger.debug("[Container] Using Docker runtime");
+    return "docker";
+  } catch {
+    // Docker not found
+  }
+
+  detectedRuntime = null;
+  return null;
+}
+
+/**
+ * Check if container runtime is available
+ */
+async function isContainerRuntimeAvailable(): Promise<boolean> {
+  const runtime = await detectContainerRuntime();
+  return runtime !== null;
+}
+
+/**
+ * Get container runtime name for messages
+ */
+async function getRuntimeName(): Promise<string> {
+  const runtime = await detectContainerRuntime();
+  return runtime || "container runtime";
 }
 
 /**
@@ -96,13 +159,38 @@ async function containerExists(): Promise<boolean> {
 }
 
 /**
+ * Check if a port is in use
+ */
+async function isPortInUse(port: number): Promise<boolean> {
+  try {
+    const { stdout } = await execAsync(`ss -tlnH sport = :${port} 2>/dev/null`);
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detect if there's a root Qdrant container running
+ */
+async function detectRootQdrantContainer(): Promise<boolean> {
+  try {
+    // Check for qdrant process owned by root
+    const { stdout } = await execAsync(`ps aux | grep -E "qdrant" | grep "^root" | grep -v grep`);
+    return stdout.trim().length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Get container status
  *
  * @returns Container status information
  */
 export async function getQdrantContainerStatus(): Promise<ContainerStatus> {
-  if (!(await isPodmanInstalled())) {
-    throw new Error("Podman is not installed. Install with: sudo dnf install podman");
+  if (!(await isContainerRuntimeAvailable())) {
+    throw new Error("No container runtime found. Install podman or docker.");
   }
 
   if (!(await containerExists())) {
@@ -139,8 +227,8 @@ export async function getQdrantContainerStatus(): Promise<ContainerStatus> {
  * @returns Container ID
  */
 export async function startQdrantContainer(): Promise<string> {
-  if (!(await isPodmanInstalled())) {
-    throw new Error("Podman is not installed. Install with: sudo dnf install podman");
+  if (!(await isContainerRuntimeAvailable())) {
+    throw new Error("No container runtime found. Install podman or docker.");
   }
 
   const exists = await containerExists();
@@ -163,6 +251,38 @@ export async function startQdrantContainer(): Promise<string> {
   // Create new container
   logger.info(`[Qdrant Container] Creating new container`);
 
+  // Ensure data directory exists
+  if (!existsSync(QDRANT_DATA_DIR)) {
+    logger.info(`[Qdrant Container] Creating data directory: ${QDRANT_DATA_DIR}`);
+    try {
+      mkdirSync(QDRANT_DATA_DIR, { recursive: true });
+    } catch (mkdirError: any) {
+      throw new Error(
+        `Cannot create ${QDRANT_DATA_DIR}. Run: sudo mkdir -p ${QDRANT_DATA_DIR} && sudo chown $USER:$USER ${QDRANT_DATA_DIR}`
+      );
+    }
+  }
+
+  // Check if port is in use by another process
+  const portInUse = await isPortInUse(QDRANT_HTTP_PORT);
+  if (portInUse) {
+    // Check if it's a root container
+    const rootContainer = await detectRootQdrantContainer();
+    if (rootContainer) {
+      throw new Error(
+        `Port ${QDRANT_HTTP_PORT} is in use by a ROOT Qdrant container.\n` +
+        `To use your userspace container, stop the root one first:\n` +
+        `  sudo podman stop qdrant && sudo podman rm qdrant\n` +
+        `Or if using systemd:\n` +
+        `  sudo systemctl stop qdrant`
+      );
+    }
+    throw new Error(
+      `Port ${QDRANT_HTTP_PORT} is already in use by another process.\n` +
+      `Check with: ss -tlnp | grep ${QDRANT_HTTP_PORT}`
+    );
+  }
+
   const runCommand = [
     `run -d`,
     `--name ${CONTAINER_NAME}`,
@@ -184,6 +304,13 @@ export async function startQdrantContainer(): Promise<string> {
         `Permission denied accessing ${QDRANT_DATA_DIR}. Run: sudo mkdir -p ${QDRANT_DATA_DIR} && sudo chown $USER:$USER ${QDRANT_DATA_DIR}`
       );
     }
+    // If port in use (pasta error)
+    if (error.message.includes("Address already in use")) {
+      throw new Error(
+        `Port ${QDRANT_HTTP_PORT} is already in use by another process. ` +
+        `Check with: ss -tlnp | grep ${QDRANT_HTTP_PORT}`
+      );
+    }
     throw error;
   }
 }
@@ -192,8 +319,8 @@ export async function startQdrantContainer(): Promise<string> {
  * Stop Qdrant container
  */
 export async function stopQdrantContainer(): Promise<void> {
-  if (!(await isPodmanInstalled())) {
-    throw new Error("Podman is not installed");
+  if (!(await isContainerRuntimeAvailable())) {
+    throw new Error("No container runtime found. Install podman or docker.");
   }
 
   if (!(await containerExists())) {
@@ -217,8 +344,8 @@ export async function stopQdrantContainer(): Promise<void> {
  * Restart Qdrant container
  */
 export async function restartQdrantContainer(): Promise<void> {
-  if (!(await isPodmanInstalled())) {
-    throw new Error("Podman is not installed");
+  if (!(await isContainerRuntimeAvailable())) {
+    throw new Error("No container runtime found. Install podman or docker.");
   }
 
   if (!(await containerExists())) {
@@ -238,8 +365,8 @@ export async function restartQdrantContainer(): Promise<void> {
  * @param force - Force remove even if running
  */
 export async function removeQdrantContainer(force: boolean = false): Promise<void> {
-  if (!(await isPodmanInstalled())) {
-    throw new Error("Podman is not installed");
+  if (!(await isContainerRuntimeAvailable())) {
+    throw new Error("No container runtime found. Install podman or docker.");
   }
 
   if (!(await containerExists())) {
@@ -260,8 +387,8 @@ export async function removeQdrantContainer(force: boolean = false): Promise<voi
  * @returns Log output
  */
 export async function getQdrantContainerLogs(lines: number = 50): Promise<string> {
-  if (!(await isPodmanInstalled())) {
-    throw new Error("Podman is not installed");
+  if (!(await isContainerRuntimeAvailable())) {
+    throw new Error("No container runtime found. Install podman or docker.");
   }
 
   if (!(await containerExists())) {

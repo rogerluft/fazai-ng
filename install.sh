@@ -745,8 +745,10 @@ install_qdrant_docker() {
   if [ -f "$INSTALL_DIR/etc/fazai/qdrant.service" ]; then
     info "Instalando serviço systemd para Qdrant..."
 
-    # Substituir podman por docker no service file
+    # Substituir podman por docker e configurar User/Group dinamicamente
     sudo sed 's/podman/docker/g' "$INSTALL_DIR/etc/fazai/qdrant.service" > /tmp/qdrant.service
+    sudo sed -i "s/# User=fazai_user/User=$(whoami)/" /tmp/qdrant.service
+    sudo sed -i "s/# Group=fazai_group/Group=$(id -gn)/" /tmp/qdrant.service
     sudo mv /tmp/qdrant.service /etc/systemd/system/qdrant.service
     sudo systemctl daemon-reload
     sudo systemctl enable qdrant
@@ -832,7 +834,10 @@ install_qdrant_podman() {
   if [ -f "$INSTALL_DIR/etc/fazai/qdrant.service" ]; then
     info "Instalando serviço systemd para Qdrant..."
 
+    # Copiar e configurar User/Group dinamicamente
     sudo cp "$INSTALL_DIR/etc/fazai/qdrant.service" /etc/systemd/system/qdrant.service
+    sudo sed -i "s/# User=fazai_user/User=$(whoami)/" /etc/systemd/system/qdrant.service
+    sudo sed -i "s/# Group=fazai_group/Group=$(id -gn)/" /etc/systemd/system/qdrant.service
     sudo systemctl daemon-reload
     sudo systemctl enable qdrant
     sudo systemctl start qdrant

@@ -6,8 +6,9 @@ Wants=network-online.target
 
 [Service]
 Type=forking
-User=rluft
-Group=rluft
+# User/Group set by install.sh dynamically
+# User=fazai_user
+# Group=fazai_group
 
 # Environment
 Environment=PODMAN_SYSTEMD_UNIT=%n
