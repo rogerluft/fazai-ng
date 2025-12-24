@@ -10,6 +10,7 @@
  * Features:
  * - In-memory LRU cache with configurable size
  * - Optional persistence to JSON file
+ * - Configurable TTL (Time To Live) for entries
  * - Cache key = hash(text + model)
  * - Automatic eviction of least recently used
  * - Thread-safe operations
@@ -77,6 +78,7 @@ export class EmbeddingCache {
   private cache: Map<string, CacheEntry> = new Map();
   private readonly maxSize: number;
   private readonly persistPath?: string;
+  private readonly ttl: number; // Time To Live in milliseconds
 
   // Statistics
   private stats = {
@@ -91,13 +93,16 @@ export class EmbeddingCache {
    * @param maxSize Maximum number of embeddings to cache (default: 10000)
    * @param persistPath Optional file path to persist cache (default: /opt/fazai/data/embedding-cache.json)
    * @param autoLoad Automatically load persisted cache on creation (default: true)
+   * @param ttl Cache entry Time To Live in milliseconds (default: 7 days)
    */
   constructor(
     maxSize: number = 10000,
     persistPath?: string,
-    autoLoad: boolean = true
+    autoLoad: boolean = true,
+    ttl: number = 7 * 24 * 60 * 60 * 1000 // 7 days
   ) {
     this.maxSize = maxSize;
+    this.ttl = ttl;
 
     // Default persist path: /opt/fazai/data/embedding-cache.json
     if (persistPath === undefined) {
@@ -130,7 +135,7 @@ export class EmbeddingCache {
    *
    * @param text Text to lookup
    * @param model Model name
-   * @returns Cached embedding vector or null if not found
+   * @returns Cached embedding vector or null if not found or expired
    */
   get(text: string, model: string): number[] | null {
     const key = this.generateKey(text, model);
@@ -138,6 +143,16 @@ export class EmbeddingCache {
 
     if (!entry) {
       this.stats.misses++;
+      return null;
+    }
+
+    // Check for TTL expiration
+    const isExpired = this.ttl > 0 && Date.now() - entry.timestamp > this.ttl;
+
+    if (isExpired) {
+      this.cache.delete(key);
+      logger.debug(`Removed expired cache entry for ${text.substring(0, 50)}...`);
+      this.stats.misses++; // Count as a miss
       return null;
     }
 
@@ -312,7 +327,15 @@ export class EmbeddingCache {
 
       // Load entries into cache
       let loaded = 0;
+      let expired = 0;
       for (const entry of data.entries) {
+        // Check for expiration while loading
+        const isExpired = this.ttl > 0 && Date.now() - entry.timestamp > this.ttl;
+        if (isExpired) {
+          expired++;
+          continue;
+        }
+
         if (entry.key && entry.vector && Array.isArray(entry.vector)) {
           this.cache.set(entry.key, {
             vector: entry.vector,
@@ -329,7 +352,7 @@ export class EmbeddingCache {
       }
 
       logger.info(
-        `Loaded ${loaded} cached embeddings from ${this.persistPath}`
+        `Loaded ${loaded} cached embeddings from ${this.persistPath} (${expired} expired entries ignored)`
       );
 
       // Restore stats if available
