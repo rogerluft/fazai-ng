@@ -179,7 +179,7 @@ describe('JulesAPIClient', () => {
         'https://jules.googleapis.com/v1alpha/sessions/abc123:sendMessage',
         expect.objectContaining({
           method: 'POST',
-          body: JSON.stringify({ message: 'Add tests' }),
+          body: JSON.stringify({ content: 'Add tests' }),
         })
       );
 
@@ -293,7 +293,7 @@ describe('JulesAPIClient', () => {
     it('deve tratar erro de rede', async () => {
       (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
 
-      await expect(client.listSources()).rejects.toThrow('Erro de rede ao acessar Jules API');
+      await expect(client.listSources()).rejects.toThrow('Erro de rede ao acessar Jules API: Network error');
     });
 
     it('deve tratar resposta não-JSON', async () => {

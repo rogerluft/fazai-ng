@@ -107,10 +107,10 @@ export interface Message {
 /**
  * @interface SendMessageRequest
  * @description Payload para enviar mensagem em uma sessão
- * @property {string} message - Conteúdo da mensagem
+ * @property {string} content - Conteúdo da mensagem
  */
 export interface SendMessageRequest {
-  message: string;
+  content: string;
 }
 
 /**
@@ -220,21 +220,25 @@ export class JulesAPIClient {
           status: data.error?.status || data.status,
           details: data.error?.details || data.details,
         };
-
-        logger.error(`Jules API error [${error.code}]: ${error.message}`, error.details);
-        throw new Error(`Jules API error [${error.code}]: ${error.message}`);
+        // Lança um erro para ser tratado e logado de forma centralizada no bloco catch.
+        const apiError = new Error(`Jules API error [${error.code}]: ${error.message}`);
+        (apiError as any).julesErrorDetails = error;
+        throw apiError;
       }
 
       logger.debug(`Jules API response: ${response.status}`, data);
       return data as T;
     } catch (error: any) {
-      if (error.message?.includes('Jules API error')) {
-        throw error;
+      if ((error as any).julesErrorDetails) {
+        // Erro da API, log formatado. O erro já tem uma mensagem descritiva.
+        logger.error(error.message, (error as any).julesErrorDetails);
+        throw error; // Propaga o erro original da API.
+      } else {
+        // Erro de rede ou outro erro inesperado.
+        const networkError = new Error(`Erro de rede ao acessar Jules API: ${error.message}`);
+        logger.error(networkError.message, { endpoint, originalError: error });
+        throw networkError; // Lança um novo erro mais descritivo.
       }
-
-      const networkError = `Erro de rede ao acessar Jules API: ${error.message}`;
-      logger.error(networkError, { endpoint, error });
-      throw new Error(networkError);
     }
   }
 
@@ -304,14 +308,14 @@ export class JulesAPIClient {
    *   "Please also add unit tests for the fix"
    * );
    */
-  async sendMessage(sessionId: string, message: string): Promise<SendMessageResponse> {
+  async sendMessage(sessionId: string, content: string): Promise<SendMessageResponse> {
     // Normaliza sessionId (aceita "123" ou "sessions/123")
     const normalizedId = sessionId.startsWith('sessions/') ? sessionId : `sessions/${sessionId}`;
 
-    logger.info(`Enviando mensagem para ${normalizedId}: "${message}"`);
+    logger.info(`Enviando mensagem para ${normalizedId}: "${content}"`);
 
     const payload: SendMessageRequest = {
-      message,
+      content,
     };
 
     const response = await this.request<SendMessageResponse>(`/${normalizedId}:sendMessage`, {
