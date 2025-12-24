@@ -27,7 +27,7 @@ Terminal FazAI é uma ferramenta de administração Linux alimentada por IA que 
 ### Características Principais
 
 - ✅ **5 Collections Qdrant** para RAG e memória operacional
-- ✅ **Multi-modelo IA** (Claude, GPT, Ollama)
+- ✅ **Multi-modelo IA** (Claude, GPT, Perplexity, Ollama)
 - ✅ **Sistema de segurança com 5 camadas**
 - ✅ **Importação de conversas** (Claude/ChatGPT Desktop)
 - ✅ **Pesquisa MCP Context7** com fallback web
@@ -173,6 +173,9 @@ ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
 # OpenAI GPT
 OPENAI_API_KEY=sk-xxxxx
 
+# Perplexity AI
+PERPLEXITY_API_KEY=pplx-xxxxx
+
 # Ollama (local/gratuito)
 OLLAMA_BASE_URL=http://localhost:11434
 
@@ -215,6 +218,12 @@ LOG_FILE_PATH=/var/log/fazai/fazai.log
 2. Faça login
 3. Crie uma nova key
 4. Copie para `OPENAI_API_KEY`
+
+**Perplexity AI:**
+1. Acesse https://docs.perplexity.ai/docs/getting-started
+2. Crie uma conta e vá para "API Keys"
+3. Gere uma nova API key
+4. Copie para `PERPLEXITY_API_KEY`
 
 **Ollama (Local):**
 ```bash
@@ -1339,6 +1348,8 @@ Este projeto é um fork do [Mandark](https://github.com/original/mandark) sob Ap
 | OpenAI | `gpt4turbo` | gpt-4-turbo | $$ | Alta performance |
 | Anthropic | `sonnet35` | claude-3-5-sonnet | $$$ | Mais inteligente |
 | Anthropic | `haiku` | claude-3-haiku | $ | Rápido, barato |
+| Perplexity | `sonar-large` | llama-3-sonar-large-32k-online | $$ | Pesquisa em tempo real |
+| Perplexity | `sonar-small` | llama-3-sonar-small-32k-online | $ | Pesquisa em tempo real |
 | Ollama | `llama32` | llama3.2 | GRÁTIS | Local, privado |
 | Ollama | `qwen` | qwen2.5:7b | GRÁTIS | Local, Qwen |
 | Ollama | `mistral` | mistral | GRÁTIS | Local, Mistral |
@@ -1394,6 +1405,7 @@ FAZAI_RESEARCH_ON_FAILURE=true
 # API Keys
 ANTHROPIC_API_KEY=sk-ant-...
 OPENAI_API_KEY=sk-...
+PERPLEXITY_API_KEY=pplx-...
 OLLAMA_BASE_URL=http://localhost:11434
 
 # Qdrant

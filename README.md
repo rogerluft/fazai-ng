@@ -24,6 +24,7 @@
 ### 🤖 IA Multi-Modelo
 - **Claude** (Anthropic): Sonnet 3.5, Haiku - Tarefas complexas e rápidas
 - **GPT** (OpenAI): GPT-4o, GPT-4 Turbo, GPT-4 Mini
+- **Perplexity** (Perplexity AI): Sonar (small/large) - Pesquisa e resposta em tempo real
 - **Ollama** (Local): Llama 3.2, Qwen 2.5, Mistral - 100% privado e gratuito
 
 ### 🛡️ Segurança em 5 Camadas
@@ -600,6 +601,18 @@ OPENROUTER_API_KEY=sk-or-v1-xxxxx
 # GEMINI_API_KEY=xxxxx (opcional, use OpenRouter para free tier)
 ```
 
+### Perplexity AI (Cloud)
+```bash
+# MODELS_PERPLEXITY=llama-3-sonar-large-32k-online,llama-3-sonar-small-32k-online
+# PERPLEXITY_API_KEY=pplx-xxxxx
+```
+| Nickname | Modelo | Velocidade | Custo | Quando Usar |
+|----------|--------|-----------|-------|-------------|
+| `sonar-large` | llama-3-sonar-large-32k-online | Rápido | Médio | Pesquisa e resposta em tempo real |
+| `sonar-small` | llama-3-sonar-small-32k-online | Muito Rápido | Baixo | Pesquisa e resposta em tempo real |
+
+**API Key**: https://docs.perplexity.ai/docs/getting-started
+
 ### Como Configurar Modelos
 
 Edite `/etc/fazai/fazai.conf`:
@@ -610,6 +623,7 @@ MODELS_OLLAMA=gptoss-20b,llama3.2,llama3.1
 MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b,google/gemini-2.0-flash-exp:free
 MODELS_OPENAI=gpt-4o,gpt-4o-mini
 MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+MODELS_PERPLEXITY=llama-3-sonar-large-32k-online,llama-3-sonar-small-32k-online
 ```
 
 ### Usar Modelos
@@ -652,6 +666,7 @@ nano /etc/fazai/fazai.conf
 # --- APIs de IA ---
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
 OPENAI_API_KEY=sk-xxxxx
+PERPLEXITY_API_KEY=pplx-xxxxx
 OLLAMA_BASE_URL=http://localhost:11434
 
 # --- Vector Store (Qdrant) ---
@@ -701,6 +716,14 @@ fazai
 3. Cole no `fazai.conf`: `OPENAI_API_KEY=sk-xxxxx`
 
 **Modelos:** GPT-4o, GPT-4 Turbo, GPT-4 Mini
+
+#### Perplexity AI
+1. Acesse [docs.perplexity.ai](https://docs.perplexity.ai/docs/getting-started)
+2. Crie uma conta e vá para "API Keys"
+3. Gere uma nova API key
+4. Cole no `fazai.conf`: `PERPLEXITY_API_KEY=pplx-xxxxx`
+
+**Modelos:** Sonar Small, Sonar Large (com acesso à internet)
 
 #### Ollama (Local/Gratuito)
 1. Instale Ollama: [ollama.com](https://ollama.com)
