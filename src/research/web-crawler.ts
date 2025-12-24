@@ -25,7 +25,7 @@ import { randomUUID } from "crypto";
 import { FAZAI_PATHS } from "../utils/paths";
 import * as fs from "fs";
 import * as path from "path";
-import { PlaywrightCrawler, Dataset } from "crawlee";
+import type { PlaywrightCrawler } from "crawlee";
 
 /**
  * Search result from a single source
@@ -380,6 +380,7 @@ export class AgenticWebCrawler {
     }
 
     // FALLBACK: Playwright Scraping with strict timeout (Option C)
+    const { PlaywrightCrawler, Dataset } = await import("crawlee");
     const datasetName = `devdocs-${randomUUID()}`;
     const dataset = await Dataset.open(datasetName);
     let crawler: PlaywrightCrawler | null = null;
