@@ -31,6 +31,8 @@ import {
   getFallbackModel,
   EmbeddingModel,
 } from "./embedding-strategies";
+import { CachedEmbeddingService } from "./cached-embedding-service";
+import { embeddingCache } from "./embedding-cache";
 
 /**
  * Embedding provider types
@@ -491,15 +493,17 @@ class OpenAIEmbeddingService implements EmbeddingService {
 }
 
 /**
- * Create embedding service with automatic provider selection
+ * Create embedding service with automatic provider selection and caching.
  *
  * Priority:
  * 1. Ollama (local, free, native dimensions)
  * 2. OpenAI (cloud, paid, 1536 dim)
  *
- * @returns EmbeddingService instance
+ * @returns EmbeddingService instance wrapped with a caching layer.
  */
 export async function createEmbeddingService(): Promise<EmbeddingService> {
+  let underlyingService: EmbeddingService;
+
   // Try Ollama first
   const ollamaBaseUrl =
     getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
@@ -531,7 +535,8 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
         logger.info(
           `✓ Using Ollama for embeddings (models: ${modelNames.filter((n: string) => n.includes("embed")).join(", ")})`
         );
-        return new OllamaEmbeddingService(ollamaBaseUrl);
+        underlyingService = new OllamaEmbeddingService(ollamaBaseUrl);
+        return new CachedEmbeddingService(underlyingService, embeddingCache);
       }
 
       logger.debug(
@@ -550,11 +555,12 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
       "✓ Using OpenAI for embeddings (text-embedding-3-small, 1536 dim)"
     );
     logger.warn("⚠️  OpenAI embeddings are paid ($0.02/1M tokens)");
-    return new OpenAIEmbeddingService(
+    underlyingService = new OpenAIEmbeddingService(
       openaiApiKey,
       "text-embedding-3-small",
       1536
     );
+    return new CachedEmbeddingService(underlyingService, embeddingCache);
   }
 
   throw new Error(
