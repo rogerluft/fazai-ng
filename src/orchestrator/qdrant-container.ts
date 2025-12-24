@@ -51,10 +51,10 @@ const CONTAINER_NAME = "qdrant";
 const CONTAINER_IMAGE = "docker.io/qdrant/qdrant:latest";
 const QDRANT_HTTP_PORT = 6333;
 const QDRANT_GRPC_PORT = 6334;
-// Use user home directory for data (no root needed)
+// Use ~/.fazai/qdrant_storage for data (original location)
 const QDRANT_DATA_DIR = process.env.HOME
-  ? `${process.env.HOME}/.local/share/qdrant/storage`
-  : "/var/lib/qdrant";
+  ? `${process.env.HOME}/.fazai/qdrant_storage`
+  : "/opt/fazai/qdrant_storage";
 
 /**
  * Execute container runtime command (podman or docker)
