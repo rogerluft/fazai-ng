@@ -41,6 +41,34 @@ let logFilePath: string | null = null;
 let logStream: fs.WriteStream | null = null;
 let hasWarnedAboutLogFile = false;
 
+// Rate limiter para evitar loop infinito de logs
+const LOG_RATE_LIMIT = {
+  count: 0,
+  lastReset: Date.now(),
+  maxPerSecond: 100,
+  killed: false,
+};
+
+function checkRateLimit(): boolean {
+  if (LOG_RATE_LIMIT.killed) return false;
+
+  const now = Date.now();
+  if (now - LOG_RATE_LIMIT.lastReset > 1000) {
+    LOG_RATE_LIMIT.count = 0;
+    LOG_RATE_LIMIT.lastReset = now;
+  }
+
+  LOG_RATE_LIMIT.count++;
+
+  if (LOG_RATE_LIMIT.count > LOG_RATE_LIMIT.maxPerSecond) {
+    LOG_RATE_LIMIT.killed = true;
+    console.error("\n🛑 LOOP DETECTADO: Logger desativado (>100 logs/seg). Processo continuando sem logs.\n");
+    return false;
+  }
+
+  return true;
+}
+
 function closeStream(): void {
   if (logStream) {
     logStream.end();
@@ -103,6 +131,9 @@ function shouldLog(level: LogLevel): boolean {
 }
 
 function log(level: LogLevel, ...args: unknown[]): void {
+  // Rate limit para evitar loop infinito consumir memória
+  if (!checkRateLimit()) return;
+
   const message = formatArgs(args);
   writeToFile(level, message);
 
