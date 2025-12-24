@@ -1,20 +1,17 @@
-#!/usr/bin/env bash
+#!/bin/bash
 # =============================================================================
-# fzalias - Atalho para 'fazai alias'
+# fzalias - Wrapper para 'fazai alias' com source automático
 # =============================================================================
-# Wrapper para manter compatibilidade com uso standalone de fzalias
-# Redireciona todos os comandos para 'fazai alias'
+# Este script chama 'fazai alias' e depois faz source do arquivo de aliases
+# para disponibilizar imediatamente na sessão atual.
 #
 # Uso:
 #   fzalias ll 'ls -lah --color=auto'     # Cria alias
 #   fzalias list                          # Lista aliases
 #   fzalias remove ll                     # Remove alias
-#
-# Equivale a:
-#   fazai alias ll 'ls -lah --color=auto'
-#   fazai alias list
-#   fazai alias remove ll
 # =============================================================================
+
+ALIAS_FILE="/etc/fazai/fzalias"
 
 # Verifica se fazai está instalado
 if ! command -v fazai >/dev/null 2>&1; then
@@ -23,5 +20,22 @@ if ! command -v fazai >/dev/null 2>&1; then
     exit 1
 fi
 
-# Redireciona para fazai alias
-exec fazai alias "$@"
+# Executa fazai alias
+fazai alias "$@"
+exit_code=$?
+
+# Se criou/removeu alias com sucesso, faz source
+if [[ $exit_code -eq 0 && -f "$ALIAS_FILE" ]]; then
+    # Só faz source se não for comandos de leitura
+    case "${1:-}" in
+        list|ls|show|--help|-h)
+            # Comandos de leitura, não precisa source
+            ;;
+        *)
+            # Criação ou remoção, faz source
+            source "$ALIAS_FILE" 2>/dev/null || true
+            ;;
+    esac
+fi
+
+exit $exit_code

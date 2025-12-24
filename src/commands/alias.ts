@@ -203,11 +203,17 @@ export async function createAlias(
     aliases.push({ name, command });
   }
 
-  // Gera conteúdo
+  // Gera conteúdo com função fzalias embutida
   const header = [
     "# FazAI Global Aliases",
     "# Managed by fazai alias command",
     `# Last updated: ${new Date().toISOString()}`,
+    "",
+    "# Função fzalias - wrapper que faz source automático",
+    "fzalias() {",
+    "  fazai alias \"$@\"",
+    "  source /etc/fazai/fzalias 2>/dev/null || true",
+    "}",
     "",
   ].join("\n");
 
@@ -232,27 +238,7 @@ export async function createAlias(
 
   logger.info(chalk.green(`✓ Alias '${name}' created successfully`));
   logger.info(chalk.gray(`  Command: ${command}`));
-
-  // Verifica se o source está configurado no bashrc do sistema
-  let autoLoadConfigured = false;
-  try {
-    const bashrcFile = await fs.access("/etc/bashrc").then(() => "/etc/bashrc").catch(() => null)
-      || await fs.access("/etc/bash.bashrc").then(() => "/etc/bash.bashrc").catch(() => null);
-
-    if (bashrcFile) {
-      const content = await fs.readFile(bashrcFile, "utf-8");
-      autoLoadConfigured = content.includes("source /etc/fazai/fzalias");
-    }
-  } catch {
-    // Ignora erro
-  }
-
-  if (autoLoadConfigured) {
-    logger.info(chalk.gray("  Alias disponível em novas sessões de terminal"));
-  } else {
-    logger.info(chalk.cyan("\n  Para usar agora: source /etc/fazai/fzalias"));
-    logger.info(chalk.gray("  Ou abra um novo terminal"));
-  }
+  logger.info(chalk.cyan(`  Use 'fzalias' para criar aliases com source automático`));
 }
 
 /**
@@ -269,11 +255,17 @@ export async function removeAlias(name: string): Promise<void> {
     throw new Error(`Alias '${name}' not found`);
   }
 
-  // Gera conteúdo
+  // Gera conteúdo com função fzalias embutida
   const header = [
     "# FazAI Global Aliases",
     "# Managed by fazai alias command",
     `# Last updated: ${new Date().toISOString()}`,
+    "",
+    "# Função fzalias - wrapper que faz source automático",
+    "fzalias() {",
+    "  fazai alias \"$@\"",
+    "  source /etc/fazai/fzalias 2>/dev/null || true",
+    "}",
     "",
   ].join("\n");
 
