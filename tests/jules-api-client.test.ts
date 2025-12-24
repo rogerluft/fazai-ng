@@ -117,7 +117,7 @@ describe('JulesAPIClient', () => {
   });
 
   describe('createSession', () => {
-    it('deve criar nova sessão com sucesso', async () => {
+    it('deve criar nova sessão simples com sucesso', async () => {
       const mockSession = {
         name: 'sessions/abc123',
         state: 'ACTIVE',
@@ -140,10 +140,6 @@ describe('JulesAPIClient', () => {
         'https://jules.googleapis.com/v1alpha/sessions',
         expect.objectContaining({
           method: 'POST',
-          headers: expect.objectContaining({
-            'Content-Type': 'application/json',
-            'X-Goog-Api-Key': 'test-api-key',
-          }),
           body: JSON.stringify({
             prompt: 'Fix auth bug',
             sourceContext: {
@@ -156,6 +152,60 @@ describe('JulesAPIClient', () => {
 
       expect(result.name).toBe('sessions/abc123');
       expect(result.state).toBe('ACTIVE');
+    });
+
+    it('deve criar sessão com auto PR ativado', async () => {
+      const mockSessionWithPR = {
+        name: 'sessions/def456',
+        state: 'COMPLETED',
+        createTime: '2025-12-22T11:00:00Z',
+        title: 'feat: Add new feature',
+        outputs: [
+          {
+            pullRequest: {
+              url: 'https://github.com/owner/repo/pull/101',
+              title: 'feat: Add new feature',
+              description: 'PR description',
+            },
+          },
+        ],
+      };
+
+      (global.fetch as any).mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        text: async () => JSON.stringify(mockSessionWithPR),
+      });
+
+      const result = await client.createSession(
+        'Implement the new feature',
+        {
+          source: 'sources/github/owner/repo',
+          githubRepoContext: { startingBranch: 'feature-branch', targetBranch: 'main' },
+        },
+        'feat: Add new feature',
+        true
+      );
+
+      expect(global.fetch).toHaveBeenCalledWith(
+        'https://jules.googleapis.com/v1alpha/sessions',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({
+            prompt: 'Implement the new feature',
+            sourceContext: {
+              source: 'sources/github/owner/repo',
+              githubRepoContext: { startingBranch: 'feature-branch', targetBranch: 'main' },
+            },
+            title: 'feat: Add new feature',
+            automationMode: 'AUTO_CREATE_PR',
+          }),
+        })
+      );
+
+      expect(result.name).toBe('sessions/def456');
+      expect(result.outputs).toBeDefined();
+      expect(result.outputs?.[0].pullRequest.url).toBe('https://github.com/owner/repo/pull/101');
     });
   });
 

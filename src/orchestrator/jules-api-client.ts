@@ -66,10 +66,14 @@ export interface SourceContext {
  * @description Payload para criar uma nova sessão de trabalho
  * @property {string} prompt - Descrição da tarefa que Jules deve executar
  * @property {SourceContext} sourceContext - Contexto do repositório/fonte
+ * @property {string} [title] - Título para a sessão e para o PR, se for criado.
+ * @property {'AUTO_CREATE_PR'} [automationMode] - Se definido como 'AUTO_CREATE_PR', tenta criar um PR automaticamente.
  */
 export interface CreateSessionRequest {
   prompt: string;
   sourceContext: SourceContext;
+  title?: string;
+  automationMode?: 'AUTO_CREATE_PR';
 }
 
 /**
@@ -82,13 +86,33 @@ export interface CreateSessionRequest {
  * @property {string} [plan] - Plano de execução proposto pelo Jules
  * @property {Message[]} [messages] - Histórico de mensagens
  */
+/**
+ * @interface PullRequest
+ * @description Detalhes de um pull request criado
+ */
+export interface PullRequest {
+  url: string;
+  title: string;
+  description: string;
+}
+
+/**
+ * @interface PullRequestOutput
+ * @description Objeto de saída contendo os detalhes do pull request
+ */
+export interface PullRequestOutput {
+  pullRequest: PullRequest;
+}
+
 export interface Session {
   name: string;
   state: string;
   createTime: string;
+  title?: string;
   updateTime?: string;
   plan?: string;
   messages?: Message[];
+  outputs?: PullRequestOutput[];
 }
 
 /**
@@ -263,11 +287,14 @@ export class JulesAPIClient {
   }
 
   /**
-   * Cria uma nova sessão de trabalho para o Jules
+   * Cria uma nova sessão de trabalho para o Jules, com a opção de criar um Pull Request automaticamente.
    * @param {string} prompt - Descrição da tarefa (ex: "Fix the bug in auth.ts")
    * @param {SourceContext} sourceContext - Contexto do repositório
+   * @param {string} [title] - Título para a sessão e o PR. Se não fornecido, a API pode usar o prompt.
+   * @param {boolean} [autoCreatePR=false] - Se true, tenta criar um PR automaticamente ao final da execução.
    * @returns {Promise<Session>} Sessão criada
    * @example
+   * // Criar uma sessão simples
    * const session = await client.createSession(
    *   "Fix authentication bug in src/auth.ts",
    *   {
@@ -275,14 +302,41 @@ export class JulesAPIClient {
    *     githubRepoContext: { startingBranch: "main" }
    *   }
    * );
+   *
+   * // Criar uma sessão que gera um PR
+   * const prSession = await client.createSession(
+   *   "Add a new feature for user profiles",
+   *   {
+   *     source: "sources/github/owner/repo",
+   *     githubRepoContext: { startingBranch: "feature-branch", targetBranch: "main" }
+   *   },
+   *   "feat: Implement user profiles", // Título do PR
+   *   true // Criar PR
+   * );
    */
-  async createSession(prompt: string, sourceContext: SourceContext): Promise<Session> {
+  async createSession(
+    prompt: string,
+    sourceContext: SourceContext,
+    title?: string,
+    autoCreatePR: boolean = false
+  ): Promise<Session> {
     logger.info(`Criando nova sessão Jules com prompt: "${prompt}"`);
+    if (autoCreatePR) {
+      logger.info(`Sessão configurada para criar Pull Request automaticamente com título: "${title || prompt}"`);
+    }
 
     const payload: CreateSessionRequest = {
       prompt,
       sourceContext,
     };
+
+    if (title) {
+      payload.title = title;
+    }
+
+    if (autoCreatePR) {
+      payload.automationMode = 'AUTO_CREATE_PR';
+    }
 
     const session = await this.request<Session>('/sessions', {
       method: 'POST',
@@ -290,6 +344,9 @@ export class JulesAPIClient {
     });
 
     logger.info(`Sessão criada: ${session.name} (estado: ${session.state})`);
+    if (session.outputs && session.outputs.length > 0) {
+      logger.info(`PR criado: ${session.outputs[0].pullRequest.url}`);
+    }
     return session;
   }
 
