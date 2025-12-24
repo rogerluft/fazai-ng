@@ -88,8 +88,8 @@ class ErrorTracker {
       this.errors.shift(); // Remove o mais antigo
     }
 
-    // Log para arquivo (opcional, mas recomendado)
-    logger.error(`[${type.toUpperCase()}] ${message}`, context || "");
+    // REMOVIDO: logger.error() aqui causava loop infinito
+    // O erro já foi logado por quem chamou captureError() via logger.ts
   }
 
   /**
