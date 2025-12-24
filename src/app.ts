@@ -16,6 +16,10 @@ import { importConversations } from "./conversation-importer";
 import { decomposeTask } from "./agentic/task-decomposer";
 import { DAGExecutor } from "./agentic/dag-executor";
 import { handleGitHubCommand } from "./commands/github";
+import { handleAskCommand } from "./commands/ask";
+import { handleVectorCommand } from "./commands/vector";
+import { handleImportCommand } from "./commands/import";
+import { handleIndexCommand } from "./commands/index-command";
 
 import { getConfigValue } from "./config";
 import { normalizeTask } from "./utils/task-normalizer";
@@ -110,169 +114,6 @@ ${modelsHelpText}`;
   logger.info(helpText);
 }
 
-function parseVectorArgs(rawArgs: string[]): { options: VectorValidationOptions; action: "validate" | "recreate" } {
-  const options: VectorValidationOptions = {};
-  let action: "validate" | "recreate" = "validate";
-
-  for (let i = 0; i < rawArgs.length; i += 1) {
-    const arg = rawArgs[i];
-    if (!arg) {
-      continue;
-    }
-
-    if (arg === "validate") {
-      action = "validate";
-      continue;
-    }
-
-    if (arg === "recreate" || arg === "reset") {
-      action = "recreate";
-      options.recreate = true;
-      continue;
-    }
-
-    if (arg === "--recreate" || arg === "--reset") {
-      options.recreate = true;
-      action = "recreate";
-      continue;
-    }
-
-    if (arg === "--provider" && rawArgs[i + 1]) {
-      options.provider = parseProvider(rawArgs[i + 1]);
-      i += 1;
-      continue;
-    }
-
-    if (arg.startsWith("--provider=")) {
-      options.provider = parseProvider(arg.split("=")[1]);
-      continue;
-    }
-
-    if (arg === "--dimension" && rawArgs[i + 1]) {
-      options.dimension = parseDimension(rawArgs[i + 1]);
-      i += 1;
-      continue;
-    }
-
-    if (arg.startsWith("--dimension=")) {
-      options.dimension = parseDimension(arg.split("=")[1]);
-      continue;
-    }
-
-    if (arg === "--distance" && rawArgs[i + 1]) {
-      const parsedDistance = parseDistance(rawArgs[i + 1]);
-      if (parsedDistance) {
-        options.distance = parsedDistance;
-      }
-      i += 1;
-      continue;
-    }
-
-    if (arg.startsWith("--distance=")) {
-      const parsedDistance = parseDistance(arg.split("=")[1]);
-      if (parsedDistance) {
-        options.distance = parsedDistance;
-      }
-      continue;
-    }
-  }
-
-  if (action === "recreate" && options.recreate !== true) {
-    options.recreate = true;
-  }
-
-  return { options, action };
-}
-
-function parseProvider(raw?: string): VectorValidationOptions["provider"] {
-  if (!raw) {
-    return undefined;
-  }
-
-  const normalized = raw.trim().toLowerCase();
-  if (normalized === "qdrant") {
-    return "qdrant";
-  }
-  if (normalized === "milvus" || normalized === "zilliz") {
-    return "milvus";
-  }
-
-  logger.warn(chalk.yellow(`⚠️  Provedor desconhecido "${raw}". Use "qdrant" ou "milvus".`));
-  return undefined;
-}
-
-function parseDimension(raw?: string): number | undefined {
-  if (!raw) {
-    return undefined;
-  }
-  const parsed = Number.parseInt(raw, 10);
-  if (Number.isNaN(parsed) || parsed <= 0) {
-    logger.warn(chalk.yellow(`⚠️  Dimensão inválida "${raw}". Informe um inteiro maior que zero.`));
-    return undefined;
-  }
-  return parsed;
-}
-
-function parseDistance(raw?: string): VectorValidationOptions["distance"] {
-  if (!raw) {
-    return undefined;
-  }
-  const normalized = raw.trim().toLowerCase();
-  if (normalized === "cosine" || normalized === "cos" || normalized === "angular") {
-    return "Cosine";
-  }
-  if (normalized === "euclid" || normalized === "l2" || normalized === "euclidean") {
-    return "Euclid";
-  }
-  if (normalized === "dot" || normalized === "dot_product" || normalized === "ip") {
-    return "Dot";
-  }
-  logger.warn(chalk.yellow(`⚠️  Distância desconhecida "${raw}". Valores aceitos: cosine, euclid, dot.`));
-  return undefined;
-}
-
-async function handleVectorCommand(rawArgs: string[]): Promise<void> {
-  const { options, action } = parseVectorArgs(rawArgs);
-  const { validateVectorCollections } = await import("./vector-store");
-  const result = await validateVectorCollections(options);
-
-  reportVectorResult(result, action);
-
-  if (result.errors.length > 0) {
-    process.exitCode = 1;
-  }
-}
-
-function reportVectorResult(result: VectorValidationResult, action: "validate" | "recreate"): void {
-  logger.info(chalk.cyan(`\n📦 Vetor store: ${result.provider} (${action})`));
-  logger.info(chalk.gray(`Dimensão: ${result.dimension} · Distância: ${result.distance}`));
-
-  if (result.created.length) {
-    logger.info(chalk.green(`✅ Criadas: ${result.created.join(", ")}`));
-  }
-
-  if (result.verified.length) {
-    logger.info(chalk.green(`✅ Já em conformidade: ${result.verified.join(", ")}`));
-  }
-
-  if (result.updated.length) {
-    logger.info(chalk.yellow(`ℹ️  Necessitam ajuste manual: ${result.updated.join(", ")}`));
-  }
-
-  if (!result.created.length && !result.verified.length && !result.updated.length) {
-    logger.info(chalk.gray("Nenhuma collection processada."));
-  }
-
-  if (result.errors.length) {
-    logger.error(chalk.red("\n❌ Ocorreram erros:"));
-    for (const entry of result.errors) {
-      logger.error(` - ${entry.collection}: ${entry.message}`);
-    }
-  } else {
-    logger.info(chalk.green("\nTudo certo com as collections vetoriais."));
-  }
-}
-
 async function checkAndSetAPIKey(selectedModel: (typeof models)[number]) {
   const provider = selectedModel.provider;
   const apiKeyPresent = checkAPIKey(provider);
@@ -282,118 +123,6 @@ async function checkAndSetAPIKey(selectedModel: (typeof models)[number]) {
   }
 
   logger.info(chalk.green(`✅ API key configurada (${provider})`));
-}
-
-async function handleImportCommand(rawArgs: string[]): Promise<void> {
-  // Parse argumentos
-  let filePath: string | undefined;
-  let source: "claude" | "chatgpt" | undefined;
-  let recursive = false;
-  let extractKnowledge = true;
-  let extractLearning = true;
-
-  for (let i = 0; i < rawArgs.length; i++) {
-    const arg = rawArgs[i];
-
-    if (arg === "--source" && rawArgs[i + 1]) {
-      const sourceArg = rawArgs[i + 1].toLowerCase();
-      if (sourceArg === "claude" || sourceArg === "chatgpt") {
-        source = sourceArg;
-      }
-      i++;
-      continue;
-    }
-
-    if (arg.startsWith("--source=")) {
-      const sourceArg = arg.split("=")[1].toLowerCase();
-      if (sourceArg === "claude" || sourceArg === "chatgpt") {
-        source = sourceArg;
-      }
-      continue;
-    }
-
-    if (arg === "--recursive" || arg === "-r") {
-      recursive = true;
-      continue;
-    }
-
-    if (arg === "--no-knowledge") {
-      extractKnowledge = false;
-      continue;
-    }
-
-    if (arg === "--no-learning") {
-      extractLearning = false;
-      continue;
-    }
-
-    // Primeiro argumento sem -- é o filepath
-    if (!arg.startsWith("--") && !filePath) {
-      filePath = arg;
-    }
-  }
-
-  // Validar argumentos
-  if (!filePath) {
-    logger.error(chalk.red("✗ Erro: caminho do arquivo é obrigatório"));
-    logger.info(chalk.cyan("\nUso:"));
-    logger.info("  fazai import <arquivo> --source=<claude|chatgpt>");
-    logger.info("  fazai import <diretório> --source=claude --recursive");
-    logger.info("");
-    logger.info(chalk.cyan("Opções:"));
-    logger.info("  --source=<claude|chatgpt>  Fonte das conversas (obrigatório)");
-    logger.info("  --recursive, -r            Processar diretório recursivamente");
-    logger.info("  --no-knowledge             Não extrair conhecimento técnico");
-    logger.info("  --no-learning              Não extrair padrões de aprendizado");
-    return;
-  }
-
-  if (!source) {
-    logger.error(chalk.red("✗ Erro: --source é obrigatório (claude ou chatgpt)"));
-    logger.info(chalk.cyan("\nExemplo:"));
-    logger.info("  fazai import conversas.json --source=claude");
-    return;
-  }
-
-  // Executar importação
-  try {
-    const result = await importConversations(filePath, source, {
-      recursive,
-      extractKnowledge,
-      extractLearning,
-    });
-
-    // Reportar resultados
-    logger.info("");
-    logger.info(chalk.green("✅ Importação concluída!"));
-    logger.info("");
-    logger.info(chalk.cyan("📊 Estatísticas:"));
-    logger.info(`  Conversas importadas: ${chalk.green(result.imported)}`);
-    logger.info(`  Conversas puladas: ${chalk.yellow(result.skipped)}`);
-    logger.info("");
-    logger.info(chalk.cyan("📦 Inserções no Qdrant:"));
-    logger.info(`  fazai_memory: ${chalk.green(result.stats.memoryEntries)} mensagens`);
-    logger.info(`  fazai_kb: ${chalk.green(result.stats.kbEntries)} soluções técnicas`);
-    logger.info(`  fazai_learning: ${chalk.green(result.stats.learningEntries)} padrões de aprendizado`);
-
-    if (result.errors.length > 0) {
-      logger.info("");
-      logger.warn(chalk.yellow(`⚠️  ${result.errors.length} erro(s) encontrado(s):`));
-      result.errors.slice(0, 5).forEach((err) => {
-        logger.warn(chalk.gray(`  - ${err}`));
-      });
-
-      if (result.errors.length > 5) {
-        logger.warn(chalk.gray(`  ... e mais ${result.errors.length - 5} erro(s)`));
-      }
-    }
-
-    logger.info("");
-  } catch (error: any) {
-    logger.error(chalk.red(`✗ Erro fatal na importação: ${error.message}`));
-    logger.debug(error.stack);
-    process.exit(1);
-  }
 }
 
 async function main() {
@@ -461,11 +190,7 @@ async function main() {
 
   // Source Indexer command (Metacognition)
   if (inputs[0] === "index") {
-    const { runSourceIndexer } = await import("./services/source-indexer");
-    const force = inputs.includes("--force") || inputs.includes("-f");
-    const verbose = inputs.includes("--verbose") || inputs.includes("-v") || debugFlag || verboseFlag;
-    
-    await runSourceIndexer({ force, verbose });
+    await handleIndexCommand(inputs.slice(1));
     process.exit(0);
   }
 
@@ -588,46 +313,7 @@ async function main() {
 
   // Ask mode (general questions)
   if (inputs[0] === "ask") {
-    // Check if last arg is a model name (exact match)
-    const lastArg = inputs[inputs.length - 1];
-    let selectedModel = models.find((model) => model.name === lastArg);
-
-    let questionParts: string[];
-    if (selectedModel) {
-      // Model specified, question is everything except first (ask) and last (model)
-      questionParts = inputs.slice(1, -1);
-    } else {
-      // No model, use default and question is everything except first (ask)
-      selectedModel = models[0];
-      questionParts = inputs.slice(1);
-    }
-
-    const question = questionParts.join(" ");
-
-    if (!question) {
-      logger.error('Usage: fazai ask "Your question here" [model-name]');
-      logger.info('Example: fazai ask "How to configure nginx?" gpt-4o');
-      logger.info('         fazai ask "Best practices for SSH?" llama-3-sonar-small-32k-online');
-      process.exit(1);
-    }
-
-    await checkAndSetAPIKey(selectedModel);
-
-    logger.info(chalk.blue("🤔 Fazendo pergunta..."));
-    logger.info(chalk.gray(`Modelo: ${selectedModel.name} (${selectedModel.provider})`));
-
-    const answerStream = askAI(
-      "",
-      question,
-      selectedModel.name,
-      selectedModel.provider,
-      true
-    );
-
-    for await (const chunk of answerStream) {
-      process.stdout.write(chunk);
-    }
-    logger.info("");
+    await handleAskCommand(inputs.slice(1));
     process.exit(0);
   }
 
@@ -683,10 +369,15 @@ async function main() {
   }
 
   logger.info(`Modelo: ${selectedModel.name} (${selectedModel.provider})\n`);
-  if (!selectedModel) selectedModel = models[0];
+  if (!selectedModel) {
+    logger.error("Modelo selecionado não encontrado.");
+    process.exit(1);
+  }
 
   await checkAndSetAPIKey(selectedModel);
-  const researchCoordinator = new ResearchCoordinator({ researchOnFailure: autoResearchOnFailure });
+  const researchCoordinator = new ResearchCoordinator({
+    researchOnFailure: autoResearchOnFailure,
+  });
 
   // Collect system info
   logger.info(chalk.gray("Coletando informações do sistema..."));
