@@ -35,8 +35,8 @@ import {
  * Main handler for qdrant commands
  */
 export async function handleQdrantCommand(args: string[]): Promise<void> {
-  if (args.length === 0 || args[0] === "help" || args[0] === "--help") {
-    displayQdrantHelp();
+  if (args.length === 0 || args[0] === "help" || args[0] === "--help" || args[0] === "-h") {
+    showQdrantHelp();
     return;
   }
 
@@ -79,7 +79,7 @@ export async function handleQdrantCommand(args: string[]): Promise<void> {
 
       default:
         logger.error(chalk.red(`✗ Unknown subcommand: ${subcommand}`));
-        displayQdrantHelp();
+        showQdrantHelp();
         process.exit(1);
     }
   } catch (error: any) {
@@ -94,7 +94,7 @@ export async function handleQdrantCommand(args: string[]): Promise<void> {
 /**
  * Display help for qdrant commands
  */
-function displayQdrantHelp(): void {
+function showQdrantHelp(): void {
   const help = `
 ${chalk.bold.cyan("QDRANT MANAGEMENT COMMANDS")}
 
