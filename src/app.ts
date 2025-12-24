@@ -85,6 +85,8 @@ Usage:
   fazai cf zones                                     # Cloudflare: list zones
   fazai cf dns list <zoneId>                         # Cloudflare: manage DNS
   fazai github <action>                              # GitHub integration (auth, repos, issues, etc)
+  fazai sync                                         # Sincroniza configurações e scripts (dotfiles)
+  fazai index                                        # Gerencia o índice de metacognição (código fonte)
 
 Options:
   --dry-run                Simulate commands without executing

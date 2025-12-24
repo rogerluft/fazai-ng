@@ -30,6 +30,8 @@ _fazai() {
         'cloudflare:Manage Cloudflare (zones, dns, workers)'
         'cf:Cloudflare (alias)'
         'github:GitHub integration (auth, repos, issues, etc)'
+        'qdrant:Qdrant management (status, metrics, backup, etc)'
+        'index:Gerencia o índice de metacognição (código fonte)'
     )
 
     # Load models dynamically from config (cached)

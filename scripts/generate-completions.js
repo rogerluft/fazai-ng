@@ -136,6 +136,15 @@ function parseAppTS(appPath) {
       subcommands: ["auth", "user", "repos", "issues", "fork", "star", "pr", "help"],
       options: ["login", "logout", "status"],
     },
+    {
+      name: "qdrant",
+      description: "Qdrant management (status, metrics, backup, etc)",
+      subcommands: ["status", "metrics", "backup", "restore", "import", "export", "container"],
+    },
+    {
+      name: "index",
+      description: "Gerencia o índice de metacognição (código fonte)",
+    },
   ];
 
   const globalOptions = [
