@@ -21,7 +21,7 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands (auto-generated from app.ts)
-    commands="ask config completion alias search vector import sync cloudflare cf github qdrant index"
+    commands="ask config completion alias search vector import sync cloudflare cf github qdrant index inference"
 
     # Options/flags (auto-generated from app.ts)
     opts="--dry-run --cli --debug --verbose --log-file --auto-research --yolo -y --help -h"

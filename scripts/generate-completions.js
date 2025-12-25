@@ -145,6 +145,12 @@ function parseAppTS(appPath) {
       name: "index",
       description: "Gerencia o índice de metacognição (código fonte)",
     },
+    {
+      name: "inference",
+      description: "Gerencia conhecimento injetado pelo usuário",
+      subcommands: ["add", "import", "list", "search", "remove", "clear"],
+      options: ["--category=doc", "--category=rule", "--category=example", "--category=fact"],
+    },
   ];
 
   const globalOptions = [

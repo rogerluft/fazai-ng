@@ -12,11 +12,20 @@ Sistema completo de **RAG (Retrieval-Augmented Generation)** com busca neural mu
 
 ## Collections Qdrant (Pesos de Fusion)
 
-- `fazai_personality` (15%) - Traços de personalidade
+- `fazai_personality` (0%) - Traços de personalidade (desabilitado para buscas gerais)
 - `fazai_memory` (20%) - Histórico de conversas
-- `fazai_learning` (30%) - Padrões aprendidos **[MAIS IMPORTANTE]**
-- `fazai_kb` (25%) - Base de conhecimento técnico
-- `fazai_inference` (10%) - Regras operacionais
+- `fazai_learning` (40%) - Padrões aprendidos **[MAIS IMPORTANTE]**
+- `fazai_kb` (30%) - Base de conhecimento técnico (aprendizado automático via RAG)
+- `fazai_inference` (10%) - Conhecimento injetado pelo USUÁRIO via `fazai inference`
+
+### Diferença entre KB e Inference
+
+| Collection | Fonte | Operação |
+|------------|-------|----------|
+| `fazai_kb` | Automática (RAG de docs, erros, etc) | READ/WRITE pelo sistema |
+| `fazai_inference` | Manual pelo usuário | READ-ONLY (usuário popula via CLI) |
+
+Use `fazai inference add doc "..."` para ensinar fatos específicos ao FazAI.
 
 ## Uso Rápido
 

@@ -32,6 +32,7 @@ _fazai() {
         'github:GitHub integration (auth, repos, issues, etc)'
         'qdrant:Qdrant management (status, metrics, backup, etc)'
         'index:Gerencia o índice de metacognição (código fonte)'
+        'inference:Gerencia conhecimento injetado pelo usuário'
     )
 
     # Load models dynamically from config (cached)

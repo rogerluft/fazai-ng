@@ -87,6 +87,7 @@ Usage:
   fazai github <action>                              # GitHub integration (auth, repos, issues, etc)
   fazai sync                                         # Sincroniza configurações e scripts (dotfiles)
   fazai index                                        # Gerencia o índice de metacognição (código fonte)
+  fazai inference <command>                          # Gerencia conhecimento injetado pelo usuário
 
 Options:
   --dry-run                Simulate commands without executing
@@ -164,12 +165,27 @@ async function main() {
     return;
   }
 
-  // Show help if no arguments or help flag is present
-  if (
-    inputs.length === 0 ||
-    inputs.includes("--help") ||
-    inputs.includes("-h")
-  ) {
+  // List of subcommands that have their own --help handlers
+  const SUBCOMMANDS_WITH_HELP = [
+    "qdrant", "vector", "ask", "import", "alias",
+    "cloudflare", "cf", "github", "index", "sync",
+    "config", "search", "inference"
+  ];
+
+  const firstArg = inputs[0];
+  const hasHelpFlag = inputs.includes("--help") || inputs.includes("-h");
+
+  // Show general help only if:
+  // 1. No arguments at all, OR
+  // 2. Only --help/-h flag (not a subcommand with --help)
+  if (inputs.length === 0) {
+    displayHelp();
+    process.exit(0);
+  }
+
+  // If --help/-h is present BUT first arg is a known subcommand,
+  // let the subcommand handler process the --help
+  if (hasHelpFlag && !SUBCOMMANDS_WITH_HELP.includes(firstArg)) {
     displayHelp();
     process.exit(0);
   }
@@ -223,6 +239,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Inference command - Gerencia conhecimento injetado pelo usuário
+  if (inputs[0] === "inference") {
+    const { handleInferenceCommand } = await import("./commands/inference");
+    await handleInferenceCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "completion") {
     const suggestions = [
       "ask",
@@ -237,6 +260,7 @@ async function main() {
       "cloudflare",
       "github",
       "qdrant",
+      "inference",
       "--debug",
       "--verbose",
       "--log-file",
@@ -289,9 +313,10 @@ async function main() {
       autoResearchOnFailure = true;
       return false;
     }
+    // --help e -h são tratados no início do main() para subcomandos
+    // Aqui só remove da lista de args para o admin mode
     if (input === "--help" || input === "-h") {
-      displayHelp();
-      process.exit(0);
+      return false;
     }
     if (input === "--version" || input === "-v") {
       console.log(`FazAI v${require('../package.json').version}`);

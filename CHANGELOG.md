@@ -1,5 +1,39 @@
 # FazAI Changelog
 
+## [3.8.2-beta] - 2025-12-25
+
+### 🎄 Christmas Release - Inference Command & CLI Help Fix
+
+#### ✨ Features
+
+- **Comando `fazai inference`**: Gerenciamento de conhecimento injetado pelo usuário
+  - `fazai inference add <category> <content>` - Adiciona conhecimento inline
+  - `fazai inference import <arquivo>` - Importa de arquivos txt/md/json
+  - `fazai inference list [limit]` - Lista conhecimento armazenado
+  - `fazai inference search <query>` - Busca semântica
+  - `fazai inference remove <id>` - Remove entry específico
+  - `fazai inference clear` - Limpa toda a collection
+  - Categorias suportadas: `doc`, `rule`, `example`, `fact`
+
+#### 🐛 Fixes
+
+- **CLI --help routing**: Subcomandos agora exibem help específico
+  - `fazai qdrant --help` mostra help do qdrant (não mais o geral)
+  - `fazai ask --help`, `fazai vector --help`, etc. funcionam corretamente
+  - Removida duplicação de lógica de --help no filter de args
+
+#### 📚 Documentation
+
+- Atualizado `src/rag/README.md` com diferença entre `fazai_kb` (automático) e `fazai_inference` (usuário)
+- Documentados pesos de fusion atualizados (learning 40%, kb 30%, memory 20%, inference 10%)
+
+#### 🧪 Tests
+
+- Adicionado `tests/cli-help.test.ts` - 9 testes de routing de --help
+- Adicionado `tests/inference.test.ts` - 5 testes do comando inference
+
+---
+
 ## [3.8.1-beta] - 2025-12-22
 
 ### ✨ NEW FEATURE - Jules API REST Client
