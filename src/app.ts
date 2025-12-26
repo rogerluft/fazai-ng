@@ -88,6 +88,8 @@ Usage:
   fazai sync                                         # Sincroniza configurações e scripts (dotfiles)
   fazai index                                        # Gerencia o índice de metacognição (código fonte)
   fazai inference <command>                          # Gerencia conhecimento injetado pelo usuário
+  fazai agent <command>                              # Executa agentes GenAIScript (loop, reflect, etc)
+  fazai dashboard <command>                          # Gerencia REST API Dashboard (start, stop, status)
 
 Options:
   --dry-run                Simulate commands without executing
@@ -253,6 +255,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Dashboard command - REST API Server
+  if (inputs[0] === "dashboard") {
+    const { handleDashboardCommand } = await import("./commands/dashboard");
+    await handleDashboardCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "completion") {
     const suggestions = [
       "ask",
@@ -268,6 +277,8 @@ async function main() {
       "github",
       "qdrant",
       "inference",
+      "agent",
+      "dashboard",
       "--debug",
       "--verbose",
       "--log-file",

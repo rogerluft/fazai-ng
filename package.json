@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.9.0",
+  "version": "3.10.0",
   "author": "Roger Luft (VeilWalker) <roger@webstorage.com.br> (fork from Mandark by Hrishi Olickel)",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -12,6 +12,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
     "@crawlee/playwright": "^3.15.3",
+    "@genaiscript/api": "^2.5.1",
+    "@genaiscript/core": "^2.5.1",
     "@genaiscript/runtime": "^2.5.1",
     "@github/copilot": "^0.0.359",
     "@github/copilot-language-server-linux-x64": "^1.396.0",
@@ -19,6 +21,7 @@
     "@inquirer/prompts": "^8.0.2",
     "@octokit/rest": "^21.0.2",
     "@qdrant/js-client-rest": "^1.15.1",
+    "@xenova/transformers": "^2.17.2",
     "axios": "^1.13.2",
     "boxen": "^8.0.1",
     "chalk": "4.1.2",
@@ -26,6 +29,8 @@
     "claude-code-plugins": "^1.0.3",
     "cli-table3": "^0.6.5",
     "crawlee": "^3.15.3",
+    "express": "^5.2.1",
+    "genaiscript": "^2.5.1",
     "gradient-string": "^3.0.0",
     "inquirer": "^12.10.0",
     "oboe": "^2.1.7",
@@ -72,6 +77,7 @@
   "engineStrict": true,
   "devDependencies": {
     "@swc/core": "^1.7.0",
+    "@types/express": "^5.0.6",
     "@types/node": "^24.10.1",
     "@vitest/ui": "^4.0.9",
     "tsup": "^8.5.1",

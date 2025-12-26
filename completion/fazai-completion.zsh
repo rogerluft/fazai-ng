@@ -33,6 +33,8 @@ _fazai() {
         'qdrant:Qdrant management (status, metrics, backup, etc)'
         'index:Gerencia o índice de metacognição (código fonte)'
         'inference:Gerencia conhecimento injetado pelo usuário'
+        'agent:Execute GenAIScript agents'
+        'dashboard:Manage REST API Dashboard'
     )
 
     # Load models dynamically from config (cached)

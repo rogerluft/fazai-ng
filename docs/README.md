@@ -26,6 +26,12 @@ Documentação completa do FazAI - Terminal Admin Linux Inteligente com IA
 - **[Sync Workflow](development/SYNC_WORKFLOW.md)** - Workflow de sincronização
 - **[GitHub Permissions](development/GITHUB-PERMISSIONS.md)** - Permissões GitHub
 
+### 🤖 Agentic System ✨ NEW
+- **[Agentic Overview](agentic/README.md)** - Sistema agêntico com reflexão e auto-evolução
+- **[Architecture](agentic/ARCHITECTURE.md)** - Arquitetura técnica do sistema agêntico
+- **[Tools](agentic/TOOLS.md)** - Ferramentas (GenAI + Qdrant + Embeddings)
+- **[Usage Guide](agentic/USAGE.md)** - Guia prático com exemplos e integrações
+
 ### 🚀 Implementation Summaries
 - **[Alias System Summary](implementation/ALIAS_SYSTEM_SUMMARY.md)** - Sistema de aliases integrado ✨ NEW
 - **[PRIO 4 Summary](implementation/PRIO4_SUMMARY.md)** - RAG Integration & Metrics
@@ -59,6 +65,7 @@ Documentação completa do FazAI - Terminal Admin Linux Inteligente com IA
 
 ```
 docs/
+├── agentic/            # Agentic system documentation ✨ NEW
 ├── guides/              # User guides and tutorials
 ├── development/         # Development documentation
 ├── implementation/      # Implementation summaries
@@ -84,10 +91,12 @@ docs/
 
 ## 🚀 Latest Version
 
-**Current**: v3.5.4-beta
+**Current**: v3.10.0-beta
 
 ### Recent Major Features:
-- ✅ Alias System - Global bash aliases (v3.5.4) ✨ NEW
+- ✅ Agentic System - Loop agêntico com reflexão e auto-evolução ✨ NEW
+- ✅ Dashboard REST API - Express.js server com endpoints completos ✨ NEW
+- ✅ Alias System - Global bash aliases (v3.5.4)
 - ✅ Neural RAG System (PRIO 3)
 - ✅ RAG Integration & Metrics (PRIO 4)
 - ✅ Semantic Cache
@@ -104,5 +113,5 @@ docs/
 
 ---
 
-**Last Updated**: 2025-12-12
+**Last Updated**: 2025-12-26
 **Maintained by**: Roger Luft (VeilWalker)

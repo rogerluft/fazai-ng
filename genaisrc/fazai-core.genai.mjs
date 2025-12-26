@@ -54,11 +54,12 @@ defTool(
   async ({ query, collections = ["memory", "learning", "kb"], limit = 3 }) => {
     try {
       // Importa serviço de embeddings do FazAI
+      // CORRIGIDO: createEmbeddingService é async e retorna serviço já pronto
       const { createEmbeddingService } = await import("../dist/services/embeddings.js");
-      const embeddingService = createEmbeddingService();
-      await embeddingService.init();
+      const embeddingService = await createEmbeddingService();  // AWAIT necessário!
+      // Não precisa de .init() - serviço já vem inicializado
 
-      const embedding = await embeddingService.embed(query);
+      const embedding = await embeddingService.generate(query);  // .generate() não .embed()
 
       // Importa tools do Qdrant
       const { qdrantFusionSearch } = await import("./tools/qdrant-tools.mjs");
@@ -120,9 +121,10 @@ defTool(
       const { createEmbeddingService } = await import("../dist/services/embeddings.js");
       const { qdrantUpsertInsight } = await import("./tools/qdrant-tools.mjs");
 
-      const embeddingService = createEmbeddingService();
-      await embeddingService.init();
-      const embedding = await embeddingService.embed(content);
+      // CORRIGIDO: createEmbeddingService é async e retorna serviço já pronto
+      const embeddingService = await createEmbeddingService();  // AWAIT necessário!
+      // Não precisa de .init() - serviço já vem inicializado
+      const embedding = await embeddingService.generate(content);  // .generate() não .embed()
 
       const result = await qdrantUpsertInsight(content, embedding, category, source);
 
@@ -236,8 +238,95 @@ defTool(
   }
 );
 
+// === EMBEDDINGS LOCAIS (Transformers.js) ===
+
+/**
+ * Tool: Embeddings 100% locais com Transformers.js
+ * Usa modelo all-MiniLM-L6-v2 (384 dims, padded para 1536)
+ */
+defTool(
+  "local_embed",
+  "Gera embeddings 100% locais com Transformers.js (CPU only, zero custo)",
+  {
+    type: "object",
+    properties: {
+      text: {
+        type: "string",
+        description: "Texto para gerar embedding",
+      },
+      returnFull: {
+        type: "boolean",
+        description: "Se true, retorna vetor completo. Default: false (retorna preview)",
+        default: false,
+      },
+    },
+    required: ["text"],
+  },
+  async ({ text, returnFull = false }) => {
+    try {
+      const { embed, getModelInfo } = await import("./tools/transformers-embed.mjs");
+
+      const vector = await embed(text);
+      const info = getModelInfo();
+
+      return JSON.stringify({
+        success: true,
+        provider: info.provider,
+        model: info.model,
+        dimension: vector.length,
+        isLocal: true,
+        vector: returnFull ? vector : vector.slice(0, 5).map(v => v.toFixed(6)) + "...",
+      }, null, 2);
+    } catch (error) {
+      return JSON.stringify({
+        error: error.message,
+        fallback: "Use qdrant_multi_search que usa embedding service padrão",
+      });
+    }
+  }
+);
+
+/**
+ * Tool: Batch embeddings locais
+ */
+defTool(
+  "local_embed_batch",
+  "Gera embeddings em batch com Transformers.js (mais eficiente para múltiplos textos)",
+  {
+    type: "object",
+    properties: {
+      texts: {
+        type: "array",
+        items: { type: "string" },
+        description: "Array de textos para embedding",
+      },
+    },
+    required: ["texts"],
+  },
+  async ({ texts }) => {
+    try {
+      const { embedBatch, getModelInfo } = await import("./tools/transformers-embed.mjs");
+
+      const vectors = await embedBatch(texts);
+      const info = getModelInfo();
+
+      return JSON.stringify({
+        success: true,
+        provider: info.provider,
+        count: vectors.length,
+        dimension: vectors[0]?.length || 0,
+        isLocal: true,
+      }, null, 2);
+    } catch (error) {
+      return JSON.stringify({
+        error: error.message,
+      });
+    }
+  }
+);
+
 // === PLACEHOLDER: SKILL SEEKERS ===
-// TODO: Skill_Seekers integration - auto-geração de skills
+// TODO: Skill_Seekers integration - auto-geração de skills (aguardando instrução)
 defTool(
   "skill_seeker_scrape",
   "Auto-generates skills from external sources when knowledge gap detected. PLACEHOLDER - a ser implementado.",
@@ -298,7 +387,9 @@ SUAS FERRAMENTAS:
 2. qdrant_upsert_insight - Salva insights para aprendizado futuro
 3. reflect - Reflete sobre ações para meta-cognição
 4. check_loop_status - Verifica estado do loop
-5. skill_seeker_scrape - (PLACEHOLDER) Auto-gera skills de fontes externas
+5. local_embed - Embeddings 100% locais com Transformers.js (CPU, zero custo)
+6. local_embed_batch - Embeddings em batch para múltiplos textos
+7. skill_seeker_scrape - (PLACEHOLDER) Auto-gera skills de fontes externas
 
 LOOP AGÊNTICO (máx 5 iterações):
 1. BUSCAR: Use qdrant_multi_search para encontrar contexto relevante
@@ -319,6 +410,8 @@ DIRETRIZES:
       "qdrant_upsert_insight",
       "reflect",
       "check_loop_status",
+      "local_embed",
+      "local_embed_batch",
       "skill_seeker_scrape",
     ],
   }

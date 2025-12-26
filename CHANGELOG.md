@@ -1,5 +1,155 @@
 # FazAI Changelog
 
+## [Unreleased]
+
+### 📚 Documentação - Sistema Agêntico
+
+#### ✨ Documentation
+
+- **Documentação Completa do Sistema Agêntico**:
+  - `docs/agentic/README.md` - Overview e quick start
+  - `docs/agentic/ARCHITECTURE.md` - Arquitetura técnica detalhada
+  - `docs/agentic/TOOLS.md` - Documentação de todas as ferramentas
+  - `docs/agentic/USAGE.md` - Guia prático com exemplos
+
+- **Conteúdo Incluído**:
+  - Diagramas ASCII dos fluxos de execução
+  - Explicação detalhada de fusion scoring
+  - Exemplos práticos de uso
+  - Troubleshooting comum
+  - Best practices
+  - Integração com Express.js, Discord Bot
+  - Scripts utilitários (backup, indexação, benchmark)
+
+- **Cobertura Técnica**:
+  - Loop agêntico com reflexão (GenAI + TypeScript native)
+  - Ferramentas Qdrant (search, fusion, upsert)
+  - Embeddings locais (Transformers.js)
+  - Padrões de design (Factory, Singleton, Strategy)
+  - Performance e otimizações
+  - Segurança e error handling
+
+---
+
+## [3.10.0-beta] - 2025-12-26
+
+### 🚀 Dashboard REST API - Complete Implementation
+
+#### ✨ Features - Express.js Dashboard
+
+- **Comando `fazai dashboard`**: REST API Server para FazAI
+  - `fazai dashboard start` - Inicia servidor HTTP (default: localhost:3000)
+  - `fazai dashboard stop` - Para o servidor
+  - `fazai dashboard status` - Status do servidor
+  - Opções: `--port`, `--host`, `--no-cors`, `--no-rate-limit`, `--no-logs`
+
+- **Status & Health Endpoints**:
+  - `GET /health` - Health check básico
+  - `GET /api/status` - Status completo (Qdrant, Ollama, GenAIScript, Sistema)
+  - `GET /api/status/qdrant` - Status detalhado do Qdrant
+  - `GET /api/status/ollama` - Status do Ollama
+
+- **Collections Endpoints**:
+  - `GET /api/collections` - Lista collections FazAI
+  - `GET /api/collections/:name` - Detalhes de collection
+  - `GET /api/collections/:name/points` - Lista points (paginado)
+  - `GET /api/collections/:name/count` - Contagem de points
+  - `DELETE /api/collections/:name?confirm=true` - Deleta collection
+
+- **Search Endpoints**:
+  - `POST /api/search` - Busca semântica multi-collection com fusion scoring
+  - `POST /api/search/:collection` - Busca em collection específica
+  - Suporte a filtros Qdrant, threshold, limit
+
+- **Agent Endpoints**:
+  - `POST /api/agent/run` - Executa agente GenAIScript
+  - `POST /api/agent/loop` - Executa loop agêntico
+  - `POST /api/agent/reflect` - Trigger reflexão autônoma
+  - `GET /api/agent/scripts` - Lista scripts disponíveis
+  - `GET /api/agent/info` - Info do ambiente GenAIScript
+  - `GET /api/agent/status` - Status do sistema agêntico
+
+- **Skills Endpoints**:
+  - `POST /api/skills/seek` - Trigger skill seeker (detect/scrape/generate)
+  - `GET /api/skills` - Lista skills geradas (com filtros)
+  - `GET /api/skills/categories` - Lista categorias de skills
+  - `GET /api/skills/:id` - Detalhes de skill específica
+  - `POST /api/skills/import` - Importa skill manualmente
+
+#### 🏗️ Architecture
+
+- **Novo módulo `src/dashboard/`**:
+  - `server.ts` - Servidor Express com graceful shutdown
+  - `routes/api.ts` - Router principal com documentação
+  - `routes/status.ts` - Endpoints de status
+  - `routes/collections.ts` - Gerenciamento de collections
+  - `routes/search.ts` - Busca semântica
+  - `routes/agent.ts` - Operações de agentes
+  - `routes/skills.ts` - Gerenciamento de skills
+
+- **Middleware Stack**:
+  - `error-handler.ts` - Error handling centralizado com ApiError
+  - `async-handler.ts` - Wrapper para async routes
+  - `request-logger.ts` - Logging de requisições HTTP
+  - `cors.ts` - CORS configurável
+  - `rate-limiter.ts` - Rate limiting in-memory (100 req/min)
+
+#### 🔒 Security
+
+- **Rate Limiting**: 100 requests/min por IP (configurável)
+- **CORS**: Origens configuráveis via `DASHBOARD_ALLOWED_ORIGINS`
+- **Collection Access**: Apenas collections FazAI (`fazai_*`)
+- **Error Handling**: Sem vazamento de stack traces em produção
+- **Validation**: Input validation em todos os endpoints
+
+#### ⚙️ Configuration
+
+Novas variáveis em `/etc/fazai/fazai.conf`:
+```bash
+DASHBOARD_PORT=3000
+DASHBOARD_HOST=localhost
+DASHBOARD_ENABLE_CORS=true
+DASHBOARD_ENABLE_RATE_LIMIT=true
+DASHBOARD_LOG_REQUESTS=true
+DASHBOARD_ALLOWED_ORIGINS=*
+```
+
+#### 📚 Documentation
+
+- **README completo**: `src/dashboard/README.md`
+  - Guia de início rápido
+  - Referência completa de endpoints
+  - Exemplos de uso com curl
+  - Troubleshooting
+
+#### 🧪 Examples
+
+```bash
+# Iniciar dashboard
+fazai dashboard start --port 8080
+
+# Status do sistema via API
+curl http://localhost:8080/api/status
+
+# Busca semântica
+curl -X POST http://localhost:8080/api/search \
+  -H "Content-Type: application/json" \
+  -d '{"query":"nginx configuration","limit":5}'
+
+# Executar agente
+curl -X POST http://localhost:8080/api/agent/run \
+  -H "Content-Type: application/json" \
+  -d '{"query":"configure firewall","model":"ollama:phi3"}'
+```
+
+#### 📦 Dependencies
+
+- **Express.js**: Já disponível via `@genaiscript/core`
+- **@types/express**: Adicionado como devDependency
+- Nenhuma dependência adicional em runtime
+
+---
+
 ## [3.9.0-beta] - 2025-12-25
 
 ### 🫀 Coração Agêntico - MVP Release

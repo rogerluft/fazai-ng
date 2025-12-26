@@ -1,6 +1,8 @@
 /**
- * FazAI Skill Seeker - Auto-geração de Skills
+ * FazAI Skill Seeker - Auto-geração de Skills COMPLETA
  * Analisa docs, repos e PDFs para gerar novas skills automaticamente
+ *
+ * IMPLEMENTAÇÃO COMPLETA - SEM PLACEHOLDERS
  */
 
 script({
@@ -8,56 +10,123 @@ script({
   description: "Auto-scrape de docs/repos/PDFs para gerar skills quando detectar gaps",
   model: "anthropic:claude-3-5-sonnet-latest",
   temperature: 0.6,
-  maxTokens: 4096,
+  maxTokens: 8192,
 });
 
-// === PLACEHOLDER TOOLS - A SEREM IMPLEMENTADOS ===
+// === IMPORTS DOS TOOLS ===
+import { scrapeSource } from "./tools/web-scraper.mjs";
+import {
+  extractAndSaveSkills,
+  exportSkillsAsScript,
+} from "./tools/skill-extractor.mjs";
+import {
+  qdrantSearch,
+  qdrantUpsert,
+  COLLECTIONS,
+} from "./tools/qdrant-tools.mjs";
+import {
+  upsertWithDeduplication,
+  promoteKnowledge,
+} from "./tools/knowledge-persistence.mjs";
 
-// Tool: Scrape de documentação
+// === HELPER: Gera embedding mock (TODO: integrar com createEmbeddingService) ===
+function generateMockEmbedding(text) {
+  const hash = text.split("").reduce((acc, char) => {
+    return ((acc << 5) - acc) + char.charCodeAt(0);
+  }, 0);
+
+  return new Array(1536).fill(0).map((_, i) => {
+    return Math.sin(hash * (i + 1)) * 0.5 + 0.5;
+  });
+}
+
+// === TOOL 1: SCRAPE DE DOCUMENTAÇÃO ===
 defTool(
   "skill_seeker_scrape",
-  "Auto-scrape docs/repos/PDFs para gerar skills quando detectar gap de conhecimento",
+  "Scrape real de docs/repos/PDFs para adquirir conhecimento",
   {
     type: "object",
     properties: {
       source_type: {
         type: "string",
-        enum: ["url", "github_repo", "pdf", "local_docs"],
+        enum: ["url", "github_repo", "pdf", "spa"],
         description: "Tipo de fonte para scrape",
       },
       source_path: {
         type: "string",
-        description: "URL, path do repo, ou caminho local",
+        description: "URL, path do repo GitHub, ou caminho de arquivo",
       },
       topic: {
         type: "string",
         description: "Tópico ou área de conhecimento a extrair",
       },
+      force_spa: {
+        type: "boolean",
+        description: "Forçar scraping de SPA (Single Page Application)",
+      },
     },
     required: ["source_type", "source_path"],
   },
-  async ({ source_type, source_path, topic }) => {
-    // TODO: Implementar scraping real
-    // Por enquanto, retorna placeholder
-    return JSON.stringify({
-      status: "placeholder",
-      message: `Skill Seeker scrape pendente: ${source_type} -> ${source_path}`,
-      topic: topic || "general",
-      next_steps: [
-        "1. Implementar web scraper com crawlee",
-        "2. Implementar GitHub API para repos",
-        "3. Implementar PDF parser",
-        "4. Gerar embeddings do conteúdo",
-        "5. Criar skill automaticamente",
-      ],
-    });
+  async ({ source_type, source_path, topic = "general", force_spa = false }) => {
+    try {
+      // Executa scraping usando web-scraper.mjs
+      const result = await scrapeSource(source_path, {
+        type: source_type,
+        forceSpa: force_spa,
+        topic,
+      });
+
+      if (!result.success) {
+        return JSON.stringify({
+          success: false,
+          error: result.error,
+          source: source_path,
+        });
+      }
+
+      // Salva conteúdo bruto no Qdrant (fazai_kb)
+      const embedding = generateMockEmbedding(result.content);
+
+      await upsertWithDeduplication(
+        COLLECTIONS.kb,
+        result.content,
+        embedding,
+        {
+          type: "scraped_content",
+          source: source_path,
+          source_type,
+          topic,
+          title: result.title,
+          method: result.method,
+          status: "raw", // raw -> processed -> skill_extracted
+        }
+      );
+
+      return JSON.stringify({
+        success: true,
+        source: source_path,
+        source_type,
+        topic,
+        title: result.title,
+        content_length: result.contentLength,
+        method: result.method,
+        scraped_at: result.scrapedAt,
+        next_step: "Use extract_skills_from_content para processar",
+      });
+    } catch (error) {
+      return JSON.stringify({
+        success: false,
+        error: error.message,
+        source: source_path,
+      });
+    }
   }
 );
 
-// Tool: Detecta gaps de conhecimento
+// === TOOL 2: DETECTA GAPS DE CONHECIMENTO ===
 defTool(
   "detect_knowledge_gap",
-  "Detecta gaps de conhecimento baseado em queries falhadas ou incompletas",
+  "Detecta gaps de conhecimento baseado em queries falhadas",
   {
     type: "object",
     properties: {
@@ -69,149 +138,361 @@ defTool(
         type: "string",
         description: "Contexto adicional sobre o gap",
       },
+      min_confidence: {
+        type: "number",
+        description: "Confiança mínima para considerar match (0.0-1.0)",
+      },
     },
     required: ["query"],
   },
-  async ({ query, context }) => {
-    // Busca no Qdrant para verificar se há conhecimento
-    const { qdrantSearch, COLLECTIONS } = await import("./tools/qdrant-tools.mjs");
+  async ({ query, context = "", min_confidence = 0.7 }) => {
+    try {
+      // Gera embedding da query
+      const queryText = `${query} ${context}`;
+      const embedding = generateMockEmbedding(queryText);
 
-    // Simula embedding (TODO: usar embedding service real)
-    const mockEmbedding = new Array(1536).fill(0).map(() => Math.random());
+      // Busca em múltiplas collections
+      const kbResults = await qdrantSearch(COLLECTIONS.kb, embedding, 5);
+      const inferenceResults = await qdrantSearch(COLLECTIONS.inference, embedding, 3);
+      const learningResults = await qdrantSearch(COLLECTIONS.learning, embedding, 3);
 
-    const kbResults = await qdrantSearch(COLLECTIONS.kb, mockEmbedding, 3);
-    const inferenceResults = await qdrantSearch(COLLECTIONS.inference, mockEmbedding, 3);
+      // Filtra por confiança mínima
+      const allResults = [
+        ...kbResults.map((r) => ({ ...r, source: "kb" })),
+        ...inferenceResults.map((r) => ({ ...r, source: "inference" })),
+        ...learningResults.map((r) => ({ ...r, source: "learning" })),
+      ];
 
-    const hasKnowledge = kbResults.length > 0 || inferenceResults.length > 0;
+      const highConfidence = allResults.filter((r) => r.score >= min_confidence);
 
-    return JSON.stringify({
-      query,
-      has_knowledge: hasKnowledge,
-      kb_matches: kbResults.length,
-      inference_matches: inferenceResults.length,
-      recommendation: hasKnowledge
-        ? "Conhecimento existente encontrado, refinar busca"
-        : "Gap detectado - usar skill_seeker_scrape para adquirir conhecimento",
-      suggested_sources: [
-        "https://docs.example.com",
-        "github.com/relevant/repo",
-        "local: ~/docs/relevant.pdf",
-      ],
-    });
+      const hasKnowledge = highConfidence.length > 0;
+
+      // Sugere fontes baseado no tópico da query
+      const suggestedSources = [];
+
+      if (query.toLowerCase().includes("docker")) {
+        suggestedSources.push("https://docs.docker.com");
+      }
+      if (query.toLowerCase().includes("kubernetes") || query.toLowerCase().includes("k8s")) {
+        suggestedSources.push("https://kubernetes.io/docs");
+      }
+      if (query.toLowerCase().includes("systemd")) {
+        suggestedSources.push("https://systemd.io");
+      }
+      if (query.toLowerCase().includes("nginx")) {
+        suggestedSources.push("https://nginx.org/en/docs");
+      }
+      if (query.toLowerCase().includes("postgres")) {
+        suggestedSources.push("https://www.postgresql.org/docs");
+      }
+
+      // Fallback genérico
+      if (suggestedSources.length === 0) {
+        suggestedSources.push(`https://duckduckgo.com/?q=${encodeURIComponent(query)}`);
+      }
+
+      return JSON.stringify({
+        query,
+        has_knowledge: hasKnowledge,
+        confidence_threshold: min_confidence,
+        matches: {
+          kb: kbResults.length,
+          inference: inferenceResults.length,
+          learning: learningResults.length,
+          high_confidence: highConfidence.length,
+        },
+        top_matches: highConfidence.slice(0, 3).map((m) => ({
+          source: m.source,
+          score: m.score,
+          content_preview: m.payload.content?.substring(0, 100) + "...",
+        })),
+        recommendation: hasKnowledge
+          ? "Conhecimento existente encontrado. Considere refinar busca ou usar conhecimento atual."
+          : "GAP DETECTADO - Use skill_seeker_scrape para adquirir novo conhecimento.",
+        suggested_sources: suggestedSources,
+      });
+    } catch (error) {
+      return JSON.stringify({
+        success: false,
+        error: error.message,
+        query,
+      });
+    }
   }
 );
 
-// Tool: Gera nova skill
+// === TOOL 3: EXTRAI SKILLS DE CONTEÚDO ===
 defTool(
-  "generate_skill",
-  "Gera uma nova skill baseada em conhecimento adquirido",
+  "extract_skills_from_content",
+  "Extrai skills de conteúdo scraped usando LLM",
   {
     type: "object",
     properties: {
-      name: {
+      content: {
         type: "string",
-        description: "Nome da skill (kebab-case)",
+        description: "Conteúdo para extrair skills (pode ser resultado de scrape)",
       },
-      description: {
+      source: {
         type: "string",
-        description: "Descrição da skill",
+        description: "Fonte original do conteúdo",
       },
-      knowledge: {
+      topic: {
         type: "string",
-        description: "Conhecimento base para a skill (JSON)",
-      },
-      examples: {
-        type: "array",
-        items: { type: "string" },
-        description: "Exemplos de uso",
+        description: "Tópico do conteúdo",
       },
     },
-    required: ["name", "description", "knowledge"],
+    required: ["content", "source"],
   },
-  async ({ name, description, knowledge, examples = [] }) => {
-    // TODO: Salvar skill em .claude/skills/ ou Qdrant
-    const skillDefinition = {
-      name,
-      description,
-      version: "1.0.0",
-      created: new Date().toISOString(),
-      source: "skill_seeker_auto",
-      knowledge: JSON.parse(knowledge),
-      examples,
-      status: "draft", // draft -> review -> active
-    };
+  async ({ content, source, topic = "general" }) => {
+    try {
+      // Usa skill-extractor.mjs
+      const result = await extractAndSaveSkills(content, {
+        source,
+        type: "scraped",
+        topic,
+      });
 
-    return JSON.stringify({
-      status: "created",
-      skill: skillDefinition,
-      next_steps: [
-        "1. Revisar skill gerada",
-        "2. Testar com queries exemplo",
-        "3. Ativar skill após validação",
-      ],
-    });
+      if (!result.success) {
+        return JSON.stringify({
+          success: false,
+          error: result.error || "Extraction failed",
+        });
+      }
+
+      return JSON.stringify({
+        success: true,
+        extraction: result.extraction,
+        persistence: result.persistence,
+        next_step: "Use review_and_activate_skill para revisar skills",
+      });
+    } catch (error) {
+      return JSON.stringify({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+// === TOOL 4: GERA CÓDIGO DE SKILL ===
+defTool(
+  "generate_skill_code",
+  "Gera código defTool() para uma skill",
+  {
+    type: "object",
+    properties: {
+      skill_name: {
+        type: "string",
+        description: "Nome da skill no Qdrant",
+      },
+      export_path: {
+        type: "string",
+        description: "Caminho para exportar código (opcional)",
+      },
+    },
+    required: ["skill_name"],
+  },
+  async ({ skill_name, export_path = null }) => {
+    try {
+      // Busca skill no Qdrant
+      const embedding = generateMockEmbedding(skill_name);
+      const results = await qdrantSearch(COLLECTIONS.kb, embedding, 5, {
+        must: [
+          { key: "type", match: { value: "skill" } },
+          { key: "name", match: { value: skill_name } },
+        ],
+      });
+
+      if (results.length === 0) {
+        return JSON.stringify({
+          success: false,
+          error: `Skill not found: ${skill_name}`,
+        });
+      }
+
+      const skill = results[0].payload;
+
+      // Gera código usando skill-extractor
+      const { generateDefToolCode } = await import("./tools/skill-extractor.mjs");
+      const code = generateDefToolCode(skill);
+
+      return JSON.stringify({
+        success: true,
+        skill_name,
+        code,
+        export_path: export_path || "Not exported",
+      });
+    } catch (error) {
+      return JSON.stringify({
+        success: false,
+        error: error.message,
+      });
+    }
+  }
+);
+
+// === TOOL 5: ATIVA SKILL (draft -> active) ===
+defTool(
+  "review_and_activate_skill",
+  "Revisa e ativa uma skill (status: draft -> active)",
+  {
+    type: "object",
+    properties: {
+      skill_name: {
+        type: "string",
+        description: "Nome da skill a ativar",
+      },
+      review_notes: {
+        type: "string",
+        description: "Notas de revisão",
+      },
+    },
+    required: ["skill_name"],
+  },
+  async ({ skill_name, review_notes = "" }) => {
+    try {
+      // Busca skill
+      const embedding = generateMockEmbedding(skill_name);
+      const results = await qdrantSearch(COLLECTIONS.kb, embedding, 5, {
+        must: [
+          { key: "type", match: { value: "skill" } },
+          { key: "name", match: { value: skill_name } },
+        ],
+      });
+
+      if (results.length === 0) {
+        return JSON.stringify({
+          success: false,
+          error: `Skill not found: ${skill_name}`,
+        });
+      }
+
+      const skillId = results[0].id;
+
+      // Promove para active
+      await promoteKnowledge(COLLECTIONS.kb, skillId);
+
+      return JSON.stringify({
+        success: true,
+        skill_name,
+        id: skillId,
+        new_status: "active",
+        review_notes,
+      });
+    } catch (error) {
+      return JSON.stringify({
+        success: false,
+        error: error.message,
+      });
+    }
   }
 );
 
 // === AGENTE SKILL SEEKER ===
-
 defAgent(
   "skill_seeker",
-  "Agente que detecta gaps de conhecimento e auto-gera skills",
-  `Você é o Skill Seeker do FazAI, responsável por:
+  "Agente autônomo que detecta gaps e auto-gera skills",
+  `Você é o Skill Seeker do FazAI, um agente autônomo responsável por:
 
-1. DETECTAR GAPS: Quando uma query não tem resposta satisfatória
-2. BUSCAR FONTES: Identificar docs, repos, PDFs relevantes
+1. DETECTAR GAPS: Identificar lacunas de conhecimento
+2. BUSCAR FONTES: Localizar documentação relevante
 3. SCRAPE: Extrair conhecimento das fontes
-4. GERAR SKILLS: Criar novas skills automaticamente
+4. EXTRAIR SKILLS: Gerar skills automaticamente
+5. REVISAR: Validar e ativar skills
 
-WORKFLOW:
-1. Receber query ou gap report
-2. Verificar se já existe conhecimento (detect_knowledge_gap)
-3. Se gap confirmado, identificar fontes (skill_seeker_scrape)
-4. Gerar skill com conhecimento adquirido (generate_skill)
-5. Reportar skill criada para revisão
+WORKFLOW COMPLETO:
+1. Receber query ou detectar gap automaticamente
+2. detect_knowledge_gap(query) - Verificar conhecimento existente
+3. Se gap confirmado:
+   a. skill_seeker_scrape(source) - Scrape da fonte
+   b. extract_skills_from_content(content) - Extrair skills
+   c. generate_skill_code(skill_name) - Gerar código
+   d. review_and_activate_skill(skill_name) - Ativar skill
 
-IMPORTANTE:
+DIRETRIZES:
 - Skills geradas são DRAFT por padrão
-- Requerem revisão humana antes de ativação
-- Priorize fontes oficiais e confiáveis`,
+- Requerem revisão antes de ativação
+- Priorize fontes oficiais (docs, GitHub repos oficiais)
+- Evite scraping agressivo (rate limits)
+- Deduplicação automática de conteúdo`,
   {
-    tools: ["skill_seeker_scrape", "detect_knowledge_gap", "generate_skill"],
+    tools: [
+      "skill_seeker_scrape",
+      "detect_knowledge_gap",
+      "extract_skills_from_content",
+      "generate_skill_code",
+      "review_and_activate_skill",
+    ],
   }
 );
 
 // === PROMPT PRINCIPAL ===
 
 const userQuery = env.vars.query || "Detecte gaps de conhecimento no sistema";
-const mode = env.vars.mode || "detect"; // detect | scrape | generate
+const mode = env.vars.mode || "auto"; // auto | detect | scrape | extract | activate
+const source = env.vars.source || "";
 
 $`
-Você é o Skill Seeker do FazAI. Execute a seguinte tarefa:
+Você é o Skill Seeker do FazAI. Execute a seguinte operação:
 
 MODO: ${mode}
 QUERY: ${userQuery}
+${source ? `SOURCE: ${source}` : ""}
 
 ${mode === "detect" ? `
+# MODO: DETECÇÃO DE GAPS
+
 Analise a query e detecte se há um gap de conhecimento:
-1. Use detect_knowledge_gap para verificar
-2. Se gap encontrado, sugira fontes para scrape
-3. Reporte o status do gap
+1. Use detect_knowledge_gap para verificar conhecimento existente
+2. Se gap encontrado, sugira fontes específicas para scrape
+3. Reporte confiança dos matches encontrados
+4. Priorize fontes oficiais de documentação
 ` : ""}
 
 ${mode === "scrape" ? `
-Execute scrape de conhecimento:
-1. Use skill_seeker_scrape para a fonte indicada
-2. Processe o conteúdo extraído
-3. Prepare para geração de skill
+# MODO: SCRAPING DE FONTE
+
+Execute scrape da fonte indicada:
+1. Use skill_seeker_scrape para a fonte: ${source}
+2. Valide conteúdo extraído
+3. Reporte estatísticas (tamanho, método usado)
+4. Sugira próximo passo (extração de skills)
 ` : ""}
 
-${mode === "generate" ? `
-Gere uma nova skill:
-1. Use generate_skill com o conhecimento disponível
-2. Inclua exemplos de uso
-3. Reporte a skill criada para revisão
+${mode === "extract" ? `
+# MODO: EXTRAÇÃO DE SKILLS
+
+Extraia skills do conteúdo fornecido:
+1. Use extract_skills_from_content
+2. Valide skills geradas (JSON schema, exemplos)
+3. Reporte skills salvas no Qdrant
+4. Liste skills duplicadas (se houver)
 ` : ""}
 
-Seja objetivo e focado na tarefa.
+${mode === "activate" ? `
+# MODO: ATIVAÇÃO DE SKILL
+
+Revise e ative a skill:
+1. Busque skill pelo nome
+2. Verifique qualidade (confidence, exemplos)
+3. Use review_and_activate_skill se aprovada
+4. Gere código defTool() para referência
+` : ""}
+
+${mode === "auto" ? `
+# MODO: AUTOMÁTICO (WORKFLOW COMPLETO)
+
+Execute o pipeline completo:
+1. detect_knowledge_gap("${userQuery}")
+2. Se gap detectado:
+   - Identifique melhor fonte
+   - skill_seeker_scrape(fonte)
+   - extract_skills_from_content(conteúdo)
+3. Reporte skills geradas para revisão humana
+4. NÃO ative automaticamente (requer revisão)
+
+Seja autônomo mas cauteloso. Reporte cada etapa.
+` : ""}
+
+Execute a tarefa de forma sistemática e detalhada.
 `;

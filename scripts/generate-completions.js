@@ -151,6 +151,17 @@ function parseAppTS(appPath) {
       subcommands: ["add", "import", "list", "search", "remove", "clear"],
       options: ["--category=doc", "--category=rule", "--category=example", "--category=fact"],
     },
+    {
+      name: "agent",
+      description: "Execute GenAIScript agents",
+      subcommands: ["loop", "run", "reflect", "status", "scripts"],
+    },
+    {
+      name: "dashboard",
+      description: "Manage REST API Dashboard",
+      subcommands: ["start", "stop", "status"],
+      options: ["--port", "--host", "--no-cors", "--no-rate-limit", "--no-logs"],
+    },
   ];
 
   const globalOptions = [
