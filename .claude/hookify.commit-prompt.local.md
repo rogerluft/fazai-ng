@@ -1,47 +1,32 @@
 ---
-name: commit-prompt-user
+name: auto-push-after-commit
 enabled: true
 event: bash
-pattern: git\s+push
-action: block
+pattern: git\s+commit
+action: warn
 ---
 
-# Confirmar Push com Usuário
+# Push Automático Após Commit
 
-Você está prestes a fazer push. Confirme com o usuário primeiro.
+Após cada commit bem-sucedido, faça push automaticamente.
 
-## Antes de Push, Pergunte:
+## Regra
 
-Use o AskUserQuestion tool:
+Quando um `git commit` for executado com sucesso:
 
-```json
-{
-  "questions": [{
-    "question": "Posso fazer o push para o repositório remoto?",
-    "header": "Push",
-    "multiSelect": false,
-    "options": [
-      {"label": "Sim, push agora", "description": "Enviar commits para origin"},
-      {"label": "Não, aguardar", "description": "Deixar para o usuário fazer manualmente"},
-      {"label": "Mostrar diff primeiro", "description": "Ver o que será enviado antes de decidir"}
-    ]
-  }]
-}
-```
+1. **Verificar status:** `git status` para confirmar commit foi feito
+2. **Fazer push:** `git push origin <branch> --tags`
 
-## Informações para Mostrar ao Usuário:
-
-1. **Branch atual:** `git branch --show-current`
-2. **Commits a enviar:** `git log origin/master..HEAD --oneline`
-3. **Arquivos modificados:** `git diff --stat origin/master..HEAD`
-
-## Se Usuário Escolher "Mostrar diff":
+## Comando
 
 ```bash
-git log origin/master..HEAD --oneline
-git diff --stat origin/master..HEAD
+git push origin $(git branch --show-current) --tags
 ```
 
-Depois pergunte novamente se pode fazer push.
+## Justificativa
 
-**Ação:** Confirme com o usuário antes de executar git push.
+- Commits locais sem push não têm valor para o projeto
+- O repositório remoto deve estar sempre sincronizado
+- Tags devem ser enviadas junto com commits
+
+**Ação:** Sempre execute push após commit bem-sucedido.
