@@ -84,7 +84,7 @@ export interface AgenticConfig {
  */
 export class AgenticLoop {
   private client: QdrantClient;
-  private embeddingService: ReturnType<typeof createEmbeddingService> | null = null;
+  private embeddingService: Awaited<ReturnType<typeof createEmbeddingService>> | null = null;
   private config: Required<AgenticConfig>;
   private initialized = false;
 
@@ -106,8 +106,8 @@ export class AgenticLoop {
   async init(): Promise<void> {
     if (this.initialized) return;
 
-    this.embeddingService = createEmbeddingService();
-    await this.embeddingService.init();
+    // createEmbeddingService é async - retorna Promise<EmbeddingService>
+    this.embeddingService = await createEmbeddingService();
     this.initialized = true;
 
     if (this.config.verbose) {
@@ -123,7 +123,7 @@ export class AgenticLoop {
       throw new Error("AgenticLoop não inicializado. Chame init() primeiro.");
     }
 
-    const embedding = await this.embeddingService.embed(query);
+    const embedding = await this.embeddingService.generate(query);
     const results: ContextItem[] = [];
 
     // Busca em paralelo em todas as collections
@@ -177,7 +177,7 @@ export class AgenticLoop {
     }
 
     try {
-      const embedding = await this.embeddingService.embed(content);
+      const embedding = await this.embeddingService.generate(content);
 
       await this.client.upsert(COLLECTIONS.learning, {
         wait: true,

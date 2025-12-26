@@ -3,15 +3,13 @@
  * Integra GenAIScript runtime com FazAI com error handling robusto
  */
 
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { join } from "path";
 import { spawn, ChildProcess } from "child_process";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const PROJECT_ROOT = join(__dirname, "../..");
+// Compatível com CJS bundle - usa process.cwd() como fallback
+const PROJECT_ROOT = process.env.FAZAI_PROJECT_ROOT || process.cwd();
 const GENAISRC_DIR = join(PROJECT_ROOT, "genaisrc");
 
 export interface GenAIRunOptions {
