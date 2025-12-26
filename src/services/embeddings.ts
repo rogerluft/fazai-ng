@@ -354,67 +354,66 @@ class OpenAIEmbeddingService implements EmbeddingService {
  * const vector = await embeddings.generate("Hello world");
  */
 export async function createEmbeddingService(): Promise<EmbeddingService> {
-  // Try Ollama first (local, free)
-  const ollamaBaseUrl =
-    getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
-  const preferredOllamaModel = "mxbai-embed-large";
+  // Define provider checks as an array of Promises
+  const providerChecks = [
+    // Check 1: Ollama
+    async (): Promise<EmbeddingService | null> => {
+      try {
+        const ollamaBaseUrl = getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
+        const preferredOllamaModel = "mxbai-embed-large";
 
-  try {
-    logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
+        logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-    // Check Ollama availability AND model presence
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
+        const response = await fetch(`${ollamaBaseUrl}/api/tags`, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
 
-    const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
-      signal: controller.signal,
-    }).catch(() => null);
+        if (response.ok) {
+          const data = await response.json();
+          const models = data.models || [];
+          const modelNames = models.map((m: any) => m.name?.split(':')[0] || m.name);
 
-    clearTimeout(timeoutId);
+          if (modelNames.some((name: string) => name === preferredOllamaModel || name.startsWith(preferredOllamaModel))) {
+            logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1536 dim [padded])`);
+            return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 1024);
+          }
 
-    if (response && response.ok) {
-      const data = await response.json();
-      const models = data.models || [];
-      const modelNames = models.map((m: any) => m.name?.split(':')[0] || m.name);
+          const alternativeModel = "nomic-embed-text";
+          if (modelNames.some((name: string) => name === alternativeModel || name.startsWith(alternativeModel))) {
+            logger.info(`✓ Using Ollama for embeddings (${alternativeModel}, 1536 dim [padded])`);
+            return new OllamaEmbeddingService(ollamaBaseUrl, alternativeModel, 768);
+          }
 
-      // Check if preferred embedding model is available
-      const hasPreferredModel = modelNames.some((name: string) =>
-        name === preferredOllamaModel || name.startsWith(preferredOllamaModel)
-      );
-
-      if (hasPreferredModel) {
-        logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1536 dim [padded])`);
-        return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 1024);
+          logger.debug(`Ollama available but no embedding models found. Available: ${modelNames.join(', ')}`);
+        }
+      } catch (error: any) {
+        logger.debug(`Ollama not available: ${error.message}`);
       }
+      return null;
+    },
 
-      // Try alternative embedding model: nomic-embed-text (768 dim)
-      const alternativeModel = "nomic-embed-text";
-      const hasAlternativeModel = modelNames.some((name: string) =>
-        name === alternativeModel || name.startsWith(alternativeModel)
-      );
-
-      if (hasAlternativeModel) {
-        logger.info(`✓ Using Ollama for embeddings (${alternativeModel}, 1536 dim [padded])`);
-        return new OllamaEmbeddingService(ollamaBaseUrl, alternativeModel, 768);
+    // Check 2: OpenAI
+    async (): Promise<EmbeddingService | null> => {
+      try {
+        const openaiApiKey = getConfigValue("OPENAI_API_KEY");
+        if (openaiApiKey) {
+          logger.info("✓ Using OpenAI for embeddings (text-embedding-3-small, 1536 dim)");
+          logger.warn("⚠️  OpenAI embeddings are paid ($0.02/1M tokens)");
+          return new OpenAIEmbeddingService(openaiApiKey, "text-embedding-3-small", 1536);
+        }
+      } catch (error: any) {
+         logger.debug(`OpenAI not available: ${error.message}`);
       }
-
-      logger.debug(`Ollama available but no embedding models found. Available: ${modelNames.join(', ')}`);
+      return null;
     }
-  } catch (error: any) {
-    logger.debug(`Ollama not available: ${error.message}`);
-  }
+  ];
 
-  // Fallback to OpenAI
-  const openaiApiKey = getConfigValue("OPENAI_API_KEY");
-
-  if (openaiApiKey) {
-    logger.info("✓ Using OpenAI for embeddings (text-embedding-3-small, 1536 dim)");
-    logger.warn("⚠️  OpenAI embeddings are paid ($0.02/1M tokens)");
-    return new OpenAIEmbeddingService(
-      openaiApiKey,
-      "text-embedding-3-small",
-      1536
-    );
+  // Sequentially check for the first available provider
+  for (const check of providerChecks) {
+    const service = await check();
+    if (service) {
+      return service;
+    }
   }
 
   // No provider available

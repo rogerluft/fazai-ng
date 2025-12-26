@@ -163,12 +163,21 @@ export class DashboardServer {
       });
 
       // Force close after 5 seconds
-      setTimeout(() => {
+      const forceCloseTimeout = setTimeout(() => {
         logger.warn("Force closing server after timeout");
-        this.server?.closeAllConnections?.();
+
+        // server.closeAllConnections() was added in Node v18.2.0
+        // For broader compatibility, we can destroy sockets manually if needed
+        if (this.server && typeof this.server.closeAllConnections === 'function') {
+           this.server.closeAllConnections();
+        }
+
         this.server = null;
         resolve();
       }, 5000);
+
+      // Prevent the timeout from keeping the process alive
+      forceCloseTimeout.unref();
     });
   }
 

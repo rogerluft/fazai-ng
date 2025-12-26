@@ -590,3 +590,10 @@ main().catch((error) => {
   logger.error("Unhandled error:", error);
   process.exit(1);
 });
+
+// Global handler for unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error(`FATAL: Unhandled Rejection at:`, promise, 'reason:', reason);
+  // Em situações críticas, pode ser útil forçar a saída
+  // process.exit(1);
+});
