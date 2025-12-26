@@ -169,7 +169,7 @@ async function main() {
   const SUBCOMMANDS_WITH_HELP = [
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
-    "config", "search", "inference"
+    "config", "search", "inference", "agent"
   ];
 
   const firstArg = inputs[0];
@@ -243,6 +243,13 @@ async function main() {
   if (inputs[0] === "inference") {
     const { handleInferenceCommand } = await import("./commands/inference");
     await handleInferenceCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Agent command - Coração agêntico do FazAI
+  if (inputs[0] === "agent") {
+    const { handleAgentCommand } = await import("./commands/agent");
+    await handleAgentCommand(inputs.slice(1));
     process.exit(0);
   }
 

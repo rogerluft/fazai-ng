@@ -1,5 +1,67 @@
 # FazAI Changelog
 
+## [3.9.0-beta] - 2025-12-25
+
+### 🫀 Coração Agêntico - MVP Release
+
+#### ✨ Features - Sistema Agêntico Completo
+
+- **Comando `fazai agent`**: Coração agêntico do FazAI
+  - `fazai agent loop <query>` - Loop agêntico nativo com reflexão (RECOMENDADO)
+  - `fazai agent run <query>` - Execução via GenAIScript
+  - `fazai agent reflect` - Reflexão autônoma sobre aprendizados
+  - `fazai agent status` - Status do sistema agêntico
+  - `fazai agent scripts` - Lista scripts GenAIScript disponíveis
+
+- **Loop Agêntico Nativo** (`src/agentic/agentic-loop.ts`):
+  - Busca multi-collection com fusion scoring (Neural Flow style)
+  - Reflexão automática após cada iteração
+  - Persistência de insights na collection learning
+  - Detecção de gaps de conhecimento
+  - Timeout e limite de iterações configuráveis
+
+- **GenAIScript Integration** (`genaisrc/`):
+  - `fazai-core.genai.mjs` - Loop agêntico principal com defAgent
+  - `reflect.genai.mjs` - Script de reflexão autônoma
+  - `skill-seeker.genai.mjs` - Auto-geração de skills (placeholder)
+  - `tools/qdrant-tools.mjs` - Ferramentas Qdrant para GenAIScript
+  - Configuração para ollama:phi3 (local) com fallback cloud
+
+- **Skill Seekers Placeholder**:
+  - `skill_seeker_scrape` tool definida para futura implementação
+  - Detecta gaps de conhecimento automaticamente
+  - Preparado para auto-geração de skills de docs/repos/PDFs
+
+#### 🏗️ Architecture
+
+- **Novo módulo `src/agentic/`**:
+  - `agentic-loop.ts` - Loop agêntico nativo TypeScript
+  - `genai-runner.ts` - Executor de scripts GenAIScript com error handling
+
+- **Fusion Scoring** (pesos por collection):
+  - learning: 40% (aprendizados técnicos)
+  - kb: 30% (knowledge base)
+  - memory: 20% (memórias de conversas)
+  - inference: 10% (regras de inferência)
+
+#### 📝 Exemplos de Uso
+
+```bash
+# Loop agêntico nativo (mais rápido)
+fazai agent loop "como otimizar embeddings locais no DL380"
+
+# Via GenAIScript com modelo específico
+fazai agent run "configure samba" --model ollama:phi3
+
+# Reflexão autônoma
+fazai agent reflect
+
+# Status do sistema
+fazai agent status
+```
+
+---
+
 ## [3.8.2-beta] - 2025-12-25
 
 ### 🎄 Christmas Release - Inference Command & CLI Help Fix

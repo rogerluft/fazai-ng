@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.8.2",
+  "version": "3.9.0",
   "author": "Roger Luft (VeilWalker) <roger@webstorage.com.br> (fork from Mandark by Hrishi Olickel)",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -12,6 +12,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.24.3",
     "@crawlee/playwright": "^3.15.3",
+    "@genaiscript/runtime": "^2.5.1",
     "@github/copilot": "^0.0.359",
     "@github/copilot-language-server-linux-x64": "^1.396.0",
     "@google/generative-ai": "^0.24.1",

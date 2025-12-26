@@ -1,0 +1,101 @@
+Here's a formatted prompt you can use to instruct an AI like Claude (leveraging its "superpowers" for planning and execution) to integrate Microsoft's GenAIScript with local AI models (such as Phi-3 or Gemma-2B, as previously discussed) for building the "coração agêntico" in your FazAI-ng project. This prompt draws on the brainstorm ideas you shared, incorporating GenAIScript's strengths in programmatic prompting, agent orchestration, and tool integration to create an agentic loop system.
+Key Considerations for the Prompt
+
+It emphasizes iterative development to avoid overwhelming changes in your TypeScript/Node.js CLI.
+Research suggests GenAIScript excels at automating AI tasks in scripts, making it suitable for agentic features like self-reflection and skill generation, though integration may require testing for compatibility with Qdrant and existing embeddings.
+Be prepared for potential setup hurdles, like configuring local models via Ollama, but evidence leans toward smooth embedding in Node.js projects.
+This approach acknowledges the project's evolving nature, allowing for hooks and todos to be addressed gradually.
+
+Copy-paste it directly into your interaction with Claude (or a similar AI). Customize placeholders like [Your Repo Path] if needed. It structures the task as a step-by-step plan, using GenAIScript for the core agentic logic while tying into your existing architecture (e.g., Qdrant collections for memory and knowledge).
+GenAIScript, developed by Microsoft Research as a scripting vehicle for generative AI, offers a powerful way to integrate large language models (LLMs) into programmable workflows, making it an ideal tool for enhancing projects like your FazAI-ng with agentic capabilities. This detailed exploration covers its features, setup, integration strategies, and tailored application to your brainstormed "coração agêntico" architecture, drawing on official documentation and examples to ensure a thorough, self-contained guide. We'll break it down into core components, usage patterns, potential challenges, and a step-by-step adaptation plan for FazAI-ng, including tables for clarity on mappings and todos.
+Understanding GenAIScript: Core Features and Mechanics
+GenAIScript treats "prompting as coding," allowing developers to assemble LLM prompts programmatically using a simplified JavaScript/TypeScript syntax. Key features include template literals prefixed with $ for building prompts, the def() function for injecting variables (e.g., file contents or data), and seamless orchestration of LLMs from providers like OpenAI, Anthropic, or local setups via Ollama. It supports rich data handling for files (PDF, DOCX, CSV, XLSX), images, videos, and web content, alongside structured outputs via JSON schemas for validation. Safety features incorporate Responsible AI prompts and Azure Content Safety to mitigate issues like prompt injection.
+At its core, GenAIScript scripts (typically .genai.mjs files) execute in a Node.js runtime, enabling CLI automation, CI/CD integration (e.g., GitHub Actions for PR reviews), and VS Code extension support for debugging. For agentic systems, it provides defAgent() for creating LLM agents that combine tools, prompts, and reasoning loops—enabling autonomous task delegation, such as querying Git repos or file systems. This aligns closely with your goal of a self-evolving loop, where agents can reflect on outputs and iterate.
+Installation is straightforward: npm install -g @genaiscript/cli for global use, or embed the runtime in apps via @genaiscript/runtime. Configuration involves setting LLM providers (e.g., script({ model: "ollama:phi3" }) for local Phi-3), and scripts can be run with npx genaiscript run script.genai.mjs. Basic examples demonstrate its power: a simple $Write a poem.  generates creative output, while more advanced ones chain file ingestion with analysis, saving results as files or JSON.
+Integration with External AIs and Local Models
+GenAIScript excels at integrating with AIs like the ones you've considered (e.g., Phi-3 or Gemma-2B), especially local models through Ollama or LocalAI, which keeps computations offline and lightweight for your server setup. You can define custom tools as JavaScript functions (e.g., defTool("qdrant_search", ...) to interface with your Qdrant vector DB), and agents can call them in loops for reflection—mirroring your desired self-evolving system. For instance, an agent might analyze code from fazai_source collection, reflect on improvements, and generate new skills.
+Examples from documentation show hierarchical LLM composition: looping over files to summarize individually, then summarizing the summaries—a pattern adaptable for your Skill_Seekers feature, where docs are ingested and skills auto-generated via prompts like $Extract skills from DOCS as JSON tools.`` Built-in agents (e.g., agent.git for repo analysis, agent.fs for file ops) can extend to custom ones for Qdrant interactions or web dashboards. Plugins like Playwright for browser automation or Transformers.js for on-device ML further enhance agentic capabilities, though you should test for compatibility with your Btrfs/Docker environment.
+Adapting GenAIScript to FazAI-ng's Agentic Heart
+To turn FazAI-ng into a "coração agêntico," integrate GenAIScript as the orchestration layer, using local models for embeddings and loops while building on your Qdrant-based memory system. Start by adding a genaisrc/ folder for scripts, embedding the runtime in src/app.ts for CLI commands like fazai agent run. For your brainstorm points:
+
+Embeddador Integrado: Use GenAIScript's local embedding support (e.g., via Transformers.js plugin) or wrap your existing createEmbeddingService as a tool. A script could embed user-injected knowledge and upsert to fazai_inference.
+Loop Agêntico: Implement reflection with chained runPrompt() calls, where an agent queries Qdrant memory, reflects ($Reflect on previous output and improve.), and evolves procedures in fazai_learning`.
+Skill_Seekers: Create a script that ingests docs (e.g., via workspace.readText()), prompts for skill generation, and defines them as defTool() outputs stored in Qdrant.
+Interface Web: Build an Express.js dashboard exposing GenAIScript endpoints (e.g., /knowledge/search runs a search script), managing collections like fazai_kb.
+
+Address your todos by hooking GenAIScript into git hooks (e.g., post-commit runs an agentic reflection script) and verifying episodic-memory indexing with a diagnostic agent. Potential challenges include model latency on local hardware—mitigate by starting with Phi-3 mini—and ensuring thread safety in loops for your multi-server setup.
+
+
+Brainstorm Component,GenAIScript Mapping,Implementation Steps in FazAI-ng,Potential Tools/Agents
+Embeddador Integrado,Local embeddings via Ollama/Transformers.js,"Wrap createEmbeddingService in defTool(), upsert to Qdrant in script loop","Custom ""embed"" tool"
+Loop Agêntico,defAgent() with chained prompts,Add fazai agent loop command; reflect on Qdrant memory outputs,"agent.planner, custom reflection tool"
+Skill_Seekers,File ingestion + schema extraction,"Script ingests docs, generates JSON tools, saves to fazai_kb","agent.fs, defSchema() for validation"
+Interface Web,CLI runtime embedding + API endpoints,New src/dashboard.ts with Express; expose scripts as routes,agent.web for dynamic queries
+Todos/Hooks Integration,CI/CD automation,"Update hooks to trigger .genai.mjs (e.g., code-reviewer agent)",agent.git for commit analysis
+
+
+#################### prompt encapsulado ####
+**For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans and superpowers:brainstorming to implement this integration task-by-task. Leverage GenAIScript from Microsoft for scripting and orchestrating the agentic components.
+
+**Goal:** Transform FazAI-ng into a "coração agêntico" by integrating Microsoft's GenAIScript with local AI models (e.g., Phi-3 or Gemma-2B via Ollama/LocalAI) to enable an agentic loop. This builds on the existing brainstorm:  
+1. Embeddador integrado - Use a light local model for embeddings (e.g., integrate with existing Qdrant for vector search).  
+2. Loop agêntico - Create a self-evolving system with reflection, using GenAIScript's agent definitions and LLM chaining.  
+3. Skill_Seekers - Auto-generate skills from docs via programmatic prompts and tool calls.  
+4. Interface web - Build a simple dashboard (e.g., using Express.js) for managing knowledge in Qdrant collections.  
+
+Incorporate the following todos:  
+- Brainstorm: Plano para FazAI agêntico inteligente  
+- Verificar status da indexação episodic-memory  
+- Existing hooks (e.g., for documentation, code review, indexing to Qdrant source, reflection on install.sh, tests, systemctl, commit/push).  
+
+**Architecture Overview:** FazAI-ng is a TypeScript/Node.js CLI using Qdrant for vector memory (collections: fazai_personality, fazai_memory, etc.). GenAIScript will handle LLM orchestration, tools, and agents within new scripts (e.g., .genai.mjs files in a genaisrc/ folder). Use local models to keep it lightweight and offline-capable.
+
+**Tech Stack Additions:**  
+- GenAIScript: Install via npm install @genaiscript/cli and @genaiscript/runtime.  
+- Local Models: Phi-3/Gemma-2B via Ollama (configure as LLM provider in GenAIScript).  
+- Integration: Embed GenAIScript runtime in src/app.ts or new commands for agentic execution.
+
+**Task Breakdown:**  
+1. **Setup GenAIScript:** Install dependencies, create genaisrc/ folder in [Your Repo Path], and configure with local models (e.g., script({ model: "ollama:phi3" })). Test a basic hello-world script.  
+2. **Embeddador Integrado:** Use GenAIScript's embedding tools or integrate with existing createEmbeddingService. Create a script to generate embeddings locally and upsert to Qdrant (e.g., fazai_inference).  
+3. **Loop Agêntico:** Define an agent in GenAIScript with reflection (e.g., defAgent("fazai_core", "Self-reflect on tasks", { tools: ["qdrant_upsert", "reflect"] })). Implement a loop using runPrompt() chaining for self-evolution, querying Qdrant for memory.  
+4. **Skill_Seekers:** Build a script that ingests docs (e.g., via workspace.readText()), prompts the LLM to generate skills as JSON schemas, and saves them as tools or hooks.  
+5. **Interface Web:** Add a simple Express.js server (new file: src/dashboard.ts) to expose endpoints for knowledge management (e.g., list/search from Qdrant). Integrate GenAIScript agents for dynamic queries.  
+6. **Incorporate Todos and Hooks:** Update existing hooks to trigger GenAIScript scripts (e.g., post-commit hook runs agentic reflection). Verify episodic-memory indexing status and add if missing.  
+7. **Testing and Commit:** Write Vitest tests for new features, update CHANGELOG/README, and commit task-by-task with messages like "feat(agentic): add GenAIScript integration for loop".  
+
+**Guidelines:**  
+- Use GenAIScript's agents and tools for autonomy (e.g., agent.fs for file ops, agent.git for repo analysis).  
+- Ensure compatibility with existing RAG/neural-flow.ts by exposing Qdrant as a tool.  
+- Handle errors gracefully, e.g., fallback to cloud models if local fails.  
+- Output: Updated code, new scripts, and a final brainstorm summary for the agentic plan.  
+
+Execute this plan task-by-task, providing code diffs, tests, and commits.
+
+################################################################################################################################
+Generative AI Scripting | GenAIScript - Microsoft Open Source
+microsoft/genaiscript: Automatable GenAI Scripting - GitHub
+Microsoft GenAIScript First Look - YouTube
+Video Introduction | GenAIScript - Microsoft Open Source
+GenAIScript - Visual Studio Marketplace
+Getting Started | GenAIScript
+What is GenAIScript? - Just Some Dev - nickyt.co
+Prompting is the New Scripting: Meet GenAIScript - YouTube
+
+https://github.com/microsoft/genaiscript
+https://microsoft.github.io/genaiscript/getting-started/
+https://github.com/microsoft/genaiscript
+https://www.microsoft.com/en-us/research/project/genaiscript-scripting-for-generative-ai/?referrer=grok.com
+https://microsoft.github.io/genaiscript/?referrer=grok.com
+https://www.youtube.com/watch?v=GVXRsTx7wME&referrer=grok.com
+https://marketplace.visualstudio.com/items?itemName=genaiscript.genaiscript-vscode&referrer=grok.com
+https://www.nickyt.co/blog/what-is-genaiscript-1mf2/?referrer=grok.com
+https://www.youtube.com/watch?v=Aq30zfbWNSQ&referrer=grok.com
+https://learn.microsoft.com/pt-br/azure/ai-services/translator/custom-translator/azure-ai-foundry/how-to/translate-with-model
+https://microsoft.github.io/genaiscript/case-studies/documentation-translations/
+https://www.crn.com/news/ai/2025/microsoft-ignite-2025-the-biggest-news-in-ai-agents-data
+https://azure.microsoft.com/en-us/blog/actioning-agentic-ai-5-ways-to-build-with-news-from-microsoft-ignite-2025/
+https://www.microsoft.com/en-us/research/project/genaiscript-scripting-for-generative-ai/
+https://microsoft.github.io/genaiscript/
+https://blogs.microsoft.com/blog/2025/05/19/microsoft-build-2025-the-age-of-ai-agents-and-building-the-open-agentic-web/
+
