@@ -9,9 +9,12 @@
 
 import { describe, it, expect, beforeAll } from 'vitest';
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { randomUUID } from 'crypto';
 
 const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
 const TEST_COLLECTION = 'fazai_test_connection';
+// Qdrant requer UUIDs ou inteiros para IDs de pontos
+const TEST_POINT_ID = randomUUID();
 
 describe('Qdrant Connection Tests (REAL)', () => {
   let client: QdrantClient;
@@ -49,7 +52,7 @@ describe('Qdrant Connection Tests (REAL)', () => {
 
   it('deve inserir ponto no Qdrant', async () => {
     const testPoint = {
-      id: 'test-point-1',
+      id: TEST_POINT_ID,
       vector: Array(1536).fill(0.1),
       payload: {
         test: true,
@@ -64,11 +67,11 @@ describe('Qdrant Connection Tests (REAL)', () => {
     });
 
     const result = await client.retrieve(TEST_COLLECTION, {
-      ids: ['test-point-1'],
+      ids: [TEST_POINT_ID],
     });
 
     expect(result).toHaveLength(1);
-    expect(result[0].id).toBe('test-point-1');
+    expect(result[0].id).toBe(TEST_POINT_ID);
     expect(result[0].payload?.test).toBe(true);
     expect(result[0].payload?.message).toBe('Integration test point');
   });
@@ -83,18 +86,18 @@ describe('Qdrant Connection Tests (REAL)', () => {
 
     expect(searchResult).toBeDefined();
     expect(searchResult.length).toBeGreaterThan(0);
-    expect(searchResult[0].id).toBe('test-point-1');
+    expect(searchResult[0].id).toBe(TEST_POINT_ID);
     expect(searchResult[0].score).toBeGreaterThan(0);
   });
 
   it('deve deletar ponto do Qdrant', async () => {
     await client.delete(TEST_COLLECTION, {
       wait: true,
-      points: ['test-point-1'],
+      points: [TEST_POINT_ID],
     });
 
     const result = await client.retrieve(TEST_COLLECTION, {
-      ids: ['test-point-1'],
+      ids: [TEST_POINT_ID],
     });
 
     expect(result).toHaveLength(0);
@@ -107,9 +110,10 @@ describe('Qdrant Connection Tests (REAL)', () => {
       await client.getCollection(TEST_COLLECTION);
       // Se chegou aqui, collection ainda existe (erro)
       expect(true).toBe(false);
-    } catch (error: any) {
-      // Collection não existe (esperado)
-      expect(error.message).toContain('Not found');
+    } catch (error: unknown) {
+      // Collection não existe (esperado) - case insensitive match
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      expect(errorMessage.toLowerCase()).toContain('not found');
     }
   });
 });

@@ -4,11 +4,18 @@ import { ResilienceOrchestrator } from '../src/orchestrator/resilience-orchestra
 import { AgenticWebCrawler } from '../src/research/web-crawler';
 import * as askAIModule from '../src/askAI';
 import * as configModule from '../src/config';
+import * as modelsModule from '../src/models';
 
 // Mock das dependências externas
 vi.mock('../src/askAI');
 vi.mock('../src/config');
 vi.mock('../src/research/web-crawler');
+vi.mock('../src/models', () => ({
+  models: [
+    { name: 'claude-opus-4', provider: 'anthropic', enabled: true },
+    { name: 'gpt-4', provider: 'openai', enabled: true },
+  ],
+}));
 
 describe('ResilienceOrchestrator', () => {
   beforeEach(() => {

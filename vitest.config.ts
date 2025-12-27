@@ -9,5 +9,11 @@ export default defineConfig({
     testTimeout: 30000, // 30s timeout para integration tests
     hookTimeout: 30000,
     teardownTimeout: 10000,
+    // Rodar testes de integração sequencialmente para evitar conflitos de collections
+    fileParallelism: false,
+    // Rodar testes dentro de cada arquivo sequencialmente
+    sequence: {
+      shuffle: false,
+    },
   },
 });

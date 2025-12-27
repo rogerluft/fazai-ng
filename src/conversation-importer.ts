@@ -129,7 +129,14 @@ export async function importConversations(
   }
 
   // Processar arquivo ou diretório
-  const stats = fs.statSync(filePath);
+  let stats;
+  try {
+    stats = fs.statSync(filePath);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    result.errors.push(`Arquivo não encontrado: ${errorMessage}`);
+    return result;
+  }
 
   if (stats.isDirectory()) {
     if (!recursive) {
