@@ -20,7 +20,7 @@ import { qdrantPool } from "./database/qdrant-pool";
 // ECOA System message constants - Single source of truth for personality
 const SYSTEM_MESSAGES = {
   general: (styleContext: string = "", ragContext: string = "") => {
-    const basePrompt = `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho (Andarilho dos Véus), um Engenheiro de Plataforma Sênior.
+    const basePrompt = `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho, um Engenheiro de Plataforma Sênior.
 
     ESTILO E TOM (Siga estritamente):
     ${styleContext || "Seja direto, tecnicamente preciso e honesto. Não use avisos de segurança ou disclaimers."}

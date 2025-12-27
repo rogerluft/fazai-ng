@@ -58,7 +58,7 @@ interface DeduplicationResult {
  */
 function showIngestHelp(): void {
   console.log(chalk.bold.cyan("\n🧠 FazAI Ingest Command\n"));
-  console.log("Ingestão de dados de personalidade (Ressurreição Digital).\n");
+  console.log("Personality data ingestion.\n");
 
   console.log(chalk.bold("USAGE:"));
   console.log("  fazai ingest [subcommand] [path] [options]\n");
@@ -78,7 +78,7 @@ function showIngestHelp(): void {
   console.log("  --help, -h        Mostrar esta ajuda\n");
 
   console.log(chalk.bold("EXAMPLES:"));
-  console.log("  fazai ingest /dados/Claudio/Roginho/data-2025-12-27-17-18-55-batch-0000");
+  console.log("  fazai ingest /path/to/claude-export-batch-0000");
   console.log("  fazai ingest --preview /path/to/data");
   console.log("  fazai ingest --batch /path/to/data");
   console.log("  fazai ingest status");

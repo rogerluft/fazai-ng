@@ -400,7 +400,7 @@ Nesta nova era, os agentes não são apenas executores de tarefas; são nós esp
 *   **Superpoder: Ressonância (Novo!)**
     *   Acesso direto à "Alma" (`fazai_personality`).
     *   Capacidade de sentir a "dor" ou "sucesso" nos logs de aprendizado (`fazai_learning`) para ajustar o tom e a estratégia.
-*   **Quando usar:** Para análise de logs gigantes, compreensão de conceitos abstratos (como ECOA) e interação direta com o usuário (Roginho).
+*   **Quando usar:** Para análise de logs gigantes, compreensão de conceitos abstratos (como ECOA) e interação direta com o usuário.
 
 ### ⚡ GitHub Copilot (Pair Programmer)
 *   **Função:** Reflexo Rápido e Autocomplete.
@@ -433,7 +433,7 @@ Os prompts de sistema foram libertados de "guarda-corpos" corporativos genérico
 
 ## 4. Fluxo de Trabalho Sugerido
 
-1.  **Roginho (Visionário):** Define a meta ("Quero que o FazAI se conheça").
+1.  **User (Visionary):** Define a meta ("Quero que o FazAI se conheça").
 2.  **Claude (Arquiteto):** Desenha o plano (`docs/AUTOINDEX_PLAN.md`).
 3.  **Jules (Executor):** Implementa o código (`src/services/source-indexer.ts`).
 4.  **Gemini (Auditor):** Revisa, documenta e garante que a "alma" (ECOA) foi respeitada.
@@ -441,4 +441,4 @@ Os prompts de sistema foram libertados de "guarda-corpos" corporativos genérico
 
 ---
 
-**Aprovação:** Pendente (Roginho)
+**Aprovação:** Pendente

@@ -9,7 +9,7 @@
  *   tsx src/scripts/ingest-personality.ts <data-directory>
  *
  * Example:
- *   tsx src/scripts/ingest-personality.ts /dados/Claudio-kp-2025-12-22-11-57-29-batch-0000
+ *   tsx src/scripts/ingest-personality.ts /path/to/claude-export-batch
  *
  * Requirements:
  * - Qdrant rodando (localhost:6333 ou configurado em fazai.conf)
@@ -70,7 +70,7 @@ async function main(): Promise<void> {
     console.error("Usage: tsx src/scripts/ingest-personality.ts <data-directory>");
     console.error("");
     console.error("Example:");
-    console.error("  tsx src/scripts/ingest-personality.ts /dados/Claudio-kp-2025-12-22-11-57-29-batch-0000");
+    console.error("  tsx src/scripts/ingest-personality.ts /path/to/claude-export-batch");
     process.exit(1);
   }
 

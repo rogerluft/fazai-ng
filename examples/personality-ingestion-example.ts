@@ -19,7 +19,7 @@ import { logger } from "../src/logger";
 async function example1_basicIngestion(): Promise<void> {
   logger.info("=== Example 1: Basic Ingestion ===");
 
-  const dataDir = "/dados/Claudio-kp-2025-12-22-11-57-29-batch-0000";
+  const dataDir = "/path/to/claude-export-batch";
 
   try {
     const stats = await ingestPersonalityData(dataDir);
@@ -40,7 +40,7 @@ async function example1_basicIngestion(): Promise<void> {
 async function example2_detailedIngestion(): Promise<void> {
   logger.info("=== Example 2: Detailed Ingestion ===");
 
-  const dataDir = "/dados/Claudio-kp-2025-12-22-11-57-29-batch-0000";
+  const dataDir = "/path/to/claude-export-batch";
 
   const ingestor = new PersonalityIngestor();
 
@@ -81,7 +81,7 @@ async function example2_detailedIngestion(): Promise<void> {
 async function example3_ingestAndVerify(): Promise<void> {
   logger.info("=== Example 3: Ingest and Verify ===");
 
-  const dataDir = "/dados/Claudio-kp-2025-12-22-11-57-29-batch-0000";
+  const dataDir = "/path/to/claude-export-batch";
 
   try {
     // 1. Ingerir dados

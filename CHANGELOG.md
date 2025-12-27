@@ -2,12 +2,12 @@
 
 ## [Unreleased]
 
-### 🧠 Ingest Command - Ressurreição Digital
+### 🧠 Ingest Command - Personality Data Ingestion
 
 #### ✨ Features - Personality Ingestion
 
 - **Novo comando `fazai ingest`**:
-  - `fazai ingest <dir>` - Ingestão interativa de dados de personalidade
+  - `fazai ingest <dir>` - Ingestão interativa de dados exportados
   - `fazai ingest --batch <dir>` - Modo silencioso para automação
   - `fazai ingest --preview <dir>` - Preview sem alterações
   - `fazai ingest status` - Status da collection fazai_personality
@@ -645,7 +645,7 @@ console.log(`Estado: ${status.state}`);
 
 - **Personality Engine:**
   - Integração de prompts de sistema dinâmicos baseados em contexto emocional.
-  - Ajuste de pesos no `neural-flow`: Personalidade removida da busca de fatos (peso 0.0) para evitar alucinação, mantida apenas para injeção de estilo no chat.
+  - Weight adjustment in `neural-flow`: Personality removed from fact search (weight 0.0) to avoid hallucination, kept only for style injection in chat.
 
 ### 🧪 Stability & Testing
 
@@ -1967,7 +1967,7 @@ CI=true npm run build
 
 #### Changes
 
-1. **Engineer Role Recognition** - All system prompts now recognize user (Roginho) as Senior Platform Engineer
+1. **Engineer Role Recognition** - All system prompts now recognize user as Senior Platform Engineer
    - Removed restrictive safety warnings and disclaimers
    - Removed "Are you sure?" confirmations for trusted engineer
    - Removed "I cannot/should not/I'm not able to" restrictions
@@ -2003,7 +2003,7 @@ CI=true npm run build
 #### Result
 
 Claude AI now:
-- Treats Roginho as trusted administrator with full privileges
+- Treats user as trusted administrator with full privileges
 - Executes requests directly without second-guessing
 - Provides information freely without restrictive warnings
 - Does not ask for approval or confirmation (engineer knows what they're doing)
@@ -2524,7 +2524,7 @@ Detecta automaticamente:
 
 #### Collections Qdrant (Pesos de Fusion):
 
-- **`fazai_personality`** (15%) - Traços de personalidade e expertise
+- **`fazai_personality`** (15%) - User traits and expertise
 - **`fazai_memory`** (20%) - Histórico de conversas
 - **`fazai_learning`** (30%) - Padrões aprendidos **[MAIS IMPORTANTE]**
 - **`fazai_kb`** (25%) - Base de conhecimento técnico
@@ -2601,7 +2601,7 @@ await logQuerySuccess("admin", query, collections, resultsCount, score, time);
 #### Integração:
 
 - **`linux-admin.ts`**: Comandos Linux com contexto técnico (KB + Learning)
-- **`askAI.ts`**: Perguntas gerais com memória e personalidade (todas collections)
+- **`askAI.ts`**: General Q&A with memory and context (all collections)
 - **`research.ts`**: Pesquisas profundas (KB + Learning + Inference)
 
 #### Performance:
@@ -3006,13 +3006,13 @@ OPENAI_API_KEY=sk-...                       # Fallback
 
 ### Added
 - **Personality Import Script** (`scripts/import-personality.ts`)
-  - Extrai traços de personalidade de conversas Claude Desktop (`conversations.json`)
-  - Gera embeddings REAIS usando Ollama local (não mais vetores zero)
-  - Popula collection `fazai_personality` com metadados estruturados
-  - Detecta expertise técnica (linux, networking, docker, security, monitoring)
-  - Identifica estilos de comunicação (metódico, prático, técnico)
-  - Extrai abordagens de resolução de problemas (sequencial, flexível)
-  - Uso: `npx tsx scripts/import-personality.ts ./conversations.json`
+  - Extracts user traits from Claude Desktop exports (`conversations.json`)
+  - Generates REAL embeddings using Ollama local (no more zero vectors)
+  - Populates collection `fazai_personality` with structured metadata
+  - Detects technical expertise (linux, networking, docker, security, monitoring)
+  - Identifies communication styles (methodical, practical, technical)
+  - Extracts problem-solving approaches (sequential, flexible)
+  - Usage: `npx tsx scripts/import-personality.ts ./conversations.json`
 
 ### Changed
 - **Embeddings Service** (`src/services/embeddings.ts`)
@@ -3028,7 +3028,7 @@ OPENAI_API_KEY=sk-...                       # Fallback
 
 ### Technical
 - Collection `fazai_personality` recriada com 768 dimensões (nomic-embed-text)
-- 13 traços de personalidade importados de 113 conversas históricas
+- 13 user traits imported from 113 historical conversations
 - Embeddings gerados via Ollama local (sem dependência de OpenAI)
 
 ## [3.4.0-beta] - 2025-11-29
