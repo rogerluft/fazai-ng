@@ -1214,6 +1214,9 @@ main() {
     bash "$INSTALL_DIR/scripts/setup-env.sh"
   fi
 
+  # Setup log directory with proper permissions
+  setup_log_directory
+
   # Instalar systemd services (opcional)
   if [ -f "$INSTALL_DIR/scripts/systemd/install-services.sh" ]; then
     echo ""
@@ -1230,6 +1233,45 @@ main() {
   fi
 
   print_success
+}
+
+# Setup /var/log/fazai with proper permissions
+setup_log_directory() {
+  local LOG_DIR="/var/log/fazai"
+  local CURRENT_USER="${SUDO_USER:-$USER}"
+
+  info "Configurando diretório de logs..."
+
+  # Check if already writable
+  if [ -d "$LOG_DIR" ] && [ -w "$LOG_DIR" ]; then
+    success "Diretório de logs já configurado: $LOG_DIR"
+    return 0
+  fi
+
+  # Create group fazai if it doesn't exist
+  if ! getent group fazai > /dev/null 2>&1; then
+    if [ "$EUID" -eq 0 ]; then
+      groupadd -f fazai
+    else
+      sudo groupadd -f fazai
+    fi
+  fi
+
+  # Add current user to fazai group
+  if [ "$EUID" -eq 0 ]; then
+    usermod -aG fazai "$CURRENT_USER" 2>/dev/null || true
+    mkdir -p "$LOG_DIR"
+    chown root:fazai "$LOG_DIR"
+    chmod 774 "$LOG_DIR"
+  else
+    sudo usermod -aG fazai "$CURRENT_USER" 2>/dev/null || true
+    sudo mkdir -p "$LOG_DIR"
+    sudo chown root:fazai "$LOG_DIR"
+    sudo chmod 774 "$LOG_DIR"
+  fi
+
+  success "Diretório de logs configurado: $LOG_DIR (root:fazai 774)"
+  success "Usuário $CURRENT_USER adicionado ao grupo 'fazai'"
 }
 
 # Executar
