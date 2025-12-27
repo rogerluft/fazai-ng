@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.10.0",
+  "version": "3.11.0",
   "author": "Roger Luft (VeilWalker) <roger@webstorage.com.br> (fork from Mandark by Hrishi Olickel)",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -37,6 +37,7 @@
     "openai": "^6.3.0",
     "ora": "5.4.1",
     "p-queue": "^9.0.1",
+    "pdf-parse": "^2.4.5",
     "playwright": "^1.57.0",
     "robots-parser": "^3.0.1",
     "terminal-kit": "^3.1.2",

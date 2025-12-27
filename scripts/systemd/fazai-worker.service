@@ -1,0 +1,142 @@
+# =============================================================================
+# FazAI Worker Service - Servico Principal do FazAI
+# =============================================================================
+# Descricao: Worker principal que processa requisicoes de IA, gerencia
+#            conexoes com Qdrant e Ollama, e executa o loop agentico.
+#
+# Instalacao:
+#   sudo cp fazai-worker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable fazai-worker
+#   sudo systemctl start fazai-worker
+#
+# Logs:
+#   journalctl -u fazai-worker -f
+#
+# Status:
+#   systemctl status fazai-worker
+# =============================================================================
+
+[Unit]
+Description=FazAI Worker - Servico Principal de IA
+Documentation=https://github.com/rluft/fazai-ng
+After=network-online.target qdrant.service
+Wants=network-online.target
+# Dependencias opcionais - inicia mesmo se nao existirem
+Wants=qdrant.service ollama.service
+
+[Service]
+# -------------------------------------------------------------------------
+# Identidade do Processo
+# -------------------------------------------------------------------------
+# Usuario e grupo dedicado para isolamento de seguranca
+User=fazai
+Group=fazai
+
+# -------------------------------------------------------------------------
+# Diretorio de Trabalho
+# -------------------------------------------------------------------------
+# Diretorio base onde o FazAI esta instalado
+WorkingDirectory=/opt/fazai
+
+# -------------------------------------------------------------------------
+# Comando de Execucao
+# -------------------------------------------------------------------------
+# Executa o worker compilado (TypeScript -> JavaScript)
+ExecStart=/usr/bin/node /opt/fazai/dist/worker.js
+
+# Comando opcional para verificar configuracao antes de iniciar
+ExecStartPre=/usr/bin/test -f /opt/fazai/dist/worker.js
+
+# -------------------------------------------------------------------------
+# Politica de Reinicio
+# -------------------------------------------------------------------------
+# Reinicia sempre em caso de falha
+Restart=always
+# Aguarda 5 segundos antes de reiniciar
+RestartSec=5
+# Maximo de 5 reinicializacoes em 60 segundos
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+# -------------------------------------------------------------------------
+# Variaveis de Ambiente
+# -------------------------------------------------------------------------
+# Modo de producao para Node.js
+Environment=NODE_ENV=production
+
+# URL do servidor Qdrant (banco de vetores)
+Environment=QDRANT_URL=http://localhost:6333
+
+# URL do servidor Ollama (modelos locais de IA)
+Environment=OLLAMA_URL=http://localhost:11434
+
+# Arquivo de configuracao do FazAI
+Environment=FAZAI_CONFIG=/etc/fazai/fazai.conf
+
+# Diretorio de logs
+Environment=FAZAI_LOG_DIR=/var/log/fazai
+
+# Nivel de log (debug, info, warn, error)
+Environment=LOG_LEVEL=info
+
+# -------------------------------------------------------------------------
+# Arquivos de Ambiente Adicionais (secrets, API keys)
+# -------------------------------------------------------------------------
+# Carrega variaveis adicionais de arquivo seguro (opcional)
+EnvironmentFile=-/etc/fazai/fazai.env
+
+# -------------------------------------------------------------------------
+# Recursos e Limites
+# -------------------------------------------------------------------------
+# Limite de memoria (ajustar conforme necessidade)
+MemoryLimit=2G
+
+# Limite de arquivos abertos
+LimitNOFILE=65535
+
+# Prioridade de CPU (nice level)
+Nice=0
+
+# -------------------------------------------------------------------------
+# Seguranca (Hardening)
+# -------------------------------------------------------------------------
+# Impede escrita em /usr, /boot, /etc
+ProtectSystem=strict
+
+# Diretorio home somente leitura (exceto os permitidos)
+ProtectHome=read-only
+
+# Diretorios com permissao de escrita
+ReadWritePaths=/var/log/fazai /opt/fazai/data /tmp
+
+# Impede acesso a dispositivos
+PrivateDevices=true
+
+# Namespace de rede proprio (desabilitado - precisa de rede)
+PrivateNetwork=false
+
+# Impede escalacao de privilegios
+NoNewPrivileges=true
+
+# Remove capacidades desnecessarias
+CapabilityBoundingSet=
+
+# Mascara diretorios sensiveis
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# -------------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------------
+# Redireciona stdout/stderr para journal
+StandardOutput=journal
+StandardError=journal
+
+# Tag para identificacao nos logs
+SyslogIdentifier=fazai-worker
+
+[Install]
+# Inicia com o sistema em modo multi-usuario
+WantedBy=multi-user.target

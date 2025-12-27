@@ -1,0 +1,142 @@
+# =============================================================================
+# FazAI Skill Seeker Service - Indexador Assincrono de Documentos
+# =============================================================================
+# Descricao: Monitora o diretorio /etc/fazai/ingest em busca de novos arquivos
+#            (PDFs, Markdowns, TXTs) e os indexa automaticamente no Qdrant.
+#            Usa chokidar internamente para monitoramento eficiente de arquivos.
+#
+# Funcionamento:
+#   1. Monitora /etc/fazai/ingest para novos arquivos
+#   2. Detecta PDFs, MDs, TXTs adicionados
+#   3. Extrai texto e gera embeddings
+#   4. Indexa no Qdrant (collection: fazai_kb)
+#   5. Move arquivos processados para /etc/fazai/ingest/processed
+#
+# Instalacao:
+#   sudo cp fazai-skill-seeker.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable fazai-skill-seeker
+#   sudo systemctl start fazai-skill-seeker
+#
+# Logs:
+#   journalctl -u fazai-skill-seeker -f
+# =============================================================================
+
+[Unit]
+Description=FazAI Skill Seeker - Indexador Assincrono de Documentos
+Documentation=https://github.com/rluft/fazai-ng
+# Depende do worker principal estar rodando
+After=fazai-worker.service
+Requires=fazai-worker.service
+# Tambem depende de rede para acessar Qdrant
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# -------------------------------------------------------------------------
+# Identidade do Processo
+# -------------------------------------------------------------------------
+User=fazai
+Group=fazai
+
+# -------------------------------------------------------------------------
+# Diretorio de Trabalho
+# -------------------------------------------------------------------------
+WorkingDirectory=/opt/fazai
+
+# -------------------------------------------------------------------------
+# Comando de Execucao
+# -------------------------------------------------------------------------
+# Executa o skill-seeker compilado
+ExecStart=/usr/bin/node /opt/fazai/dist/skill-seeker.js
+
+# Verifica se o arquivo existe antes de iniciar
+ExecStartPre=/usr/bin/test -f /opt/fazai/dist/skill-seeker.js
+
+# Cria diretorios necessarios se nao existirem
+ExecStartPre=/usr/bin/mkdir -p /etc/fazai/ingest /etc/fazai/ingest/processed /etc/fazai/ingest/failed
+
+# -------------------------------------------------------------------------
+# Politica de Reinicio
+# -------------------------------------------------------------------------
+Restart=always
+RestartSec=10
+# Limite de reinicializacoes mais permissivo (servico secundario)
+StartLimitIntervalSec=300
+StartLimitBurst=10
+
+# -------------------------------------------------------------------------
+# Variaveis de Ambiente
+# -------------------------------------------------------------------------
+Environment=NODE_ENV=production
+
+# Diretorio a ser monitorado para novos arquivos
+Environment=INGEST_WATCH_DIR=/etc/fazai/ingest
+
+# Diretorio para arquivos processados com sucesso
+Environment=INGEST_PROCESSED_DIR=/etc/fazai/ingest/processed
+
+# Diretorio para arquivos que falharam no processamento
+Environment=INGEST_FAILED_DIR=/etc/fazai/ingest/failed
+
+# Extensoes de arquivo suportadas (separadas por virgula)
+Environment=INGEST_EXTENSIONS=.pdf,.md,.txt,.json,.yaml,.yml
+
+# URL do Qdrant para indexacao
+Environment=QDRANT_URL=http://localhost:6333
+
+# Collection padrao para knowledge base
+Environment=QDRANT_COLLECTION=fazai_kb
+
+# Modelo de embedding a usar
+Environment=EMBEDDING_MODEL=nomic-embed-text
+
+# URL do Ollama para embeddings locais
+Environment=OLLAMA_URL=http://localhost:11434
+
+# Nivel de log
+Environment=LOG_LEVEL=info
+
+# -------------------------------------------------------------------------
+# Arquivos de Ambiente Adicionais
+# -------------------------------------------------------------------------
+EnvironmentFile=-/etc/fazai/fazai.env
+
+# -------------------------------------------------------------------------
+# Recursos e Limites
+# -------------------------------------------------------------------------
+# Limite de memoria menor (servico mais leve)
+MemoryLimit=1G
+
+# Limite de arquivos abertos
+LimitNOFILE=4096
+
+# Prioridade mais baixa que o worker principal
+Nice=5
+
+# -------------------------------------------------------------------------
+# Seguranca (Hardening)
+# -------------------------------------------------------------------------
+ProtectSystem=strict
+ProtectHome=read-only
+
+# Diretorios com permissao de escrita
+ReadWritePaths=/etc/fazai/ingest /var/log/fazai /opt/fazai/data /tmp
+
+PrivateDevices=true
+PrivateNetwork=false
+NoNewPrivileges=true
+CapabilityBoundingSet=
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+
+# -------------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fazai-skill-seeker
+
+[Install]
+WantedBy=multi-user.target

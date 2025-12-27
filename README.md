@@ -39,6 +39,14 @@
 - **Fallback Web**: DuckDuckGo automático quando precisa de mais informação
 - **Importação de Conversas**: Claude/ChatGPT Desktop → Vector Store
 
+### 🎯 Universal Local Embedder
+- **Zero Padding Automático**: Normaliza embeddings de 768d → 1536d (compatível OpenAI)
+- **100% Local**: Usa Ollama nomic-embed-text (sem custos de API)
+- **Preserva Semântica**: Mantém propriedades de similaridade cosseno
+- **Batch Processing**: Processamento eficiente de múltiplos textos
+- **Type Safe**: TypeScript estrito com full type coverage
+- **Documentação**: Guia completo em `docs/universal-embedder.md`
+
 ### 💬 Modo CLI Interativo
 - **Chat persistente** com memória contextual entre sessões
 - **Comandos especiais**: `/exec`, `/history`, `/memory`, `/help`

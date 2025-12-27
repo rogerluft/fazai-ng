@@ -2,6 +2,241 @@
 
 ## [Unreleased]
 
+### 📚 SkillSeeker - Automatic Knowledge Ingestion
+
+#### ✨ Features - Knowledge Base Management
+
+- **Novo módulo `src/services/skill-seeker.ts`**:
+  - Classe `SkillSeekerService` - Monitora /etc/fazai/ingest para auto-indexação
+  - Função `getSkillSeeker()` - Singleton instance
+  - Real-time file monitoring com chokidar
+  - Suporte multi-formato: PDF, Markdown, Text
+  - Semantic chunking com overlap (1000 tokens max, 100 char overlap)
+  - ECOA compliant (1536 dim vectors via UniversalLocalEmbedder)
+  - Hash-based duplicate detection
+
+- **File Processing Pipeline**:
+  - PDF extraction com pdf-parse library
+  - Markdown/Text direct read (UTF-8)
+  - Intelligent chunking: paragraph-based com overlap
+  - Sentence-level splitting para parágrafos grandes
+  - Embedding generation (Lei 1536)
+  - Qdrant storage em collection `fazai_kb`
+
+- **Registry System**:
+  - Arquivo `/opt/fazai/data/skill-seeker-registry.json`
+  - Tracking de arquivos processados (hash, chunks, size)
+  - Prevenção de re-processamento duplicado
+  - Statistics tracking (total files, chunks, errors)
+
+- **CLI Commands** (`src/commands/skill-seeker.ts`):
+  - `fazai skill-seeker start` - Inicia monitoramento
+  - `fazai skill-seeker stop` - Para serviço
+  - `fazai skill-seeker status` - Status atual
+  - `fazai skill-seeker stats` - Estatísticas detalhadas
+  - `fazai skill-seeker process <file>` - Processa arquivo específico
+  - `fazai skill-seeker help` - Ajuda completa
+
+- **Event Handling**:
+  - Detecção de novos arquivos (add)
+  - Re-processamento em mudanças (change)
+  - Remoção de arquivos deletados (unlink)
+  - Error tracking e recovery
+  - Graceful degradation
+
+- **Qdrant Payload Structure**:
+  ```json
+  {
+    "type": "knowledge",
+    "source": "filename.pdf",
+    "chunk_index": 0,
+    "total_chunks": 5,
+    "content": "chunk text...",
+    "file_hash": "sha256_hash",
+    "ingested_at": "ISO-8601",
+    "file_type": "pdf|md|txt",
+    "semantic_id": "unique_id"
+  }
+  ```
+
+- **Documentação Completa**:
+  - `docs/SKILL_SEEKER.md` - Guia completo de uso
+  - Architecture diagram
+  - Configuration guide
+  - Performance metrics
+  - Troubleshooting
+  - Future enhancements roadmap
+
+- **Examples** (`examples/skill-seeker-usage.ts`):
+  - Example 1: Start monitoring
+  - Example 2: Process specific file
+  - Example 3: Get statistics
+  - Example 4: RAG integration
+  - Example 5: Background service (systemd)
+
+- **Testes Automatizados**:
+  - `tests/unit/services/skill-seeker.test.ts`
+  - Coverage: stats, singleton, start/stop
+  - Mock-ready for CI/CD
+
+- **TypeScript Estrito**:
+  - Full type safety com interfaces explícitas
+  - Async/await throughout
+  - Error handling robusto
+  - No `any` types
+
+- **Dependencies**:
+  - `pdf-parse` (^1.1.1) - PDF text extraction
+  - `chokidar` (^4.0.3) - File system monitoring
+
+---
+
+### 🧠 TacticalBrain - Phi-3 Mini Integration
+
+#### ✨ Features - Fast Local Inference
+
+- **Novo módulo `src/services/tactical-brain.ts`**:
+  - Classe `TacticalBrain` - Interface para Phi-3 Mini (local + cloud fallback)
+  - Função `createTacticalBrain()` - Factory com auto-configuração
+  - Primary: Ollama Phi-3 (192.168.0.101:11434) - local, rápido, 4K context
+  - Fallback: OpenRouter cloud (microsoft/phi-3-mini-128k-instruct:free)
+  - Timeout: 45000ms por tentativa (configurável)
+  - MaxRetries: 3 (3-Strike Rule antes do fallback)
+
+- **Streaming Response (AsyncGenerator)**:
+  - Método `think(prompt, context?)` - Streaming via AsyncGenerator
+  - Chunks de texto yielded conforme modelo gera
+  - Melhor UX para respostas longas
+  - Suporta contexto opcional
+
+- **Task Execution (Complete Result)**:
+  - Método `execute(task)` - Retorna resultado completo
+  - Chain-of-Thought compacto otimizado para Phi-3
+  - Retorna `TaskResult` com metadata completo:
+    - `success`: boolean
+    - `output`: string (resposta completa)
+    - `usedFallback`: boolean
+    - `provider`: "ollama" | "openrouter"
+    - `executionTimeMs`: number
+    - `error?`: string (se falhou)
+
+- **3-Strike Rule**:
+  - Contador de falhas consecutivas
+  - Após 3 strikes: fallback automático para cloud
+  - Método `getStrikes()` - Consulta contador
+  - Método `resetStrikes()` - Reset manual
+
+- **Error Handling Robusto**:
+  - AbortController para timeout preciso
+  - Retry com exponential backoff (via `withRetry`)
+  - Tratamento de JSON malformado em streams
+  - Fallback para cloud em caso de falha local
+
+- **Testes Automatizados**:
+  - `tests/unit/tactical-brain.test.ts` - 16 testes unitários
+  - Cobertura: streaming, execute, strikes, errors, timeout
+  - Mocks para Ollama e OpenRouter
+  - Validação de fallback logic
+
+- **TypeScript Estrito**:
+  - Full type safety com interfaces explícitas
+  - Generic types para AsyncGenerator
+  - Strict null checks
+  - Configuração via interface `TacticalBrainOptions`
+
+- **Características Técnicas**:
+  - System prompt otimizado para Phi-3
+  - Chain-of-Thought compacto (small model)
+  - SSE streaming para OpenRouter
+  - JSON streaming para Ollama
+  - Logging detalhado (debug, info, warn, error)
+
+---
+
+### 🔧 Universal Local Embedder - Zero Padding Implementation
+
+#### ✨ Features - Embedding Service
+
+- **Novo módulo `src/services/universal-embedder.ts`**:
+  - Classe `UniversalLocalEmbedder` - Interface unificada para embeddings locais
+  - Função `padVector()` - Zero Padding para normalização de dimensões
+  - Função `generateUniversalEmbedding()` - Wrapper de conveniência
+  - Suporte para Ollama nomic-embed-text (768d → 1536d)
+  - TypeScript estrito com full type safety
+
+- **Zero Padding Automático**:
+  - Normaliza vetores de 768d para 1536d (padrão OpenAI)
+  - Preserva informação semântica original
+  - Mantém propriedades de similaridade cosseno
+  - Permite migração de collections sem re-embedding
+
+- **Batch Processing**:
+  - Método `embedBatch()` para processamento eficiente
+  - Progress logging para batches grandes (>10 items)
+  - Retry logic com exponential backoff
+  - Fallback para zero vector em caso de erro
+
+- **Documentação Completa**:
+  - `docs/universal-embedder.md` - Guia completo de uso
+  - Exemplos práticos de integração
+  - Comparação com outras abordagens
+  - Troubleshooting e best practices
+  - API reference detalhada
+
+- **Testes Automatizados**:
+  - `tests/unit/universal-embedder.test.ts` - 12 testes unitários
+  - `tests/integration/universal-embedder.test.ts` - Testes com Ollama real
+  - Validação de propriedades matemáticas (cosine similarity, magnitude)
+  - Performance benchmarks
+
+- **Características Técnicas**:
+  - Timeout configurável (30s default)
+  - Context window: 2048 caracteres
+  - Error tracking integrado
+  - Logging detalhado com níveis (debug, info, warn, error)
+  - Configuração customizável (URL, modelo, dimensões)
+
+---
+
+### 🛠️ Systemd Services - Gerenciamento de Servicos
+
+#### ✨ Features - Servicos Systemd
+
+- **Novos arquivos em `scripts/systemd/`**:
+  - `fazai-worker.service` - Worker principal do FazAI
+  - `fazai-skill-seeker.service` - Indexador assincrono de documentos
+  - `fazai-worker.timer` - Timer para health check periodico
+  - `fazai-health-check.service` - Servico oneshot de verificacao
+  - `health-check.sh` - Script de health check completo
+  - `install-services.sh` - Instalador automatizado
+
+- **Caracteristicas do Worker**:
+  - User/Group `fazai` dedicado para isolamento
+  - Hardening de seguranca (ProtectSystem, NoNewPrivileges, etc.)
+  - Restart automatico com backoff (5s, max 5x em 60s)
+  - Variaveis de ambiente para Qdrant e Ollama
+  - Integracao com journald para logs
+
+- **Skill Seeker**:
+  - Monitora `/etc/fazai/ingest` para novos arquivos
+  - Suporta PDF, MD, TXT, JSON, YAML
+  - Move processados para `/etc/fazai/ingest/processed`
+  - Depende do worker estar ativo
+
+- **Health Check**:
+  - Verifica Qdrant, Ollama, Worker, Disco, Memoria
+  - Saida em texto colorido ou JSON (`--json`)
+  - Integrado com timer systemd (a cada 5 min)
+  - Alertas para uso alto de recursos
+
+- **Instalador**:
+  - Cria usuario `fazai` automaticamente
+  - Configura diretorios com permissoes corretas
+  - Gera `/etc/fazai/fazai.env` para API keys
+  - Opcoes: `--uninstall`, `--status`, `--restart`, `--logs`
+
+---
+
 ### 📚 Documentação - Sistema Agêntico
 
 #### ✨ Documentation
