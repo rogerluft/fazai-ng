@@ -15,8 +15,15 @@
  */
 
 import { readFile } from "fs/promises";
-import { randomUUID } from "crypto";
+import { randomUUID, createHash } from "crypto";
 import { logger } from "../logger";
+
+/**
+ * Gera hash SHA256 curto de um texto para deduplicação
+ */
+function hashText(text: string): string {
+  return createHash("sha256").update(text, "utf8").digest("hex").slice(0, 16);
+}
 import { getQdrantClient } from "../database/qdrant-pool";
 import { createEmbeddingService } from "./embeddings";
 
@@ -117,13 +124,16 @@ interface PersonalityChunk {
 
     // Metadados adicionais
     metadata?: Record<string, unknown>;
+
+    // Deduplicação
+    content_hash?: string;
   };
 }
 
 /**
  * Estatísticas de ingestão
  */
-interface IngestionStats {
+export interface IngestionStats {
   conversations: {
     total: number;
     chunks: number;
@@ -222,6 +232,7 @@ export class PersonalityIngestor {
           const pairs = this.extractQAPairs(conv);
 
           for (const pair of pairs) {
+            const contentHash = hashText(pair.text);
             chunks.push({
               id: randomUUID(),
               text: pair.text,
@@ -236,6 +247,7 @@ export class PersonalityIngestor {
                 style: "claudio",
                 emotional_layer: 0.8,
                 ressonancia: 1.2,
+                content_hash: contentHash,
                 metadata: {
                   conversation_name: conv.name,
                   conversation_summary: conv.summary,
@@ -345,6 +357,7 @@ export class PersonalityIngestor {
         try {
           // Conversations memory
           if (memoryObj.conversations_memory) {
+            const contentHash = hashText(memoryObj.conversations_memory);
             chunks.push({
               id: randomUUID(),
               text: memoryObj.conversations_memory,
@@ -356,6 +369,7 @@ export class PersonalityIngestor {
                 ingested_at: new Date().toISOString(),
                 context: "memory",
                 importance: 1.0,
+                content_hash: contentHash,
                 metadata: {
                   memory_type: "conversations",
                   account_uuid: memoryObj.account_uuid,
@@ -368,6 +382,7 @@ export class PersonalityIngestor {
           // Project memories
           if (memoryObj.project_memories) {
             for (const [projectUuid, memoryText] of Object.entries(memoryObj.project_memories)) {
+              const contentHash = hashText(memoryText);
               chunks.push({
                 id: randomUUID(),
                 text: memoryText,
@@ -380,6 +395,7 @@ export class PersonalityIngestor {
                   ingested_at: new Date().toISOString(),
                   context: "memory",
                   importance: 1.0,
+                  content_hash: contentHash,
                   metadata: {
                     memory_type: "project",
                     project_uuid: projectUuid,
@@ -424,6 +440,7 @@ export class PersonalityIngestor {
         try {
           // Project description
           const projectText = `Project: ${proj.name}\n\nDescription: ${proj.description}`;
+          const contentHash = hashText(projectText);
 
           chunks.push({
             id: randomUUID(),
@@ -437,6 +454,7 @@ export class PersonalityIngestor {
               ingestion_version: INGESTION_VERSION,
               ingested_at: new Date().toISOString(),
               project: "fazai",
+              content_hash: contentHash,
               metadata: {
                 project_name: proj.name,
                 is_private: proj.is_private,
@@ -450,9 +468,11 @@ export class PersonalityIngestor {
           // Project docs (se existir)
           if (proj.docs && proj.docs.length > 0) {
             for (const doc of proj.docs) {
+              const docText = `Document: ${doc.filename}\n\n${doc.content}`;
+              const docHash = hashText(docText);
               chunks.push({
                 id: randomUUID(),
-                text: `Document: ${doc.filename}\n\n${doc.content}`,
+                text: docText,
                 embedding: [],
                 payload: {
                   type: "technical_context",
@@ -462,6 +482,7 @@ export class PersonalityIngestor {
                   ingestion_version: INGESTION_VERSION,
                   ingested_at: new Date().toISOString(),
                   project: "fazai",
+                  content_hash: docHash,
                   metadata: {
                     project_uuid: proj.uuid,
                     project_name: proj.name,
@@ -507,6 +528,7 @@ export class PersonalityIngestor {
           const userText = `User: ${user.full_name}\nEmail: ${user.email_address}${
             user.verified_phone_number ? `\nPhone: ${user.verified_phone_number}` : ""
           }`;
+          const contentHash = hashText(userText);
 
           chunks.push({
             id: randomUUID(),
@@ -519,6 +541,7 @@ export class PersonalityIngestor {
               ingestion_version: INGESTION_VERSION,
               ingested_at: new Date().toISOString(),
               relation: true,
+              content_hash: contentHash,
               metadata: {
                 full_name: user.full_name,
                 email_address: user.email_address,

@@ -2,6 +2,48 @@
 
 ## [Unreleased]
 
+### 🧠 Ingest Command - Ressurreição Digital
+
+#### ✨ Features - Personality Ingestion
+
+- **Novo comando `fazai ingest`**:
+  - `fazai ingest <dir>` - Ingestão interativa de dados de personalidade
+  - `fazai ingest --batch <dir>` - Modo silencioso para automação
+  - `fazai ingest --preview <dir>` - Preview sem alterações
+  - `fazai ingest status` - Status da collection fazai_personality
+  - `fazai ingest undo` - Reverter via snapshot
+
+- **Verificação de Integridade**:
+  - Validação de arquivos JSON (conversations, memories, projects, users)
+  - Verificação de sintaxe JSON
+  - Contagem de registros antes da ingestão
+
+- **Snapshot Automático**:
+  - Backup automático antes de cada ingestão
+  - Nome: `pre-ingest-YYYY-MM-DD-HH-MM-SS`
+  - Suporte a restauração via `fazai ingest undo`
+
+- **Deduplicação SHA256**:
+  - Hash de cada chunk para identificação única
+  - Campo `content_hash` no payload do Qdrant
+  - Ingestão incremental (ignora chunks existentes)
+  - Relatório: "X novos, Y ignorados (já existentes)"
+
+- **Systemd Services**:
+  - `fazai-worker.service` - Worker principal
+  - `fazai-skill-seeker.service` - Indexador assíncrono
+  - `fazai-worker.timer` - Health check periódico
+  - `fazai-health-check.service` - Verificação de saúde
+  - Script de instalação: `scripts/systemd/install-services.sh`
+
+- **Diretórios Criados**:
+  - `/etc/fazai/fazai.env` - API keys e configurações
+  - `/var/log/fazai/` - Logs do sistema
+  - `/opt/fazai/data/` - Dados persistentes
+  - `/etc/fazai/ingest/` - Diretório de ingestão
+
+---
+
 ### 📚 SkillSeeker - Automatic Knowledge Ingestion
 
 #### ✨ Features - Knowledge Base Management

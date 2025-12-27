@@ -80,6 +80,7 @@ Usage:
   fazai search "query"                               # Manual research via Context7/Web (supports SPAs)
   fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
+  fazai ingest <dir> [--batch|--preview]             # Ressurreição Digital (personality ingestion)
   fazai qdrant <command>                             # Qdrant management (status, metrics, backup, etc)
   fazai cloudflare <action>                          # Manage Cloudflare (zones, dns, workers)
   fazai cf zones                                     # Cloudflare: list zones
@@ -171,7 +172,7 @@ async function main() {
   const SUBCOMMANDS_WITH_HELP = [
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
-    "config", "search", "inference", "agent"
+    "config", "search", "inference", "agent", "ingest"
   ];
 
   const firstArg = inputs[0];
@@ -262,6 +263,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Ingest command - Ressurreição Digital (Personality Ingestion)
+  if (inputs[0] === "ingest") {
+    const { handleIngestCommand } = await import("./commands/ingest");
+    await handleIngestCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "completion") {
     const suggestions = [
       "ask",
@@ -271,6 +279,7 @@ async function main() {
       "search",
       "vector",
       "import",
+      "ingest",
       "sync",
       "cf",
       "cloudflare",

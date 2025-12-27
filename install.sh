@@ -1207,11 +1207,26 @@ main() {
   install_qdrant  # Instalação interativa do Qdrant
   setup_collections
   install_web_interface  # Instalação opcional da interface web
-  
+
   # Setup environment alias and variables
   if [ -f "$INSTALL_DIR/scripts/setup-env.sh" ]; then
     info "Running environment setup..."
     bash "$INSTALL_DIR/scripts/setup-env.sh"
+  fi
+
+  # Instalar systemd services (opcional)
+  if [ -f "$INSTALL_DIR/scripts/systemd/install-services.sh" ]; then
+    echo ""
+    read -p "Instalar serviços systemd (fazai-worker, fazai-skill-seeker)? [S/n]: " install_systemd
+    if [[ "$install_systemd" =~ ^[Ss]$ ]] || [[ -z "$install_systemd" ]]; then
+      info "Instalando serviços systemd..."
+      if [ "$EUID" -eq 0 ]; then
+        bash "$INSTALL_DIR/scripts/systemd/install-services.sh"
+      else
+        sudo bash "$INSTALL_DIR/scripts/systemd/install-services.sh"
+      fi
+      success "Serviços systemd instalados"
+    fi
   fi
 
   print_success
