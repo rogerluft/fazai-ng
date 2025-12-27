@@ -22,6 +22,7 @@
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
+import { EmbeddingCache, embeddingCache } from "./embedding-cache";
 
 /**
  * Ollama API response for embeddings
@@ -116,6 +117,8 @@ export class UniversalLocalEmbedder {
   private readonly nativeDimension: number;
   private readonly targetDimension: number;
   private readonly maxChars: number;
+  private readonly cache: EmbeddingCache;
+  private readonly useCache: boolean;
 
   /**
    * Create a new Universal Local Embedder
@@ -124,21 +127,25 @@ export class UniversalLocalEmbedder {
    * @param model Ollama model name (default: nomic-embed-text)
    * @param nativeDimension Native model dimension (default: 768)
    * @param targetDimension Target dimension after padding (default: 1536)
+   * @param useCache Enable embedding cache (default: true)
    */
   constructor(
     ollamaUrl: string = "http://192.168.0.101:11434",
     model: string = "nomic-embed-text",
     nativeDimension: number = 768,
-    targetDimension: number = 1536
+    targetDimension: number = 1536,
+    useCache: boolean = true
   ) {
     this.ollamaUrl = ollamaUrl;
     this.model = model;
     this.nativeDimension = nativeDimension;
     this.targetDimension = targetDimension;
     this.maxChars = 2048; // Conservative limit for nomic-embed-text
+    this.useCache = useCache;
+    this.cache = embeddingCache; // Usa cache global singleton
 
     logger.debug(
-      `UniversalLocalEmbedder initialized: ${this.model} (${this.nativeDimension}d → ${this.targetDimension}d)`
+      `UniversalLocalEmbedder initialized: ${this.model} (${this.nativeDimension}d → ${this.targetDimension}d) cache=${useCache}`
     );
   }
 
@@ -229,6 +236,8 @@ export class UniversalLocalEmbedder {
   /**
    * Generate universal embedding for a single text
    *
+   * P0-3: Usa cache LRU para evitar re-embeddings de textos já processados.
+   *
    * @param text Input text
    * @returns 1536-dimensional embedding vector
    *
@@ -239,6 +248,15 @@ export class UniversalLocalEmbedder {
    * ```
    */
   async embed(text: string): Promise<number[]> {
+    // P0-3: Verificar cache primeiro
+    if (this.useCache) {
+      const cachedEmbedding = this.cache.get(text, this.model);
+      if (cachedEmbedding) {
+        logger.debug(`Cache HIT: embedding for "${text.substring(0, 40)}..."`);
+        return cachedEmbedding;
+      }
+    }
+
     try {
       const rawEmbedding = await this.generateRawEmbedding(text);
       const paddedEmbedding = padVector(rawEmbedding, this.targetDimension);
@@ -246,6 +264,11 @@ export class UniversalLocalEmbedder {
       logger.debug(
         `Embedded text (${text.length} chars) → ${paddedEmbedding.length}d vector`
       );
+
+      // P0-3: Salvar no cache
+      if (this.useCache) {
+        this.cache.set(text, this.model, paddedEmbedding);
+      }
 
       return paddedEmbedding;
     } catch (error: unknown) {
@@ -262,8 +285,9 @@ export class UniversalLocalEmbedder {
   /**
    * Generate universal embeddings for multiple texts
    *
-   * Processes texts sequentially (Ollama API doesn't support batch).
-   * Includes progress logging for large batches.
+   * P0-3: Usa cache LRU para evitar re-embeddings. Processa textos em batch
+   * com otimização para cache hits (textos já processados são retornados
+   * imediatamente, só textos novos são enviados para Ollama).
    *
    * @param texts Array of input texts
    * @returns Array of 1536-dimensional embedding vectors
@@ -282,41 +306,83 @@ export class UniversalLocalEmbedder {
       return [];
     }
 
+    // P0-3: Primeiro passo - verificar cache para todos os textos
+    const results: (number[] | null)[] = new Array(texts.length).fill(null);
+    const textsToProcess: { index: number; text: string }[] = [];
+    let cacheHits = 0;
+
+    if (this.useCache) {
+      for (let i = 0; i < texts.length; i++) {
+        const text = texts[i];
+        const cachedEmbedding = this.cache.get(text, this.model);
+        if (cachedEmbedding) {
+          results[i] = cachedEmbedding;
+          cacheHits++;
+        } else {
+          textsToProcess.push({ index: i, text });
+        }
+      }
+
+      if (cacheHits > 0) {
+        logger.info(
+          `Cache: ${cacheHits}/${texts.length} hits (${Math.round((cacheHits / texts.length) * 100)}%)`
+        );
+      }
+    } else {
+      // Sem cache, processa todos
+      for (let i = 0; i < texts.length; i++) {
+        textsToProcess.push({ index: i, text: texts[i] });
+      }
+    }
+
+    // Se tudo veio do cache, retornar imediatamente
+    if (textsToProcess.length === 0) {
+      logger.info(`All ${texts.length} embeddings served from cache!`);
+      return results as number[][];
+    }
+
     logger.info(
-      `Generating ${texts.length} embeddings (${this.model} → ${this.targetDimension}d)`
+      `Generating ${textsToProcess.length} embeddings (${this.model} → ${this.targetDimension}d)`
     );
 
-    const embeddings: number[][] = [];
-
-    for (let i = 0; i < texts.length; i++) {
-      const text = texts[i];
+    // Processar textos não cacheados
+    for (let i = 0; i < textsToProcess.length; i++) {
+      const { index, text } = textsToProcess[i];
 
       try {
-        const embedding = await this.embed(text);
-        embeddings.push(embedding);
+        const rawEmbedding = await this.generateRawEmbedding(text);
+        const paddedEmbedding = padVector(rawEmbedding, this.targetDimension);
+
+        results[index] = paddedEmbedding;
+
+        // Salvar no cache
+        if (this.useCache) {
+          this.cache.set(text, this.model, paddedEmbedding);
+        }
 
         // Log progress for large batches
-        if (texts.length > 10 && (i + 1) % 10 === 0) {
-          const progress = Math.round(((i + 1) / texts.length) * 100);
+        if (textsToProcess.length > 10 && (i + 1) % 10 === 0) {
+          const progress = Math.round(((i + 1) / textsToProcess.length) * 100);
           logger.debug(
-            `Batch progress: ${i + 1}/${texts.length} (${progress}%)`
+            `Batch progress: ${i + 1}/${textsToProcess.length} (${progress}%)`
           );
         }
       } catch (error: unknown) {
         const errorMessage =
           error instanceof Error ? error.message : String(error);
-        logger.error(`Failed to embed text ${i + 1}: ${errorMessage}`);
+        logger.error(`Failed to embed text ${index + 1}: ${errorMessage}`);
 
         // Use zero vector as fallback
-        embeddings.push(new Array(this.targetDimension).fill(0));
+        results[index] = new Array(this.targetDimension).fill(0);
       }
     }
 
+    const totalGenerated = textsToProcess.length;
     logger.info(
-      `Batch complete: ${embeddings.length}/${texts.length} embeddings generated`
+      `Batch complete: ${totalGenerated} generated, ${cacheHits} from cache (${texts.length} total)`
     );
 
-    return embeddings;
+    return results as number[][];
   }
 
   /**

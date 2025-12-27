@@ -5,6 +5,7 @@ import { logger } from "../logger";
 import { createEmbeddingService } from "./embeddings";
 import { getQdrantClient } from "../database/qdrant-pool";
 import { getConfigValue } from "../config";
+import { semanticChunk, ChunkingConfig } from "./embedding-strategies";
 
 /**
  * FazAI Source Code Auto-Indexer (Metacognition Engine)
@@ -34,8 +35,24 @@ interface IndexState {
 }
 
 const STATE_FILE_PATH = "/opt/fazai/data/source-index.json";
-const MAX_CHUNK_SIZE = 2000; // Characters approx
-const CHUNK_OVERLAP = 200;
+
+/**
+ * P0-4: Configurações de chunking semântico por tipo de arquivo
+ * Usa estratégias inteligentes do embedding-strategies.ts
+ */
+const CODE_CHUNKING: ChunkingConfig = {
+  maxChunkSize: 1500,   // Menor que antes para blocos mais coesos
+  overlap: 150,
+  separators: ["\n\n\n", "\n\n", "\nfunction ", "\nclass ", "\nexport ", "\nimport ", "\n"],
+  minChunkSize: 200,
+};
+
+const DOC_CHUNKING: ChunkingConfig = {
+  maxChunkSize: 800,
+  overlap: 100,
+  separators: ["\n## ", "\n### ", "\n\n", "\n", ". "],
+  minChunkSize: 150,
+};
 
 // Mapping of directories to categories/weights
 const PATH_CONFIG: Record<string, { category: string; weight: number }> = {
@@ -247,24 +264,13 @@ function analyzeCode(content: string, relPath: string) {
   return { category, weight, functions, classes, imports, isJsDoc: relPath.endsWith(".md") };
 }
 
+/**
+ * P0-4: Chunking semântico usando embedding-strategies.ts
+ *
+ * Troca chunking naive por estratégia inteligente com separadores semânticos.
+ * Prioriza quebras em boundaries naturais (funções, classes, parágrafos).
+ */
 function chunkFile(content: string, type: "code" | "doc"): string[] {
-  const chunks: string[] = [];
-  let currentChunk = "";
-  
-  const lines = content.split("\n");
-  
-  for (const line of lines) {
-    if (currentChunk.length + line.length > MAX_CHUNK_SIZE) {
-      chunks.push(currentChunk);
-      // Simple overlap: keep last 5 lines
-      const overlapLines = currentChunk.split("\n").slice(-5).join("\n");
-      currentChunk = overlapLines + "\n" + line;
-    } else {
-      currentChunk += (currentChunk ? "\n" : "") + line;
-    }
-  }
-  
-  if (currentChunk) chunks.push(currentChunk);
-  
-  return chunks;
+  const config = type === "code" ? CODE_CHUNKING : DOC_CHUNKING;
+  return semanticChunk(content, config);
 }

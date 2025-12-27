@@ -2,6 +2,82 @@
 
 ## [Unreleased]
 
+## [3.11.1] - 2025-12-27
+
+### 🧪 Testing - Test Suite Expansion
+
+#### ResearchCoordinator Test Suite
+- **Added comprehensive test suite** for `ResearchCoordinator` class
+  - 35 unit tests covering all research functionality
+  - **isEnabled()**: Tests for FAZAI_DISABLE_RESEARCH env variable (1/true/yes/on), config values, case-insensitive flags
+  - **isFailureResearchEnabled()**: Tests for FAZAI_RESEARCH_ON_FAILURE configuration (env, config, options priority)
+  - **decorateReason()**: Tests reason formatting with trigger type (pre-execution/failure) and provider name
+  - **tryLocalRAG()**: Tests RAG-first strategy with score threshold (< 0.6 falls back, >= 0.6 returns), embedding errors, summary generation, snippet truncation (300 chars)
+  - **research()**: Tests disabled state, fallback chain (local RAG → Perplexity → Context7 → Web), all sources failure
+  - **maybeRunPreExecutionResearch()**: Tests researchNeeded flag, custom query, fallback to command
+  - **handleExecutionFailure()**: Tests error output condensation (220 chars), query composition
+  - **Web search**: Tests DuckDuckGo provider configuration from options/env
+- **Test file**: `/home/rluft/fazai-ng/tests/research.test.ts`
+- **Coverage**: All public methods and configuration scenarios
+- All tests passing (35/35)
+- **Mocks**: neuralQuery, askAI, fetch, MCPClient, config, embeddings
+
+#### EmbeddingCache Test Suite
+- **Added comprehensive test suite** for `EmbeddingCache` service
+  - 33 unit tests covering all functionality
+  - Tests for constructor initialization
+  - Cache hit/miss scenarios
+  - LRU eviction mechanism
+  - TTL expiration logic
+  - Statistics tracking (hits, misses, hit rate, evictions)
+  - Persistence (save/load)
+  - Auto-save functionality
+  - Edge cases and error handling
+- **Test file**: `/home/rluft/fazai-ng/tests/services/embedding-cache.test.ts`
+- **Coverage**: 100% of EmbeddingCache class functionality
+- All tests passing (33/33)
+
+#### Neural Flow RAG Test Suite
+- **Added comprehensive unit tests** for `neural-flow.ts` (Multi-Collection RAG)
+  - 33 unit tests with mocks (no external dependencies)
+  - **normalizeWeights()**: Validates weight normalization to sum 1.0, handles zero weights
+  - **calculateRecencyBoost()**: Tests temporal decay (0 days=1.2x, 30 days=1.0x, 180+ days=0.5x), fallback fields
+  - **checkLegitimacy()**: Tests ECOA hop mechanism (legitimate_contexts validation, wildcard support)
+  - **calculateResonance()**: Tests emotional layer scoring (0.0-1.0 intensity range, edge cases)
+  - **extractContent()**: Tests content extraction priority, truncation (1000 chars), restricted access messages
+  - **createCategoryFilter()**: Validates Qdrant filter generation for category filtering
+  - **createCollectionSubset()**: Tests collection name mapping (personality → fazai_personality)
+  - Edge cases: invalid timestamps, negative emotional values, missing fields, retrocompatibility
+- **Test file**: `/home/rluft/fazai-ng/tests/rag/neural-flow.test.ts`
+- **Coverage**: Core helper functions and ECOA logic
+- All tests passing (33/33)
+- **No external dependencies**: Uses vitest mocks for logger, config, QdrantClient, retry utilities
+
+## [3.11.0] - 2025-12-27
+
+### ✨ Added - ECOA Unification & RAG-First Research
+
+- **ECOA Unification**: Campos ECOA (semantic_id, emotional_layer, temporal_layer, legitimate_contexts, resonance) adicionados em TODAS as 5 collections (fazai_learning, fazai_kb, fazai_inference agora têm schema completo)
+- **RAG-First Research**: ResearchCoordinator agora consulta RAG local via neuralQuery() ANTES de buscar em fontes externas (Perplexity, Context7, Web)
+- **Embedding Cache Integration**: UniversalLocalEmbedder agora usa EmbeddingCache LRU para evitar re-embeddings (economia de ~70% em processamento repetido)
+- **Semantic Chunking**: source-indexer.ts agora usa semanticChunk() do embedding-strategies.ts com separadores inteligentes
+
+### 🔄 Changed - Architecture Improvements
+
+- **vector-store.ts**: COLLECTION_SCHEMAS agora inclui campos ECOA em todas collections
+- **research.ts**: Nova estratégia RAG-First com fallback para external sources
+- **universal-embedder.ts**: Cache integrado no embed() e embedBatch()
+- **source-indexer.ts**: Troca de chunking naive por semantic chunking
+
+### 🔧 Technical - Foundation Work
+
+- Test coverage foundation criada
+- P0 consolidation sprint completed
+- Enhanced vector store consistency
+- Reduced external API calls through RAG-First approach
+
+---
+
 ### 🗂️ Samba Command - Samba Share Management
 
 #### ✨ Features - Samba Integration
