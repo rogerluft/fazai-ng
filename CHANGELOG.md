@@ -2,6 +2,42 @@
 
 ## [Unreleased]
 
+### 🗂️ Samba Command - Samba Share Management
+
+#### ✨ Features - Samba Integration
+
+- **Novo comando `fazai samba`**:
+  - `fazai samba list` - Lista todos os compartilhamentos Samba
+  - `fazai samba add <path>` - Adiciona diretório existente como share
+  - `fazai samba del <share>` - Remove share (com confirmação interativa)
+  - `fazai samba criauser <user>` - Cria usuário Unix + Samba
+  - `fazai samba criadir <path>` - Cria diretório + share
+  - `fazai samba criagroup <group>` - Cria grupo + aplica permissões
+  - `fazai samba completion` - Gera script bash completion
+
+- **Integração com Script Bash**:
+  - Wrapper TypeScript para `/opt/fazai/scripts/fzsamba`
+  - Elevação automática com sudo para operações de escrita
+  - Operações de leitura (list, completion) sem necessidade de sudo
+  - Fallback: busca em `/opt/fazai/scripts/fzsamba` ou `scripts/fzsamba`
+
+- **Bash Completion Inteligente**:
+  - Autocomplete de comandos samba
+  - Autocomplete de diretórios para `add` e `criadir`
+  - Autocomplete de shares existentes para `del` (lê /etc/samba/smb.conf)
+  - Autocomplete de usuários para `criauser`
+  - Autocomplete de grupos para `criagroup`
+
+- **Características**:
+  - Help formatado com chalk (colorido)
+  - Validação de argumentos obrigatórios
+  - Tratamento de erros adequado
+  - Parsing de argumentos no padrão FazAI
+  - Backup automático de smb.conf antes de modificações
+  - Reinício automático do Samba após operações de escrita
+
+---
+
 ### 🧠 Ingest Command - Personality Data Ingestion
 
 #### ✨ Features - Personality Ingestion

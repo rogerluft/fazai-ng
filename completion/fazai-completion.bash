@@ -21,7 +21,7 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands (auto-generated from app.ts)
-    commands="ask config completion alias search vector import sync cloudflare cf github qdrant index inference agent dashboard"
+    commands="ask config completion alias search vector import sync cloudflare cf github qdrant index inference agent dashboard samba"
 
     # Options/flags (auto-generated from app.ts)
     opts="--dry-run --cli --debug --verbose --log-file --auto-research --yolo -y --help -h"
@@ -147,6 +147,43 @@ _fazai_completion() {
                     ;;
                 *)
                     COMPREPLY=( $(compgen -W "${github_cmds}" -- ${cur}) )
+                    return 0
+                    ;;
+            esac
+            ;;
+
+        samba)
+            local samba_cmds="list add del criauser criadir criagroup completion"
+            case "${prev}" in
+                samba)
+                    COMPREPLY=( $(compgen -W "${samba_cmds}" -- ${cur}) )
+                    return 0
+                    ;;
+                add|criadir)
+                    # Complete with directories
+                    COMPREPLY=( $(compgen -d -- ${cur}) )
+                    return 0
+                    ;;
+                del)
+                    # Complete with existing Samba shares from smb.conf
+                    if [[ -r /etc/samba/smb.conf ]]; then
+                        local shares=$(awk -F'[][]' '/^\[.*\]$/{print $2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')
+                        COMPREPLY=( $(compgen -W "${shares}" -- ${cur}) )
+                    fi
+                    return 0
+                    ;;
+                criauser)
+                    # Complete with system users
+                    COMPREPLY=( $(compgen -u -- ${cur}) )
+                    return 0
+                    ;;
+                criagroup)
+                    # Complete with system groups
+                    COMPREPLY=( $(compgen -g -- ${cur}) )
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=( $(compgen -W "${samba_cmds}" -- ${cur}) )
                     return 0
                     ;;
             esac

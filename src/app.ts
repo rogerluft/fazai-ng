@@ -91,6 +91,7 @@ Usage:
   fazai inference <command>                          # Gerencia conhecimento injetado pelo usuário
   fazai agent <command>                              # Executa agentes GenAIScript (loop, reflect, etc)
   fazai dashboard <command>                          # Gerencia REST API Dashboard (start, stop, status)
+  fazai samba <command>                              # Gerencia compartilhamentos Samba (list, add, del, etc)
 
 Options:
   --dry-run                Simulate commands without executing
@@ -172,7 +173,8 @@ async function main() {
   const SUBCOMMANDS_WITH_HELP = [
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
-    "config", "search", "inference", "agent", "ingest"
+    "config", "search", "inference", "agent", "ingest",
+    "dashboard", "samba"
   ];
 
   const firstArg = inputs[0];
@@ -270,6 +272,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Samba command - Samba Share Management
+  if (inputs[0] === "samba") {
+    const { handleSambaCommand } = await import("./commands/samba");
+    await handleSambaCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "completion") {
     const suggestions = [
       "ask",
@@ -288,6 +297,7 @@ async function main() {
       "inference",
       "agent",
       "dashboard",
+      "samba",
       "--debug",
       "--verbose",
       "--log-file",

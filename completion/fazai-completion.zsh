@@ -35,6 +35,7 @@ _fazai() {
         'inference:Gerencia conhecimento injetado pelo usuário'
         'agent:Execute GenAIScript agents'
         'dashboard:Manage REST API Dashboard'
+        'samba:Manage Samba shares (fzsamba wrapper)'
     )
 
     # Load models dynamically from config (cached)
@@ -115,6 +116,37 @@ _fazai() {
             )
             _describe 'alias subcommands' alias_cmds
             ;;
+
+        samba)
+            local -a samba_cmds
+            samba_cmds=(
+                'list:List all Samba shares'
+                'add:Add existing directory as share'
+                'del:Delete a share from smb.conf'
+                'criauser:Create or update Samba user'
+                'criadir:Create directory and add as share'
+                'criagroup:Create group and apply to directory'
+                'completion:Generate bash completion script'
+            )
+            _describe 'samba subcommands' samba_cmds
+
+            case "$words[2]" in
+                add|criadir)
+                    _files -/
+                    ;;
+                del)
+                    local -a shares
+                    shares=(${(f)"$(awk -F'[][]' '/^\[.*\]$/{print $2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')"})
+                    _describe 'samba shares' shares
+                    ;;
+                criauser)
+                    _users
+                    ;;
+                criagroup)
+                    _groups
+                    ;;
+            esac
+            ;;
     esac
 
     _arguments \
@@ -133,6 +165,9 @@ _fazai() {
             ;;
         alias)
             state=alias
+            ;;
+        samba)
+            state=samba
             ;;
     esac
 }

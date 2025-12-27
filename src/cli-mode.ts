@@ -65,6 +65,7 @@ const SLASH_COMMANDS = [
   "/spam",
   "/opnsense",
   "/ops",
+  "/samba",
   "/api",
   "/dashboard",
   "/quit",
@@ -505,6 +506,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         logger.info("/cloudflare, /cf   Gerenciar Cloudflare (zonas, DNS, workers)");
         logger.info("/spamexperts, /spam Gerenciar SpamExperts (domínios, quarentena)");
         logger.info("/opnsense, /ops    Gerenciar OPNsense (firewall, VPN, NAT)");
+        logger.info("/samba             Gerenciar Samba (shares, users, groups)");
         logger.info("/quit, /exit       Encerra o modo CLI");
         logger.info("");
         logger.info(chalk.cyan("Busca na Web:"));
@@ -584,6 +586,20 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         try {
           const opsUI = new OPNsenseUI();
           await opsUI.showMainMenu();
+        } catch (error: any) {
+          logger.error(chalk.red(`\n❌ ${error.message}`));
+        }
+      } else if (line === "/samba" || line.startsWith("/samba ")) {
+        // Samba UI - Gerenciador de compartilhamentos
+        try {
+          const { SambaUI } = await import("./commands/samba/samba-ui");
+          const sambaUI = new SambaUI();
+          const args = line.replace(/^\/samba\s*/, "").trim().split(/\s+/).filter(Boolean);
+          if (args.length === 0) {
+            await sambaUI.showMainMenu();
+          } else {
+            await sambaUI.executeCommand(args);
+          }
         } catch (error: any) {
           logger.error(chalk.red(`\n❌ ${error.message}`));
         }

@@ -162,6 +162,11 @@ function parseAppTS(appPath) {
       subcommands: ["start", "stop", "status"],
       options: ["--port", "--host", "--no-cors", "--no-rate-limit", "--no-logs"],
     },
+    {
+      name: "samba",
+      description: "Manage Samba shares (fzsamba wrapper)",
+      subcommands: ["list", "add", "del", "criauser", "criadir", "criagroup", "completion"],
+    },
   ];
 
   const globalOptions = [
@@ -342,6 +347,43 @@ _fazai_completion() {
             esac
             ;;
 
+        samba)
+            local samba_cmds="list add del criauser criadir criagroup completion"
+            case "\${prev}" in
+                samba)
+                    COMPREPLY=( $(compgen -W "\${samba_cmds}" -- \${cur}) )
+                    return 0
+                    ;;
+                add|criadir)
+                    # Complete with directories
+                    COMPREPLY=( $(compgen -d -- \${cur}) )
+                    return 0
+                    ;;
+                del)
+                    # Complete with existing Samba shares from smb.conf
+                    if [[ -r /etc/samba/smb.conf ]]; then
+                        local shares=\$(awk -F'[][]' '/^\\[.*\\]$/{print \$2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')
+                        COMPREPLY=( $(compgen -W "\${shares}" -- \${cur}) )
+                    fi
+                    return 0
+                    ;;
+                criauser)
+                    # Complete with system users
+                    COMPREPLY=( $(compgen -u -- \${cur}) )
+                    return 0
+                    ;;
+                criagroup)
+                    # Complete with system groups
+                    COMPREPLY=( $(compgen -g -- \${cur}) )
+                    return 0
+                    ;;
+                *)
+                    COMPREPLY=( $(compgen -W "\${samba_cmds}" -- \${cur}) )
+                    return 0
+                    ;;
+            esac
+            ;;
+
         *)
             # Default: options
             COMPREPLY=( $(compgen -W "\${opts}" -- \${cur}) )
@@ -484,6 +526,37 @@ _fazai() {
             )
             _describe 'alias subcommands' alias_cmds
             ;;
+
+        samba)
+            local -a samba_cmds
+            samba_cmds=(
+                'list:List all Samba shares'
+                'add:Add existing directory as share'
+                'del:Delete a share from smb.conf'
+                'criauser:Create or update Samba user'
+                'criadir:Create directory and add as share'
+                'criagroup:Create group and apply to directory'
+                'completion:Generate bash completion script'
+            )
+            _describe 'samba subcommands' samba_cmds
+
+            case "$words[2]" in
+                add|criadir)
+                    _files -/
+                    ;;
+                del)
+                    local -a shares
+                    shares=(\${(f)"\$(awk -F'[][]' '/^\\[.*\\]$/{print \$2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')"})
+                    _describe 'samba shares' shares
+                    ;;
+                criauser)
+                    _users
+                    ;;
+                criagroup)
+                    _groups
+                    ;;
+            esac
+            ;;
     esac
 
     _arguments \\
@@ -502,6 +575,9 @@ _fazai() {
             ;;
         alias)
             state=alias
+            ;;
+        samba)
+            state=samba
             ;;
     esac
 }

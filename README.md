@@ -403,6 +403,38 @@ fazai github issue create owner/repo  # Criar nova issue
 fazai github pr                # Criar/gerenciar pull requests
 ```
 
+### Comandos Samba
+
+```bash
+# Listar compartilhamentos
+fazai samba list               # Lista todos os shares Samba
+
+# Adicionar diretório existente
+fazai samba add /dados/compartilhado  # Adiciona diretório como share
+
+# Remover share (com confirmação)
+fazai samba del myshare        # Remove share do smb.conf
+
+# Criar usuário com acesso Samba
+fazai samba criauser joao      # Cria usuário Unix + Samba (interativo)
+
+# Criar diretório como share
+fazai samba criadir /dados/projetos  # Cria dir + configura share
+
+# Criar grupo com permissões
+fazai samba criagroup developers  # Cria grupo + aplica ACLs
+
+# Bash completion
+fazai samba completion         # Gera script de completion
+```
+
+**Características:**
+- ✅ Wrapper TypeScript para script bash `fzsamba`
+- ✅ Elevação automática com sudo (quando necessário)
+- ✅ Bash completion inteligente (diretórios, shares, usuários, grupos)
+- ✅ Backup automático de smb.conf antes de modificações
+- ✅ Reinício automático do serviço Samba após mudanças
+
 ## ☁️ Integração Google Gemini via Cloudflare
 
 O FazAI suporta integração com Google Gemini através de Cloudflare Workers, oferecendo acesso aos modelos mais avançados via endpoint OpenAI-compatível:

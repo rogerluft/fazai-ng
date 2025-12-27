@@ -373,6 +373,33 @@ setup_path() {
   success "PATH configurado (/usr/local/bin)"
 }
 
+# Instalar fzsamba (gerenciador Samba)
+install_fzsamba() {
+  info "Instalando fzsamba (gerenciador Samba)..."
+
+  local FZSAMBA_SOURCE="$INSTALL_DIR/scripts/fzsamba"
+  local FZSAMBA_TARGET="/opt/fazai/scripts/fzsamba"
+
+  if [ -f "$FZSAMBA_SOURCE" ]; then
+    # Criar diretório de scripts se não existir
+    sudo mkdir -p /opt/fazai/scripts
+
+    # Copiar script
+    sudo cp "$FZSAMBA_SOURCE" "$FZSAMBA_TARGET"
+    sudo chmod +x "$FZSAMBA_TARGET"
+
+    # Instalar bash completion do fzsamba
+    if [ -d /etc/bash_completion.d ]; then
+      "$FZSAMBA_TARGET" completion | sudo tee /etc/bash_completion.d/fzsamba > /dev/null 2>&1
+      success "fzsamba instalado com completion"
+    else
+      success "fzsamba instalado"
+    fi
+  else
+    warning "Script fzsamba não encontrado em $INSTALL_DIR/scripts/"
+  fi
+}
+
 # Instalar fzalias
 install_fzalias_system() {
   info "Instalando fzalias (sistema de aliases global)..."
@@ -1203,6 +1230,7 @@ main() {
   create_entry_point
   setup_path
   install_fzalias_system  # Instalar sistema de aliases global
+  install_fzsamba         # Instalar gerenciador Samba
   setup_config
   install_qdrant  # Instalação interativa do Qdrant
   setup_collections
