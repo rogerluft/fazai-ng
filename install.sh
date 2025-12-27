@@ -1257,20 +1257,20 @@ setup_log_directory() {
     fi
   fi
 
-  # Add current user to fazai group
+  # Add current user to fazai group and setup directory
   if [ "$EUID" -eq 0 ]; then
     usermod -aG fazai "$CURRENT_USER" 2>/dev/null || true
     mkdir -p "$LOG_DIR"
-    chown root:fazai "$LOG_DIR"
+    chown "$CURRENT_USER:fazai" "$LOG_DIR"
     chmod 774 "$LOG_DIR"
   else
     sudo usermod -aG fazai "$CURRENT_USER" 2>/dev/null || true
     sudo mkdir -p "$LOG_DIR"
-    sudo chown root:fazai "$LOG_DIR"
+    sudo chown "$CURRENT_USER:fazai" "$LOG_DIR"
     sudo chmod 774 "$LOG_DIR"
   fi
 
-  success "Diretório de logs configurado: $LOG_DIR (root:fazai 774)"
+  success "Diretório de logs configurado: $LOG_DIR ($CURRENT_USER:fazai 774)"
   success "Usuário $CURRENT_USER adicionado ao grupo 'fazai'"
 }
 

@@ -245,8 +245,8 @@ async function setupLogDirectory() {
       timeout: 10000,
     });
 
-    // Set ownership: root:fazai
-    result = spawnSync("sudo", ["chown", "root:fazai", LOG_DIR], {
+    // Set ownership: $USER:fazai
+    result = spawnSync("sudo", ["chown", `${currentUser}:fazai`, LOG_DIR], {
       stdio: "pipe",
       timeout: 10000,
     });
@@ -257,7 +257,7 @@ async function setupLogDirectory() {
       timeout: 10000,
     });
 
-    console.log(`[fazai] ✅ Log directory configured: ${LOG_DIR} (root:fazai 774)`);
+    console.log(`[fazai] ✅ Log directory configured: ${LOG_DIR} (${currentUser}:fazai 774)`);
     console.log(`[fazai] ✅ User ${currentUser} added to group 'fazai'`);
 
   } catch (error) {
