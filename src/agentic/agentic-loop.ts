@@ -124,41 +124,40 @@ export class AgenticLoop {
     }
 
     const embedding = await this.embeddingService.generate(query);
-    const results: ContextItem[] = [];
 
     // Busca em paralelo em todas as collections
     const searchPromises = Object.entries(FUSION_WEIGHTS).map(async ([collName, weight]) => {
       const fullName = COLLECTIONS[collName as keyof typeof COLLECTIONS];
+      const searchResults = await this.client.search(fullName, {
+        vector: embedding,
+        limit: 5,
+        with_payload: true,
+      });
+      return searchResults.map((r) => ({
+        source: collName,
+        content: (r.payload as Record<string, unknown>)?.content as string ||
+          JSON.stringify(r.payload),
+        score: r.score,
+        fusedScore: r.score * weight,
+      }));
+    });
 
-      try {
-        const searchResults = await this.client.search(fullName, {
-          vector: embedding,
-          limit: 5,
-          with_payload: true,
-        });
+    const settledResults = await Promise.allSettled(searchPromises);
+    const results: ContextItem[] = [];
 
-        return searchResults.map((r) => ({
-          source: collName,
-          content: (r.payload as Record<string, unknown>)?.content as string ||
-            JSON.stringify(r.payload),
-          score: r.score,
-          fusedScore: r.score * weight,
-        }));
-      } catch (error) {
+    settledResults.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        results.push(...result.value);
+      } else {
         if (this.config.verbose) {
-          console.error(`Erro ao buscar em ${fullName}:`, error);
+          const collName = Object.keys(FUSION_WEIGHTS)[index];
+          const fullName = COLLECTIONS[collName as keyof typeof COLLECTIONS];
+          console.error(`Erro ao buscar em ${fullName}:`, result.reason);
         }
-        return [];
       }
     });
 
-    const allResults = await Promise.all(searchPromises);
-
-    // Flatten e ordena por fusedScore
-    for (const collResults of allResults) {
-      results.push(...collResults);
-    }
-
+    // Ordena por fusedScore
     results.sort((a, b) => b.fusedScore - a.fusedScore);
 
     return results.slice(0, 10);

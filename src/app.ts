@@ -200,11 +200,15 @@ async function main() {
 
   // Sync command
   if (inputs[0] === "sync") {
-    const { syncCommand } = await import("./commands/sync");
-    await syncCommand({
-      verbose: debugFlag || verboseFlag,
-      dryRun: inputs.includes("--dry-run")
-    });
+    try {
+      const { syncCommand } = await import("./commands/sync");
+      await syncCommand({
+        verbose: debugFlag || verboseFlag,
+        dryRun: inputs.includes("--dry-run")
+      });
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'sync' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
@@ -216,49 +220,77 @@ async function main() {
 
   // Cloudflare command
   if (inputs[0] === "cf" || inputs[0] === "cloudflare") {
-    const { handleCloudflare } = await import("./commands/cloudflare");
-    await handleCloudflare(inputs.slice(1));
+    try {
+      const { handleCloudflare } = await import("./commands/cloudflare");
+      await handleCloudflare(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'cloudflare' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
   // GitHub command
   if (inputs[0] === "github") {
-    await handleGitHubCommand(inputs.slice(1));
+    try {
+      await handleGitHubCommand(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'github' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
   // Qdrant command
   if (inputs[0] === "qdrant") {
-    const { handleQdrantCommand } = await import("./commands/qdrant");
-    await handleQdrantCommand(inputs.slice(1));
+    try {
+      const { handleQdrantCommand } = await import("./commands/qdrant");
+      await handleQdrantCommand(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'qdrant' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
   // Alias command
   if (inputs[0] === "alias") {
-    const { handleAliasCommand } = await import("./commands/alias");
-    await handleAliasCommand(inputs.slice(1));
+    try {
+      const { handleAliasCommand } = await import("./commands/alias");
+      await handleAliasCommand(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'alias' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
   // Inference command - Gerencia conhecimento injetado pelo usuário
   if (inputs[0] === "inference") {
-    const { handleInferenceCommand } = await import("./commands/inference");
-    await handleInferenceCommand(inputs.slice(1));
+    try {
+      const { handleInferenceCommand } = await import("./commands/inference");
+      await handleInferenceCommand(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'inference' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
   // Agent command - Coração agêntico do FazAI
   if (inputs[0] === "agent") {
-    const { handleAgentCommand } = await import("./commands/agent");
-    await handleAgentCommand(inputs.slice(1));
+    try {
+      const { handleAgentCommand } = await import("./commands/agent");
+      await handleAgentCommand(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'agent' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
   // Dashboard command - REST API Server
   if (inputs[0] === "dashboard") {
-    const { handleDashboardCommand } = await import("./commands/dashboard");
-    await handleDashboardCommand(inputs.slice(1));
+    try {
+      const { handleDashboardCommand } = await import("./commands/dashboard");
+      await handleDashboardCommand(inputs.slice(1));
+    } catch (e: any) {
+      logger.error(`Error loading or executing 'dashboard' command: ${e.message}`);
+    }
     process.exit(0);
   }
 
@@ -589,4 +621,10 @@ Gere uma nova sequência de comandos para atingir o mesmo objetivo, evitando rep
 main().catch((error) => {
   logger.error("Unhandled error:", error);
   process.exit(1);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
+  // Consider exiting the process to avoid unpredictable state
+  // process.exit(1);
 });

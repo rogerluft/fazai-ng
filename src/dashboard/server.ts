@@ -151,7 +151,15 @@ export class DashboardServer {
 
       logger.info("Shutting down dashboard server...");
 
+      const forceCloseTimeout = setTimeout(() => {
+        logger.warn("Force closing server after timeout");
+        this.server?.closeAllConnections?.();
+        this.server = null;
+        resolve();
+      }, 5000);
+
       this.server.close((error) => {
+        clearTimeout(forceCloseTimeout); // Clear the timeout
         if (error) {
           logger.error(`Error shutting down: ${error.message}`);
           reject(error);
@@ -161,14 +169,6 @@ export class DashboardServer {
           resolve();
         }
       });
-
-      // Force close after 5 seconds
-      setTimeout(() => {
-        logger.warn("Force closing server after timeout");
-        this.server?.closeAllConnections?.();
-        this.server = null;
-        resolve();
-      }, 5000);
     });
   }
 
