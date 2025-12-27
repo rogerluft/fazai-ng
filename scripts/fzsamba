@@ -119,6 +119,76 @@ criagroup() {
     fi
 }
 
+# Funcao: adicionar compartilhamento existente
+add() {
+    local dir="$1"
+    
+    if [ -z "$dir" ]; then
+        echo "Erro: informe o caminho do diretorio"
+        return 1
+    fi
+
+    # Remove trailing slash if present
+    dir="${dir%/}"
+
+    if [ ! -d "$dir" ]; then
+        echo "Erro: Diretorio $dir nao encontrado"
+        return 1
+    fi
+
+    local nome=$(basename "$dir")
+    
+    if grep -q "^\[$nome\]" /etc/samba/smb.conf; then
+        echo "Erro: Compartilhamento [$nome] ja existe."
+        return 1
+    fi
+    
+    local dono=$(stat -c '%U' "$dir")
+
+    echo "Adicionando compartilhamento [$nome] para $dir..."
+    echo "" >> /etc/samba/smb.conf
+    echo "[$nome]" >> /etc/samba/smb.conf
+    echo "   path = $dir" >> /etc/samba/smb.conf
+    if [ -n "$dono" ] && [ "$dono" != "root" ]; then
+        echo "   valid users = $dono" >> /etc/samba/smb.conf
+    fi
+    echo "   writable = yes" >> /etc/samba/smb.conf
+    echo "   browseable = yes" >> /etc/samba/smb.conf
+}
+
+# Funcao: gerar completion para bash
+completion() {
+    cat <<EOF
+_fzsamba() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="\${COMP_WORDS[COMP_CWORD]}"
+    prev="\${COMP_WORDS[COMP_CWORD-1]}"
+    opts="criauser criadir criagroup add completion"
+
+    case "\${prev}" in
+        criauser)
+            COMPREPLY=( \$(compgen -u -- \${cur}) )
+            return 0
+            ;;
+        criadir|add)
+            COMPREPLY=( \$(compgen -d -- \${cur}) )
+            return 0
+            ;;
+        criagroup)
+            COMPREPLY=( \$(compgen -g -- \${cur}) )
+            return 0
+            ;;
+        *)
+            COMPREPLY=( \$(compgen -W "\${opts}" -- \${cur}) )
+            return 0
+            ;;
+    esac
+}
+complete -F _fzsamba fzsamba
+EOF
+}
+
 # Dispatcher
 case "$1" in
     criauser)
@@ -130,8 +200,15 @@ case "$1" in
     criagroup)
         criagroup "$2"
         ;;
+    add)
+        add "$2"
+        ;;
+    completion)
+        completion
+        exit 0
+        ;;
     *)
-        echo "Uso: fzsamba [criauser|criadir|criagroup] [argumento]"
+        echo "Uso: fzsamba [criauser|criadir|criagroup|add|completion] [argumento]"
         exit 1
         ;;
 esac
