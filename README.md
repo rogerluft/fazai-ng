@@ -471,10 +471,10 @@ inclusive comercial, desde que atribua o crédito apropriado.
 
 ---
 
-## 🙏 Créditos
+## 🙏 Agradecimentos
 
-Este projeto foi originalmente inspirado por [Mandark](https://github.com/hrishioa/mandark).
-O código atual foi completamente reescrito e não compartilha código com o original.
+Agradecimento especial a [Hrishi Olickel](https://github.com/hrishioa) pelo projeto
+[Mandark](https://github.com/hrishioa/mandark) que serviu de inspiração inicial.
 
 ---
 
