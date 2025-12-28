@@ -75,13 +75,14 @@ class OllamaEmbeddingService implements EmbeddingService {
 
   /**
    * Trunca texto para caber no contexto do modelo
-   * Reduzido para margem de segurança (3 chars/token)
+   * mxbai-embed-large: ~512 tokens (~1200 chars com margem de segurança)
    */
   private truncateText(text: string): string {
-    const maxChars = 1500; // Conservative limit (was ~2048)
+    const maxChars = 1200; // Safe limit for mxbai-embed-large (512 tokens)
     if (text.length <= maxChars) {
       return text;
     }
+    logger.debug(`Truncating text from ${text.length} to ${maxChars} chars`);
     return text.substring(0, maxChars);
   }
 
