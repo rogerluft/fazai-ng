@@ -95,6 +95,10 @@ function getEnvVarName(provider: string): string {
       return "FIREWORKS_API_KEY";
     case "ollama":
       return "OLLAMA_BASE_URL";
+    case "llama":
+      return "LLAMA_SERVER_URL";
+    case "perplexity":
+      return "PERPLEXITY_API_KEY";
     default:
       throw new Error(`Provider não suportado: ${provider}`);
   }
@@ -115,7 +119,7 @@ export function listConfiguredKeys(): void {
     const entries = listConfigEntries();
     logger.info(chalk.cyan(`\n🔑 Configurações em ${configFileLabel()}:`));
 
-    const providers = ["openrouter", "anthropic", "openai", "ollama"];
+    const providers = ["llama", "ollama", "openrouter", "anthropic", "openai", "perplexity", "google"];
     let found = false;
 
     for (const provider of providers) {
