@@ -2,6 +2,36 @@
 
 ## [Unreleased]
 
+## [3.13.1] - 2025-12-28
+
+### 🧠 ECOA Tool Execution
+
+O sistema ECOA agora processa corretamente as diretivas de ferramenta que o modelo emite.
+
+#### Features
+
+- **Detecção de Tags ECOA** (`detectEcoaTags()`)
+  - Suporte a `[[WEB: ...]]` e `[WEB: ...]` (flexível)
+  - Suporte a `[[SAVE: ...]]` e `[[READ: ...]]`
+  - Case-insensitive matching
+
+- **Execução de Ferramentas** (`executeEcoaTool()`)
+  - `[[WEB: query]]`: Busca via Perplexity (modelo `sonar`, rápido)
+  - `[[SAVE: text]]`: Salva memória no Qdrant
+  - `[[READ: query]]`: Recupera memória do Qdrant
+  - Fallback para ResearchCoordinator se Perplexity falhar
+
+- **Prompt Otimizado**
+  - Modelo não usa `[[WEB:]]` para fatos básicos (capitais, geografia, etc.)
+  - Termos de busca devem ser específicos
+  - Follow-up call automático após execução de ferramenta
+
+#### Bug Fixes
+
+- **Fix**: Tags ECOA não eram processadas (apenas exibidas)
+- **Fix**: Modelo usava web search para fatos que já conhecia
+- **Fix**: PERPLEXITY_API_KEY não era lido de fazai.conf
+
 ## [3.13.0] - 2025-12-28
 
 ### 🦙 llama.cpp + Phi-3-mini Integration
