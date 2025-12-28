@@ -2,7 +2,7 @@
  * Embeddings Service Module
  *
  * Provides text embedding generation with multiple provider support.
- * Primary: Ollama mxbai-embed-large (1024 dim, local, free)
+ * Primary: Ollama nomic-embed-text (768 dim, 8192 context, local, free)
  * Fallback: OpenAI text-embedding-3-small (1536 dim, cloud, paid)
  *
  * Features:
@@ -54,19 +54,19 @@ export interface EmbeddingService {
  * Ollama Embedding Service
  *
  * Uses local Ollama server for embedding generation.
- * Model: mxbai-embed-large (1024 dimensions)
+ * Model: nomic-embed-text (768 dimensions, 8192 context)
  * Free, local, no API key required.
  */
 class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private readonly model: string;
   private readonly dimension: number;
-  private readonly MAX_TOKENS = 512; // mxbai-embed-large context limit
+  private readonly MAX_TOKENS = 8192; // nomic-embed-text context limit
 
   constructor(
     baseUrl: string = "http://192.168.0.101:11434",
-    model: string = "mxbai-embed-large",
-    dimension: number = 1024
+    model: string = "nomic-embed-text",
+    dimension: number = 768
   ) {
     this.baseUrl = baseUrl;
     this.model = model;
@@ -75,10 +75,10 @@ class OllamaEmbeddingService implements EmbeddingService {
 
   /**
    * Trunca texto para caber no contexto do modelo
-   * mxbai-embed-large: ~512 tokens (~1200 chars com margem de segurança)
+   * nomic-embed-text: ~8192 tokens (~24000 chars com margem de segurança)
    */
   private truncateText(text: string): string {
-    const maxChars = 1200; // Safe limit for mxbai-embed-large (512 tokens)
+    const maxChars = 24000; // Safe limit for nomic-embed-text (8192 tokens)
     if (text.length <= maxChars) {
       return text;
     }
@@ -361,7 +361,8 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
     async (): Promise<EmbeddingService | null> => {
       try {
         const ollamaBaseUrl = getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
-        const preferredOllamaModel = "mxbai-embed-large";
+        const preferredOllamaModel = "nomic-embed-text"; // 8192 context - preferred!
+        const fallbackOllamaModel = "mxbai-embed-large"; // 512 context - fallback only
 
         logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
         const controller = new AbortController();
@@ -374,15 +375,17 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
           const models = data.models || [];
           const modelNames = models.map((m: any) => m.name?.split(':')[0] || m.name);
 
+          // Prefer nomic-embed-text (8192 context) over mxbai-embed-large (512 context)
           if (modelNames.some((name: string) => name === preferredOllamaModel || name.startsWith(preferredOllamaModel))) {
             logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1536 dim [padded])`);
-            return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 1024);
+            return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 768);
           }
 
-          const alternativeModel = "nomic-embed-text";
-          if (modelNames.some((name: string) => name === alternativeModel || name.startsWith(alternativeModel))) {
-            logger.info(`✓ Using Ollama for embeddings (${alternativeModel}, 1536 dim [padded])`);
-            return new OllamaEmbeddingService(ollamaBaseUrl, alternativeModel, 768);
+          // Fallback to mxbai-embed-large if nomic not available
+          if (modelNames.some((name: string) => name === fallbackOllamaModel || name.startsWith(fallbackOllamaModel))) {
+            logger.info(`✓ Using Ollama for embeddings (${fallbackOllamaModel}, 1536 dim [padded])`);
+            logger.warn(`⚠️  mxbai-embed-large has only 512 token context - consider installing nomic-embed-text`);
+            return new OllamaEmbeddingService(ollamaBaseUrl, fallbackOllamaModel, 1024);
           }
 
           logger.debug(`Ollama available but no embedding models found. Available: ${modelNames.join(', ')}`);
