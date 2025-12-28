@@ -1,15 +1,22 @@
 import { NextResponse } from 'next/server';
-import type { SambaStatus } from '@/types/samba.types';
+import type { NextRequest } from 'next/server';
+import type { SambaAPIResponse } from '@/types/samba.types';
 
-// Samba Status API
-// Returns current Samba service status and configured shares
+// Samba Users Management API
+// POST - Create Samba user
 
-export async function GET() {
+export async function POST(request: NextRequest) {
   try {
+    const body = await request.json();
+
     // Forward to backend API
     const backendUrl = process.env.FAZAI_BACKEND_URL || 'http://localhost:3001';
-    const response = await fetch(`${backendUrl}/api/samba/status`, {
-      method: 'GET',
+    const response = await fetch(`${backendUrl}/api/samba/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -17,8 +24,8 @@ export async function GET() {
       return NextResponse.json(
         {
           success: false,
-          error: error.message || 'Failed to fetch status',
-        },
+          error: error.message || 'Failed to create user',
+        } as SambaAPIResponse<null>,
         { status: response.status }
       );
     }
@@ -31,8 +38,8 @@ export async function GET() {
       {
         success: false,
         error: message,
-        message: 'Failed to fetch Samba status'
-      },
+        message: 'Failed to create user'
+      } as SambaAPIResponse<null>,
       { status: 500 }
     );
   }

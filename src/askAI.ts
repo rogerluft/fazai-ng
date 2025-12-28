@@ -5,6 +5,7 @@ import { Readable } from "stream";
 import { models } from "./models";
 import { API_TIMEOUTS } from "./config/timeouts";
 import { perplexityProvider } from "./providers/perplexity-provider";
+import { getLlamaProvider } from "./providers/llama";
 import { SemanticCache } from "./services/semantic-cache";
 import { logger } from "./logger";
 import {
@@ -262,6 +263,21 @@ async function* _askAISingleProvider(
     }
   } else if (provider === "perplexity") {
     const stream = perplexityProvider(prompt, model, systemMessage);
+
+    for await (const chunk of stream) {
+      yield chunk;
+    }
+  } else if (provider === "llama") {
+    // Local llama.cpp server via LlamaProvider (OpenAI-compatible API)
+    const llamaProvider = getLlamaProvider();
+    const stream = llamaProvider.query({
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      model: model,
+      stream: true,
+    });
 
     for await (const chunk of stream) {
       yield chunk;

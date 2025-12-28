@@ -50,6 +50,7 @@ function loadModelsFromConfig(): Model[] {
       provider: ProviderType;
       limit: number;
     }> = [
+      { key: "MODELS_LLAMA", provider: "llama", limit: 3 },  // Local llama.cpp server (priority)
       { key: "MODELS_OLLAMA", provider: "ollama", limit: 3 },
       { key: "MODELS_OPENROUTER", provider: "openrouter", limit: 3 },
       { key: "MODELS_OPENAI", provider: "openai", limit: 3 },

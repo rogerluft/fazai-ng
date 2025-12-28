@@ -52,6 +52,11 @@ readonly SERVICES=(
     "fazai-health-check.service"
 )
 
+# Servicos opcionais (instalados separadamente)
+readonly OPTIONAL_SERVICES=(
+    "fazai-llama.service"  # Instalado via install_llama_cpp no install.sh
+)
+
 # -------------------------------------------------------------------------
 # Funcoes de Utilidade
 # -------------------------------------------------------------------------

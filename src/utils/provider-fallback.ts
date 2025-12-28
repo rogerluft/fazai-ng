@@ -17,17 +17,20 @@ import { logger } from "../logger";
 import { models } from "../models";
 import { checkAPIKey } from "../apiKeyUtils-fazai";
 
-export type ProviderName = "ollama" | "openrouter" | "anthropic" | "openai" | "google";
+export type ProviderName = "llama" | "ollama" | "openrouter" | "anthropic" | "openai" | "google" | "perplexity";
 
 /**
- * Fallback chain: ollama → openrouter → anthropic → openai → google
+ * Fallback chain: llama → ollama → openrouter → anthropic → openai → google
+ *
+ * llama.cpp local server is first priority (fastest, private, no API cost)
  */
 export const FALLBACK_CHAIN: ProviderName[] = [
-  "ollama",
-  "openrouter",
-  "anthropic",
-  "openai",
-  "google",
+  "llama",      // Local llama.cpp server (Phi-3-mini)
+  "ollama",     // Local Ollama server
+  "openrouter", // Cloud with free tier
+  "anthropic",  // Claude API
+  "openai",     // OpenAI API
+  "google",     // Gemini API
 ];
 
 /**
@@ -106,8 +109,8 @@ export function getNextProvider(currentProvider: ProviderName): ProviderName | n
   for (let i = currentIndex + 1; i < FALLBACK_CHAIN.length; i++) {
     const nextProvider = FALLBACK_CHAIN[i];
 
-    // Ollama doesn't need API key
-    if (nextProvider === "ollama") {
+    // Local providers don't need API key
+    if (nextProvider === "llama" || nextProvider === "ollama") {
       return nextProvider;
     }
 
@@ -152,18 +155,21 @@ export function getEquivalentModel(
       openrouter: "anthropic/claude-3.5-sonnet",
       google: "gemini-1.5-pro-latest",
       ollama: "llama3.2:latest",
+      llama: "phi3-mini",
     },
     sonnet: {
       openai: "gpt-4o",
       openrouter: "anthropic/claude-3.5-sonnet",
       google: "gemini-1.5-pro-latest",
       ollama: "llama3.2:latest",
+      llama: "phi3-mini",
     },
     "gemini": {
       openai: "gpt-4o",
       anthropic: "claude-3-5-sonnet-latest",
       openrouter: "google/gemini-pro-1.5",
       ollama: "llama3.2:latest",
+      llama: "phi3-mini",
     },
     // Fast models
     "gpt-4o-mini": {
@@ -171,18 +177,21 @@ export function getEquivalentModel(
       openrouter: "anthropic/claude-3.5-haiku",
       google: "gemini-1.5-flash-latest",
       ollama: "llama3.2:latest",
+      llama: "phi3-mini",
     },
     haiku: {
       openai: "gpt-4o-mini",
       openrouter: "anthropic/claude-3.5-haiku",
       google: "gemini-1.5-flash-latest",
       ollama: "llama3.2:latest",
+      llama: "phi3-mini",
     },
     flash: {
       openai: "gpt-4o-mini",
       anthropic: "claude-3-5-haiku-latest",
       openrouter: "google/gemini-flash-1.5",
       ollama: "llama3.2:latest",
+      llama: "phi3-mini",
     },
     // Ollama models
     llama: {
@@ -196,6 +205,15 @@ export function getEquivalentModel(
       anthropic: "claude-3-5-haiku-latest",
       openrouter: "qwen/qwen-2.5-coder-32b-instruct",
       google: "gemini-1.5-flash-latest",
+      llama: "phi3-mini",
+    },
+    // Phi-3 (llama.cpp local)
+    phi3: {
+      openai: "gpt-4o-mini",
+      anthropic: "claude-3-5-haiku-latest",
+      openrouter: "microsoft/phi-3-mini-128k-instruct:free",
+      google: "gemini-1.5-flash-latest",
+      ollama: "phi3:mini",
     },
   };
 

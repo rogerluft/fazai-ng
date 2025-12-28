@@ -17,7 +17,8 @@ export type ProviderType =
   | "openrouter"
   | "ollama"
   | "google"
-  | "perplexity";
+  | "perplexity"
+  | "llama";  // llama.cpp local server
 
 /**
  * Message format following OpenAI's chat completion standard

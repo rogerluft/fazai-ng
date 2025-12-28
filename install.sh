@@ -652,6 +652,25 @@ LOG_LEVEL=info
 LOG_FILE_PATH=/var/log/fazai/fazai.log
 
 # ============================================
+# Local LLM (llama.cpp + Phi-3-mini)
+# ============================================
+# llama-server local (zero custo, privacidade total)
+# Instalado automaticamente via install.sh
+LLAMA_SERVER_URL=http://localhost:11430
+LLAMA_TIMEOUT=10000
+LLAMA_RETRIES=3
+LLAMA_TEMPERATURE=0.7
+LLAMA_MAX_TOKENS=2048
+MODELS_LLAMA=phi3-mini
+
+# ============================================
+# Agentic Loop Safeguards
+# ============================================
+# Proteção contra loops infinitos no modo agêntico
+AGENTIC_MAX_ITERATIONS=5
+AGENTIC_TIMEOUT=120000
+
+# ============================================
 # Configurações Avançadas
 # ============================================
 
@@ -999,6 +1018,267 @@ check_qdrant() {
   return 0
 }
 
+# =============================================================================
+# LLAMA.CPP + PHI-3-MINI (Modelo Local)
+# =============================================================================
+
+# Instalar llama.cpp + Phi-3-mini
+install_llama_cpp() {
+  info "Verificando llama.cpp..."
+
+  # Verificar se já está instalado
+  if command -v llama-server &> /dev/null; then
+    success "llama-server já instalado: $(which llama-server)"
+    # Verificar modelo
+    if [ -f "/opt/fazai/models/phi3/Phi-3-mini-4k-instruct-q4.gguf" ]; then
+      success "Modelo Phi-3-mini já existe"
+      return 0
+    else
+      info "llama-server instalado mas modelo não encontrado. Baixando..."
+      download_phi3_model
+      return $?
+    fi
+  fi
+
+  echo ""
+  echo -e "${YELLOW}llama.cpp não encontrado. Deseja instalar?${NC}"
+  echo -e "${CYAN}Isso instalará:${NC}"
+  echo -e "  - llama.cpp (compilado do fonte)"
+  echo -e "  - Phi-3-mini-4k-instruct (~2.4GB)"
+  echo -e "  - Serviço systemd (fazai-llama)"
+  echo ""
+  read -p "Instalar llama.cpp + Phi-3? [S/n]: " install_llama
+
+  if [[ "$install_llama" =~ ^[Nn]$ ]]; then
+    warning "llama.cpp não instalado. Pule esta etapa."
+    return 1
+  fi
+
+  # Instalar dependências de build
+  info "Instalando dependências de build..."
+  if command -v dnf &> /dev/null; then
+    sudo dnf install -y cmake make gcc-c++ git wget
+  elif command -v apt-get &> /dev/null; then
+    sudo apt-get update -qq
+    sudo apt-get install -y cmake make g++ git wget
+  elif command -v yum &> /dev/null; then
+    sudo yum install -y cmake make gcc-c++ git wget
+  else
+    error "Gerenciador de pacotes não suportado. Instale cmake, make, g++, wget manualmente."
+  fi
+
+  # Clone llama.cpp
+  info "Clonando llama.cpp..."
+  if [ -d "/opt/fazai/llama.cpp" ]; then
+    warning "Diretório llama.cpp existe. Atualizando..."
+    cd /opt/fazai/llama.cpp
+    git pull origin master || warning "Falha ao atualizar, usando versão atual"
+  else
+    git clone --depth 1 https://github.com/ggerganov/llama.cpp /opt/fazai/llama.cpp || {
+      error "Falha ao clonar llama.cpp"
+    }
+  fi
+
+  # Build
+  info "Compilando llama.cpp (pode demorar alguns minutos)..."
+  cd /opt/fazai/llama.cpp
+  cmake -B build -DCMAKE_BUILD_TYPE=Release || {
+    error "Falha no cmake configure"
+  }
+  cmake --build build --config Release -j$(nproc) || {
+    error "Falha no build"
+  }
+
+  # Verificar binários
+  if [ ! -f "build/bin/llama-server" ]; then
+    error "Build falhou: llama-server não encontrado em build/bin/"
+  fi
+
+  # Symlink para PATH
+  sudo ln -sf /opt/fazai/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
+  sudo ln -sf /opt/fazai/llama.cpp/build/bin/llama-cli /usr/local/bin/llama-cli
+
+  success "llama.cpp compilado e instalado!"
+  success "Binários: llama-server, llama-cli"
+
+  # Baixar modelo Phi-3-mini
+  download_phi3_model
+
+  # Instalar serviço systemd
+  install_llama_service
+}
+
+# Baixar modelo Phi-3-mini
+download_phi3_model() {
+  local MODEL_DIR="/opt/fazai/models/phi3"
+  # CORREÇÃO: Nome correto do arquivo no repositório oficial Microsoft
+  local MODEL_FILE="Phi-3-mini-4k-instruct-q4.gguf"
+  local MODEL_URL="https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
+
+  info "Configurando diretório de modelos..."
+  sudo mkdir -p "$MODEL_DIR"
+
+  # Criar grupo fazai se não existir
+  if ! getent group fazai > /dev/null 2>&1; then
+    sudo groupadd -f fazai
+  fi
+
+  sudo chown -R root:fazai "$MODEL_DIR"
+  sudo chmod -R 774 "$MODEL_DIR"
+
+  if [ -f "$MODEL_DIR/$MODEL_FILE" ]; then
+    local file_size=$(stat -c%s "$MODEL_DIR/$MODEL_FILE" 2>/dev/null || echo "0")
+    if [ "$file_size" -gt 1000000000 ]; then
+      success "Modelo Phi-3-mini já existe: $MODEL_DIR/$MODEL_FILE ($(numfmt --to=iec $file_size))"
+      return 0
+    else
+      warning "Arquivo de modelo existe mas parece incompleto. Rebaixando..."
+      rm -f "$MODEL_DIR/$MODEL_FILE"
+    fi
+  fi
+
+  info "Baixando Phi-3-mini (~2.4GB)..."
+  info "Isso pode demorar dependendo da sua conexão..."
+
+  # Tentar download sem autenticação (modelo público)
+  if wget --progress=bar:force -O "$MODEL_DIR/$MODEL_FILE" "$MODEL_URL" 2>&1; then
+    local downloaded_size=$(stat -c%s "$MODEL_DIR/$MODEL_FILE" 2>/dev/null || echo "0")
+    if [ "$downloaded_size" -gt 1000000000 ]; then
+      success "Modelo Phi-3-mini baixado! ($(numfmt --to=iec $downloaded_size))"
+      return 0
+    else
+      warning "Download parece incompleto. Tentando com token HuggingFace..."
+      rm -f "$MODEL_DIR/$MODEL_FILE"
+    fi
+  else
+    warning "Download falhou. Tentando com token HuggingFace..."
+  fi
+
+  # Verificar se tem token no conf
+  local HF_TOKEN=""
+  if [ -f "/etc/fazai/fazai.conf" ]; then
+    HF_TOKEN=$(grep "^HF_TOKEN=" /etc/fazai/fazai.conf 2>/dev/null | cut -d= -f2)
+  fi
+
+  if [ -z "$HF_TOKEN" ]; then
+    echo ""
+    echo -e "${YELLOW}Token HuggingFace pode ser necessário para download.${NC}"
+    echo -e "Obtenha em: ${CYAN}https://huggingface.co/settings/tokens${NC}"
+    read -p "Cole seu token HF (ou Enter para pular): " HF_TOKEN
+
+    if [ -n "$HF_TOKEN" ]; then
+      # Salvar token no conf
+      if [ -f "/etc/fazai/fazai.conf" ]; then
+        if grep -q "^HF_TOKEN=" /etc/fazai/fazai.conf 2>/dev/null; then
+          sudo sed -i "s|^HF_TOKEN=.*|HF_TOKEN=$HF_TOKEN|" /etc/fazai/fazai.conf
+        else
+          echo "HF_TOKEN=$HF_TOKEN" | sudo tee -a /etc/fazai/fazai.conf > /dev/null
+        fi
+        success "Token HF salvo em /etc/fazai/fazai.conf"
+      fi
+    fi
+  fi
+
+  if [ -n "$HF_TOKEN" ]; then
+    wget --progress=bar:force --header="Authorization: Bearer $HF_TOKEN" -O "$MODEL_DIR/$MODEL_FILE" "$MODEL_URL" 2>&1 || {
+      error "Falha no download do modelo. Verifique sua conexão e token."
+    }
+    success "Modelo Phi-3-mini baixado com token!"
+  else
+    warning "Download sem token falhou e nenhum token fornecido."
+    warning "Baixe manualmente: $MODEL_URL"
+    warning "Coloque em: $MODEL_DIR/$MODEL_FILE"
+    return 1
+  fi
+}
+
+# Instalar serviço systemd para llama-server
+install_llama_service() {
+  info "Instalando serviço systemd fazai-llama..."
+
+  # Copiar arquivo de serviço
+  if [ -f "$INSTALL_DIR/etc/fazai/fazai-llama.service" ]; then
+    sudo cp "$INSTALL_DIR/etc/fazai/fazai-llama.service" /etc/systemd/system/fazai-llama.service
+  else
+    # Criar serviço inline se arquivo não existir
+    sudo tee /etc/systemd/system/fazai-llama.service > /dev/null <<'LLAMASERVICE'
+[Unit]
+Description=FazAI LLaMA Server (Phi-3-mini)
+Documentation=https://github.com/ggerganov/llama.cpp
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=fazai
+
+# Garantir permissões
+ExecStartPre=/bin/mkdir -p /var/log/fazai
+ExecStartPre=/bin/chown root:fazai /var/log/fazai
+ExecStartPre=/bin/chmod 774 /var/log/fazai
+ExecStartPre=/bin/chown -R root:fazai /opt/fazai/models
+ExecStartPre=/bin/chmod -R 774 /opt/fazai/models
+
+WorkingDirectory=/opt/fazai/models/phi3
+
+# Comando principal - Otimizado para alta memória + NUMA
+ExecStart=/usr/local/bin/llama-server \
+    --model /opt/fazai/models/phi3/Phi-3-mini-4k-instruct-q4.gguf \
+    --host 0.0.0.0 \
+    --port 11430 \
+    --ctx-size 4096 \
+    --threads 8 \
+    --parallel 4 \
+    --mlock \
+    --numa distribute \
+    --log-file /var/log/fazai/llama-server.log
+
+Restart=on-failure
+RestartSec=5
+
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+StandardOutput=null
+StandardError=journal
+SyslogIdentifier=fazai-llama
+
+[Install]
+WantedBy=multi-user.target
+LLAMASERVICE
+  fi
+
+  sudo systemctl daemon-reload
+  sudo systemctl enable fazai-llama
+
+  echo ""
+  read -p "Iniciar serviço fazai-llama agora? [S/n]: " start_llama
+  if [[ ! "$start_llama" =~ ^[Nn]$ ]]; then
+    info "Iniciando fazai-llama (carregando modelo na memória, pode demorar)..."
+    sudo systemctl start fazai-llama
+
+    # Aguardar inicialização
+    info "Aguardando llama-server inicializar (até 60s)..."
+    for i in {1..60}; do
+      if curl -sf "http://localhost:11430/health" > /dev/null 2>&1; then
+        success "fazai-llama iniciado e respondendo!"
+        info "Logs: journalctl -u fazai-llama -f"
+        info "Status: systemctl status fazai-llama"
+        return 0
+      fi
+      sleep 1
+      echo -n "."
+    done
+    echo ""
+    warning "llama-server ainda não respondeu. Verifique:"
+    warning "  journalctl -u fazai-llama -n 50"
+  else
+    success "Serviço fazai-llama instalado (não iniciado)"
+    info "Para iniciar: sudo systemctl start fazai-llama"
+  fi
+}
+
 # Criar collections
 setup_collections() {
   info "Configurando collections Qdrant..."
@@ -1233,6 +1513,7 @@ main() {
   install_fzsamba         # Instalar gerenciador Samba
   setup_config
   install_qdrant  # Instalação interativa do Qdrant
+  install_llama_cpp  # Instalação llama.cpp + Phi-3-mini (modelo local)
   setup_collections
   install_web_interface  # Instalação opcional da interface web
 

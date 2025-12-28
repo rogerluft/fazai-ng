@@ -2,6 +2,76 @@
 
 ## [Unreleased]
 
+## [3.13.0] - 2025-12-28
+
+### 🦙 llama.cpp + Phi-3-mini Integration
+
+Nova opção de LLM local usando llama.cpp com modelo Phi-3-mini da Microsoft.
+Zero custo, privacidade total, funciona offline.
+
+#### Features
+
+- **LlamaProvider** (`src/providers/llama.ts`)
+  - Provider TypeScript para llama.cpp local server
+  - API OpenAI-compatible (`/v1/chat/completions`)
+  - Streaming SSE support
+  - Retry com backoff exponencial (1s, 2s, 3s)
+  - Timeout configurável (default 10s)
+  - **Zero hardcode**: Todas configurações lidas de `fazai.conf`
+
+- **Instalação Automatizada** (`install.sh`)
+  - `install_llama_cpp()`: Compila llama.cpp da fonte
+  - `download_phi3_model()`: Baixa Phi-3-mini q4 (~2.4GB) do repo oficial Microsoft
+  - `install_llama_service()`: Configura systemd para auto-start
+  - Suporte a HuggingFace token (opcional, modelo é público)
+
+- **Serviço Systemd** (`etc/fazai/fazai-llama.service`)
+  - Porta 11430 (não conflita com outros serviços)
+  - Otimizado para alta memória (mlock, NUMA distribute)
+  - 8 threads, 4 parallel slots
+  - Logs centralizados em `/var/log/fazai/llama-server.log`
+  - Restart automático on-failure
+
+- **Fallback Chain Atualizada**
+  - Nova ordem: `llama → ollama → openrouter → anthropic → openai → google`
+  - llama.cpp é primeira prioridade (local, grátis, rápido)
+
+#### Configurações (fazai.conf)
+
+```ini
+# Local LLM (llama.cpp + Phi-3-mini)
+LLAMA_SERVER_URL=http://localhost:11430
+LLAMA_TIMEOUT=10000
+LLAMA_RETRIES=3
+LLAMA_TEMPERATURE=0.7
+LLAMA_MAX_TOKENS=2048
+MODELS_LLAMA=phi3-mini
+
+# Agentic Loop Safeguards
+AGENTIC_MAX_ITERATIONS=5
+AGENTIC_TIMEOUT=120000
+```
+
+#### Arquivos Modificados
+
+- `src/types/provider.ts` - Adicionado tipo "llama" ao ProviderType
+- `src/providers/llama.ts` - **NOVO** LlamaProvider completo
+- `src/models.ts` - Adicionado MODELS_LLAMA ao loader
+- `src/askAI.ts` - Adicionado handler para provider llama
+- `src/utils/provider-fallback.ts` - Atualizada chain e mapeamentos
+- `install.sh` - 3 novas funções para llama.cpp
+- `etc/fazai/fazai-llama.service` - **NOVO** Serviço systemd
+
+#### Testes
+
+- `tests/unit/llama-provider.test.ts` - 13 testes unitários
+  - Configuração do provider
+  - Validação de disponibilidade
+  - Retry com backoff
+  - Streaming SSE
+  - Error handling
+  - Singleton factory
+
 ## [3.12.0] - 2025-12-28
 
 ### 🧪 TDD Enforcer - Pre-Commit Hook

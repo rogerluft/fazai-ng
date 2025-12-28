@@ -6,16 +6,25 @@ import type { SambaAPIResponse } from '@/types/samba.types';
 
 export async function POST() {
   try {
-    // TODO: Integrate with actual system service management
-    // const exec = require('child_process').execSync;
-    // exec('sudo systemctl restart smbd nmbd');
-    // or
-    // exec('sudo /opt/fazai/bin/fzsamba restart');
+    // Forward to backend API
+    const backendUrl = process.env.FAZAI_BACKEND_URL || 'http://localhost:3001';
+    const response = await fetch(`${backendUrl}/api/samba/restart`, {
+      method: 'POST',
+    });
 
-    return NextResponse.json({
-      success: true,
-      message: 'Samba service restarted successfully (mock)',
-    } as SambaAPIResponse<null>);
+    if (!response.ok) {
+      const error = await response.json();
+      return NextResponse.json(
+        {
+          success: false,
+          error: error.message || 'Failed to restart service',
+        } as SambaAPIResponse<null>,
+        { status: response.status }
+      );
+    }
+
+    const data = await response.json();
+    return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
