@@ -3,7 +3,7 @@
 ## A New Operational Vulnerability
 
 **Author:** Roger Luft, aka, VeilWalker  
-**Email:** roger@webstorage.com.br, rlufti@gmail.com  
+**Email:** roger@rogerluft.com.br, rlufti@gmail.com  
 **Date:** 26/04/2025
 
 **License:** This work is licensed under the Creative Commons Attribution-ShareAlike 4.0 International (CC-BY-SA 4.0). For more details, see: https://creativecommons.org/licenses/by-sa/4.0/

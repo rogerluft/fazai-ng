@@ -464,7 +464,7 @@ Contribuições são muito bem-vindas! Consulte o [Guia de Contribuição](CONTR
 
 **[Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE)**
 
-Copyright (c) 2024-2025 Roger Luft - roger@webstorage.com.br
+Copyright (c) 2024-2025 Roger Luft - roger@rogerluft.com.br
 
 Você é livre para compartilhar e adaptar este material para qualquer finalidade,
 inclusive comercial, desde que atribua o crédito apropriado.
