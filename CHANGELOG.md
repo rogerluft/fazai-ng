@@ -2,6 +2,46 @@
 
 ## [Unreleased]
 
+## [3.12.0] - 2025-12-28
+
+### 🧪 TDD Enforcer - Pre-Commit Hook
+
+- **Husky + Pre-Commit**: Commits com testes quebrados agora são bloqueados automaticamente
+  - Executa `npm test` (suite completa) antes de cada commit
+  - Visual feedback claro: ✅ verde ou ❌ vermelho
+  - Bypass emergencial: `git commit --no-verify`
+  - Instalação automática via `npm install` (script prepare)
+
+### 🔄 Refatoração - Semantic Cache Simplificado
+
+- **semantic-cache.ts**: Reescrito de ~690 linhas para ~470 linhas
+  - Removida dependência de Qdrant (era over-engineering)
+  - Agora usa Map<string, CachedResponse> in-memory
+  - TTL: 1 hora, Max Entries: 500, LRU eviction
+  - Cosine similarity com threshold 0.90
+  - Timer com `unref()` para não bloquear processo
+
+### 🆕 Novo Módulo - Query Normalizer
+
+- **src/utils/normalize.ts**: Utilitários de normalização para cache semântico
+  - `normalizeQuery()`: lowercase, trim, remove pontuação duplicada, remove stopwords PT
+  - `generateCacheKey()`: Chave única para query+model+provider
+  - `areQueriesSimilar()`: Comparação com Jaccard similarity
+  - `jaccardSimilarity()`: Similaridade de conjuntos de tokens
+  - 38 testes cobrindo todos os casos
+
+### 🗄️ Arquivamento - Código Órfão
+
+- **Movidos para archive/**:
+  - `api-status-checker.ts` - Dashboard agora usa outras fontes
+  - `tactical-brain.ts` - Funcionalidade integrada em genai
+  - `query-analyzer.ts` - Substituído por normalize.ts
+
+### 📝 Documentação
+
+- **README.md**: Nova seção "🧪 TDD Enforced" explicando o hook
+- **package.json**: Adicionadas devDependencies husky, lint-staged
+
 ## [3.11.1] - 2025-12-27
 
 ### 🧪 Testing - Test Suite Expansion

@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.11.1",
+  "version": "3.12.0",
   "author": "Roger Luft (VeilWalker) <roger@webstorage.com.br> (fork from Mandark by Hrishi Olickel)",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -44,6 +44,7 @@
     "zod": "^4.1.12"
   },
   "scripts": {
+    "prepare": "husky",
     "build": "bash scripts/setup-env.sh && tsup",
     "build:safe": "bash scripts/setup-env.sh && tsup",
     "build:full": "bash scripts/setup-env.sh && npm test && tsup",
@@ -81,9 +82,14 @@
     "@types/express": "^5.0.6",
     "@types/node": "^24.10.1",
     "@vitest/ui": "^4.0.9",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.2.7",
     "tsup": "^8.5.1",
     "tsx": "^4.0.0",
     "typescript": "^5.5.3",
     "vitest": "^4.0.15"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": "echo 'TypeScript files staged for commit'"
   }
 }

@@ -1,60 +1,54 @@
 /**
- * Semantic Cache Module
+ * Semantic Cache Module (Simplified Hybrid Version)
  *
- * Advanced caching system using Qdrant for similarity-based lookups.
- * Unlike traditional caches that only match identical queries, this cache
- * matches semantically similar queries using vector embeddings.
+ * In-memory cache for LLM responses with query normalization.
+ * Works in conjunction with GenAIScript which handles heavy query processing.
+ *
+ * Architecture (Hybrid - Option C):
+ * - GenAIScript (fazai-core.genai.mjs) does heavy normalization (reformulation, pt→en)
+ * - This cache receives already-processed queries from agentic loop
+ * - For direct queries (fazai ask), applies MEDIUM normalization
+ * - Uses cosine similarity on embeddings for semantic matching (threshold: 0.90)
  *
  * Features:
- * - Similarity search (finds similar queries, not just exact matches)
- * - Configurable similarity threshold (0-1 scale)
- * - TTL (Time To Live) with automatic expiration
- * - LRU (Least Recently Used) eviction
- * - Hit rate metrics and monitoring
- * - Per-provider/per-model isolation
+ * - In-memory Map storage (no Qdrant dependency)
+ * - Query normalization via utils/normalize.ts
+ * - Cosine similarity matching with configurable threshold
+ * - TTL expiration (default: 1 hour)
+ * - LRU eviction when cache is full
+ * - Hit/miss metrics tracking
  *
- * Architecture:
- * 1. Query → Generate embedding
- * 2. Search Qdrant by vector similarity
- * 3. If score > threshold AND not expired → Cache HIT
- * 4. Otherwise → Cache MISS, store new response
- * 5. Periodic cleanup of expired entries
- *
- * Example:
- * ```typescript
- * const cache = await SemanticCache.getInstance();
- *
- * // Try to get from cache
- * const cached = await cache.lookup("Como instalar nginx?", "qwen2.5:7b", "ollama");
- *
- * if (cached) {
- *   console.log("Cache HIT:", cached);
- * } else {
- *   // Cache MISS, call provider
- *   const response = await callProvider(...);
- *   await cache.store("Como instalar nginx?", response, "qwen2.5:7b", "ollama");
- * }
- * ```
+ * @module services/semantic-cache
  */
 
-import { randomUUID } from "crypto";
 import { logger } from "../logger";
-import { getQdrantClient, qdrantPool } from "../database/qdrant-pool";
+import { normalizeQuery, generateCacheKey } from "../utils/normalize";
 import { createEmbeddingService } from "./embeddings";
-import { CircuitState } from "../resilience/circuit-breaker";
 
 /**
- * Cache entry stored in Qdrant
+ * Cached response entry
  */
-interface CacheEntry {
-  query: string;
+interface CachedResponse {
+  /** Original query (before normalization) */
+  originalQuery: string;
+  /** Normalized query */
+  normalizedQuery: string;
+  /** Query embedding vector */
+  embedding: number[];
+  /** LLM response */
   response: string;
+  /** Model used */
   model: string;
+  /** Provider used */
   provider: string;
+  /** Timestamp of cache entry */
   timestamp: number;
+  /** Number of cache hits */
   hits: number;
+  /** Last hit timestamp */
   lastHit: number;
-  ttl: number; // milliseconds
+  /** TTL in milliseconds */
+  ttl: number;
 }
 
 /**
@@ -62,21 +56,22 @@ interface CacheEntry {
  */
 export interface CacheLookupOptions {
   /**
-   * Minimum similarity score (0-1)
-   * Default: 0.95 (very similar)
-   *
-   * Higher = more strict (only very similar queries match)
-   * Lower = more lenient (broader matches)
+   * Minimum cosine similarity score (0-1)
+   * Default: 0.90 (high similarity required)
    */
   similarityThreshold?: number;
 
   /**
    * Maximum age in milliseconds
    * Default: 1 hour (3600000ms)
-   *
-   * Entries older than this are considered expired
    */
   maxAge?: number;
+
+  /**
+   * Skip normalization (query already normalized by GenAIScript)
+   * Default: false
+   */
+  skipNormalization?: boolean;
 }
 
 /**
@@ -84,34 +79,54 @@ export interface CacheLookupOptions {
  */
 export interface CacheStats {
   totalEntries: number;
-  avgAge: number; // seconds
-  totalHits: number;
-  totalMisses: number;
-  hitRate: number; // percentage
-  oldestEntry: number; // seconds
-  newestEntry: number; // seconds
+  hits: number;
+  misses: number;
+  hitRate: number;
+  avgAge: number;
+  memoryUsage: number;
 }
 
 /**
- * Semantic Cache using Qdrant for similarity search
- * Com fallback em memória quando Qdrant está offline (BUG-002)
+ * Calculate cosine similarity between two vectors
+ */
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) {
+    logger.warn(`Vector dimension mismatch: ${a.length} vs ${b.length}`);
+    return 0;
+  }
+
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  if (denominator === 0) return 0;
+
+  return dotProduct / denominator;
+}
+
+/**
+ * Semantic Cache - Simplified In-Memory Implementation
  *
- * Singleton pattern - use getInstance() to access.
+ * Singleton pattern for global cache access.
  */
 export class SemanticCache {
   private static instance: SemanticCache | null = null;
-  private readonly collectionName = "fazai_semantic_cache";
-  private initialized = false;
 
-  // Cache configuration
-  private readonly DEFAULT_SIMILARITY_THRESHOLD = 0.95; // Very similar
+  // Cache storage
+  private cache: Map<string, CachedResponse> = new Map();
+
+  // Configuration
+  private readonly DEFAULT_SIMILARITY_THRESHOLD = 0.90;
   private readonly DEFAULT_TTL = 60 * 60 * 1000; // 1 hour
-  private readonly MAX_CACHE_SIZE = 10000; // Maximum entries
+  private readonly MAX_CACHE_SIZE = 500; // Max entries
   private readonly CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes
-
-  // Fallback: cache em memória quando Qdrant está offline
-  private memoryCache: Map<string, { response: string; timestamp: number }> = new Map();
-  private readonly MEMORY_CACHE_MAX_SIZE = 100;
 
   // Metrics
   private metrics = {
@@ -119,14 +134,10 @@ export class SemanticCache {
     misses: 0,
     stores: 0,
     evictions: 0,
-    memoryHits: 0,
-    memoryStores: 0,
   };
 
   private cleanupTimer: NodeJS.Timeout | null = null;
-
-  // Flag para evitar registro múltiplo de handlers de processo
-  private signalHandlersRegistered = false;
+  private initialized = false;
 
   /**
    * Private constructor (singleton pattern)
@@ -134,15 +145,7 @@ export class SemanticCache {
   private constructor() {}
 
   /**
-   * Verifica se Qdrant está disponível
-   */
-  private isQdrantAvailable(): boolean {
-    return qdrantPool.isAvailable();
-  }
-
-  /**
    * Get or create singleton instance
-   * Não falha se Qdrant estiver offline - usa fallback em memória
    */
   static async getInstance(): Promise<SemanticCache> {
     if (!SemanticCache.instance) {
@@ -153,114 +156,25 @@ export class SemanticCache {
   }
 
   /**
-   * Initialize Qdrant collection for semantic cache
-   * Graceful degradation: continua funcionando mesmo sem Qdrant
+   * Initialize cache and start cleanup timer
    */
-  async initialize(): Promise<void> {
-    if (this.initialized) {
-      return;
-    }
+  private async initialize(): Promise<void> {
+    if (this.initialized) return;
 
-    // Tentar inicializar Qdrant, mas não falhar se não conseguir
-    if (!this.isQdrantAvailable()) {
-      logger.warn("⚠️ Qdrant unavailable - semantic cache running in memory-only mode");
-      this.initialized = true;
-      this.startCleanupTimer();
-      return;
-    }
+    this.startCleanupTimer();
+    this.initialized = true;
 
-    try {
-      const client = await getQdrantClient();
-      const embedService = await createEmbeddingService();
-      const { dimension } = embedService.getInfo();
-
-      logger.debug(`Initializing semantic cache with ${dimension} dimensions...`);
-
-      // Check if collection exists
-      const collections = await client.getCollections();
-      const exists = collections.collections.some(
-        (c) => c.name === this.collectionName
-      );
-
-      if (!exists) {
-        logger.info(`Creating semantic cache collection: ${this.collectionName}`);
-        await client.createCollection(this.collectionName, {
-          vectors: {
-            size: dimension,
-            distance: "Cosine", // Best for semantic similarity
-          },
-        });
-
-        // Create payload indexes for fast filtering
-        await client.createPayloadIndex(this.collectionName, {
-          field_name: "model",
-          field_schema: "keyword",
-        });
-
-        await client.createPayloadIndex(this.collectionName, {
-          field_name: "provider",
-          field_schema: "keyword",
-        });
-
-        await client.createPayloadIndex(this.collectionName, {
-          field_name: "timestamp",
-          field_schema: "integer",
-        });
-
-        logger.info("✓ Semantic cache indexes created");
-      }
-
-      this.initialized = true;
-      logger.info("✓ Semantic cache initialized (Qdrant mode)");
-
-      // Start periodic cleanup
-      this.startCleanupTimer();
-    } catch (error: any) {
-      // Fallback para modo memória
-      logger.warn(`Qdrant init failed, using memory fallback: ${error.message}`);
-      this.initialized = true;
-      this.startCleanupTimer();
-    }
+    logger.info("✓ Semantic cache initialized (in-memory mode, threshold: 0.90)");
   }
 
   /**
-   * Gera chave para o cache em memória
-   */
-  private getMemoryCacheKey(query: string, model: string, provider: string): string {
-    return `${provider}:${model}:${query.toLowerCase().trim()}`;
-  }
-
-  /**
-   * Lookup no cache em memória (fallback)
-   */
-  private lookupMemory(query: string, model: string, provider: string): string | null {
-    const key = this.getMemoryCacheKey(query, model, provider);
-    const entry = this.memoryCache.get(key);
-
-    if (!entry) {
-      return null;
-    }
-
-    // Verificar TTL
-    if (Date.now() - entry.timestamp > this.DEFAULT_TTL) {
-      this.memoryCache.delete(key);
-      return null;
-    }
-
-    this.metrics.memoryHits++;
-    logger.debug(`Memory cache HIT for "${query.substring(0, 30)}..."`);
-    return entry.response;
-  }
-
-  /**
-   * Lookup query in cache by semantic similarity
-   * Com fallback para cache em memória quando Qdrant offline
+   * Lookup query in cache
    *
-   * @param query User query text
-   * @param model Model name (e.g., "qwen2.5:7b")
-   * @param provider Provider name (e.g., "ollama")
-   * @param options Optional lookup configuration
-   * @returns Cached response if found, null if miss
+   * @param query - User query
+   * @param model - Model name
+   * @param provider - Provider name
+   * @param options - Lookup options
+   * @returns Cached response or null
    */
   async lookup(
     query: string,
@@ -268,241 +182,175 @@ export class SemanticCache {
     provider: string,
     options?: CacheLookupOptions
   ): Promise<string | null> {
-    if (!this.initialized) {
-      await this.initialize();
+    if (!this.initialized) await this.initialize();
+
+    const threshold = options?.similarityThreshold ?? this.DEFAULT_SIMILARITY_THRESHOLD;
+    const maxAge = options?.maxAge ?? this.DEFAULT_TTL;
+    const skipNorm = options?.skipNormalization ?? false;
+
+    // Normalize query (skip if already normalized by GenAIScript)
+    const normalizedQuery = skipNorm ? query : normalizeQuery(query);
+
+    if (!normalizedQuery) {
+      this.metrics.misses++;
+      logger.debug("Cache MISS: empty query after normalization");
+      return null;
     }
 
-    // Se Qdrant não está disponível, usar cache em memória
-    if (!this.isQdrantAvailable()) {
-      const memResult = this.lookupMemory(query, model, provider);
-      if (!memResult) {
-        this.metrics.misses++;
+    // Try exact match first (fast path)
+    const exactKey = generateCacheKey(normalizedQuery, model, provider);
+    const exactMatch = this.cache.get(exactKey);
+
+    if (exactMatch) {
+      const age = Date.now() - exactMatch.timestamp;
+      if (age <= maxAge) {
+        this.metrics.hits++;
+        exactMatch.hits++;
+        exactMatch.lastHit = Date.now();
+
+        logger.info(
+          `✓ Cache HIT (exact): "${normalizedQuery.substring(0, 40)}..." ` +
+          `[${model}] age=${Math.round(age / 1000)}s hits=${exactMatch.hits}`
+        );
+        return exactMatch.response;
+      } else {
+        // Expired, remove it
+        this.cache.delete(exactKey);
       }
-      return memResult;
     }
 
+    // Semantic search (slower path) - compare embeddings
     try {
-      const threshold = options?.similarityThreshold || this.DEFAULT_SIMILARITY_THRESHOLD;
-      const maxAge = options?.maxAge || this.DEFAULT_TTL;
-
-      // Generate query embedding
       const embedService = await createEmbeddingService();
-      const queryEmbedding = await embedService.generate(query);
+      const queryEmbedding = await embedService.generate(normalizedQuery);
 
-      // Search by similarity
-      const client = await getQdrantClient();
-      const results = await client.search(this.collectionName, {
-        vector: queryEmbedding,
-        limit: 1,
-        with_payload: true,
-        filter: {
-          must: [
-            { key: "model", match: { value: model } },
-            { key: "provider", match: { value: provider } },
-          ],
-        },
-      });
+      let bestMatch: CachedResponse | null = null;
+      let bestScore = 0;
 
-      if (results.length === 0) {
-        this.metrics.misses++;
-        logger.debug(`Cache MISS: no similar queries found`);
-        return null;
+      for (const [key, entry] of this.cache.entries()) {
+        // Skip different model/provider
+        if (entry.model !== model || entry.provider !== provider) continue;
+
+        // Check TTL
+        const age = Date.now() - entry.timestamp;
+        if (age > maxAge) {
+          this.cache.delete(key);
+          continue;
+        }
+
+        // Calculate similarity
+        const score = cosineSimilarity(queryEmbedding, entry.embedding);
+
+        if (score >= threshold && score > bestScore) {
+          bestScore = score;
+          bestMatch = entry;
+        }
       }
 
-      const best = results[0];
-      const payload = best.payload as unknown as CacheEntry;
+      if (bestMatch) {
+        this.metrics.hits++;
+        bestMatch.hits++;
+        bestMatch.lastHit = Date.now();
 
-      // Check similarity threshold
-      if (best.score < threshold) {
-        this.metrics.misses++;
-        logger.debug(
-          `Cache MISS: score ${best.score.toFixed(3)} < threshold ${threshold}`
+        logger.info(
+          `✓ Cache HIT (semantic): score=${bestScore.toFixed(3)} ` +
+          `"${normalizedQuery.substring(0, 30)}..." → "${bestMatch.normalizedQuery.substring(0, 30)}..." ` +
+          `[${model}]`
         );
-        return null;
+        return bestMatch.response;
       }
-
-      // Check TTL
-      const age = Date.now() - payload.timestamp;
-      if (age > maxAge) {
-        this.metrics.misses++;
-        logger.debug(
-          `Cache MISS: entry expired (${Math.round(age / 1000)}s old, max ${Math.round(maxAge / 1000)}s)`
-        );
-
-        // Delete expired entry
-        await client.delete(this.collectionName, {
-          points: [best.id as string],
-        });
-
-        return null;
-      }
-
-      // Cache HIT!
-      this.metrics.hits++;
-      logger.info(
-        `✓ Cache HIT: score=${best.score.toFixed(3)}, age=${Math.round(age / 1000)}s, query="${query.substring(0, 50)}..."`
-      );
-
-      // Update hit counter and last hit timestamp
-      await client.setPayload(this.collectionName, {
-        points: [best.id as string],
-        payload: {
-          hits: payload.hits + 1,
-          lastHit: Date.now(),
-        },
-      });
-
-      return payload.response;
     } catch (error: any) {
-      logger.warn(`Cache lookup error: ${error.message}`);
-      // Fallback para cache em memória
-      const memResult = this.lookupMemory(query, model, provider);
-      if (!memResult) {
-        this.metrics.misses++;
-      }
-      return memResult;
+      logger.debug(`Semantic search error: ${error.message}`);
     }
+
+    this.metrics.misses++;
+    logger.debug(
+      `Cache MISS: "${normalizedQuery.substring(0, 40)}..." [${model}]`
+    );
+    return null;
   }
 
   /**
-   * Store no cache em memória (fallback)
-   */
-  private storeMemory(query: string, response: string, model: string, provider: string): void {
-    const key = this.getMemoryCacheKey(query, model, provider);
-
-    // LRU: remover entradas antigas se necessário
-    if (this.memoryCache.size >= this.MEMORY_CACHE_MAX_SIZE) {
-      const oldestKey = this.memoryCache.keys().next().value;
-      if (oldestKey) {
-        this.memoryCache.delete(oldestKey);
-      }
-    }
-
-    this.memoryCache.set(key, {
-      response,
-      timestamp: Date.now(),
-    });
-
-    this.metrics.memoryStores++;
-    logger.debug(`Memory cache STORE for "${query.substring(0, 30)}..."`);
-  }
-
-  /**
-   * Store response in semantic cache
-   * Com fallback para cache em memória quando Qdrant offline
+   * Store response in cache
    *
-   * @param query User query text
-   * @param response Provider response
-   * @param model Model name
-   * @param provider Provider name
-   * @param ttl Optional TTL in milliseconds (default: 1 hour)
+   * @param query - User query
+   * @param response - LLM response
+   * @param model - Model name
+   * @param provider - Provider name
+   * @param options - Store options
    */
   async store(
     query: string,
     response: string,
     model: string,
     provider: string,
-    ttl?: number
+    options?: { ttl?: number; skipNormalization?: boolean }
   ): Promise<void> {
-    if (!this.initialized) {
-      await this.initialize();
-    }
+    if (!this.initialized) await this.initialize();
 
-    // Sempre armazenar no cache em memória também (backup)
-    this.storeMemory(query, response, model, provider);
+    const skipNorm = options?.skipNormalization ?? false;
+    const normalizedQuery = skipNorm ? query : normalizeQuery(query);
 
-    // Se Qdrant não está disponível, apenas o cache em memória é usado
-    if (!this.isQdrantAvailable()) {
+    if (!normalizedQuery || !response) {
+      logger.debug("Cache STORE skipped: empty query or response");
       return;
     }
 
     try {
-      // Generate query embedding
+      // Generate embedding for semantic matching
       const embedService = await createEmbeddingService();
-      const queryEmbedding = await embedService.generate(query);
+      const embedding = await embedService.generate(normalizedQuery);
 
-      const client = await getQdrantClient();
-
-      // Create cache entry
-      const entry: CacheEntry = {
-        query,
+      const entry: CachedResponse = {
+        originalQuery: query,
+        normalizedQuery,
+        embedding,
         response,
         model,
         provider,
         timestamp: Date.now(),
         hits: 0,
         lastHit: Date.now(),
-        ttl: ttl || this.DEFAULT_TTL,
+        ttl: options?.ttl ?? this.DEFAULT_TTL,
       };
 
-      // Generate unique ID (Qdrant requires UUID or integer)
-      const id = randomUUID();
+      const key = generateCacheKey(normalizedQuery, model, provider);
 
-      // Store in Qdrant
-      await client.upsert(this.collectionName, {
-        points: [
-          {
-            id,
-            vector: queryEmbedding,
-            payload: entry,
-          },
-        ],
-      });
+      // Evict if necessary
+      if (this.cache.size >= this.MAX_CACHE_SIZE) {
+        this.evictLRU();
+      }
 
+      this.cache.set(key, entry);
       this.metrics.stores++;
-      logger.debug(
-        `Cached response for "${query.substring(0, 50)}..." (${provider}/${model})`
-      );
 
-      // Check if we need to evict old entries
-      await this.evictIfNeeded();
+      logger.debug(
+        `Cache STORE: "${normalizedQuery.substring(0, 40)}..." [${model}] ` +
+        `(${this.cache.size}/${this.MAX_CACHE_SIZE} entries)`
+      );
     } catch (error: any) {
-      logger.warn(`Failed to store in Qdrant cache: ${error.message}`);
-      // Já armazenado em memória, então ok
+      logger.warn(`Cache store error: ${error.message}`);
     }
   }
 
   /**
-   * Evict old entries if cache is full (LRU)
+   * Evict least recently used entry
    */
-  private async evictIfNeeded(): Promise<void> {
-    try {
-      const client = await getQdrantClient();
+  private evictLRU(): void {
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
 
-      // Count total entries
-      const countResult = await client.count(this.collectionName);
-
-      if (countResult.count <= this.MAX_CACHE_SIZE) {
-        return; // Still have space
+    for (const [key, entry] of this.cache.entries()) {
+      if (entry.lastHit < oldestTime) {
+        oldestTime = entry.lastHit;
+        oldestKey = key;
       }
+    }
 
-      logger.info(
-        `Cache full (${countResult.count}/${this.MAX_CACHE_SIZE}), performing LRU eviction...`
-      );
-
-      // Find oldest entries (least recently used)
-      const scrollResult = await client.scroll(this.collectionName, {
-        limit: 100,
-        with_payload: true,
-        order_by: {
-          key: "lastHit",
-          direction: "asc",
-        },
-      });
-
-      // Delete oldest entries
-      const idsToDelete = scrollResult.points.map((p) => p.id as string);
-
-      if (idsToDelete.length > 0) {
-        await client.delete(this.collectionName, {
-          points: idsToDelete,
-        });
-
-        this.metrics.evictions += idsToDelete.length;
-        logger.info(`✓ Evicted ${idsToDelete.length} old cache entries`);
-      }
-    } catch (error: any) {
-      logger.warn(`LRU eviction error: ${error.message}`);
+    if (oldestKey) {
+      this.cache.delete(oldestKey);
+      this.metrics.evictions++;
+      logger.debug(`Cache LRU eviction: removed oldest entry`);
     }
   }
 
@@ -514,176 +362,106 @@ export class SemanticCache {
       clearInterval(this.cleanupTimer);
     }
 
-    this.cleanupTimer = setInterval(async () => {
-      await this.cleanup();
+    this.cleanupTimer = setInterval(() => {
+      this.cleanup();
     }, this.CLEANUP_INTERVAL);
 
-    // Add process exit handlers to prevent memory leak
-    // FIX: Registra handlers apenas UMA VEZ para evitar MaxListenersExceededWarning
-    if (!this.signalHandlersRegistered) {
-      process.on('SIGINT', () => this.stop());
-      process.on('SIGTERM', () => this.stop());
-      this.signalHandlersRegistered = true;
+    // Prevent timer from keeping process alive
+    if (this.cleanupTimer.unref) {
+      this.cleanupTimer.unref();
     }
-
-    logger.debug(
-      `Semantic cache cleanup timer started (every ${this.CLEANUP_INTERVAL / 60000} minutes)`
-    );
   }
 
   /**
-   * Stop cleanup timer and release resources
+   * Clean up expired entries
+   */
+  private cleanup(): void {
+    const now = Date.now();
+    let removed = 0;
+
+    for (const [key, entry] of this.cache.entries()) {
+      const age = now - entry.timestamp;
+      if (age > entry.ttl) {
+        this.cache.delete(key);
+        removed++;
+      }
+    }
+
+    if (removed > 0) {
+      logger.debug(`Cache cleanup: removed ${removed} expired entries`);
+    }
+  }
+
+  /**
+   * Stop cache (cleanup timer)
    */
   stop(): void {
     if (this.cleanupTimer) {
       clearInterval(this.cleanupTimer);
-      this.cleanupTimer = undefined;
-      logger.debug('Semantic cache cleanup timer stopped');
+      this.cleanupTimer = null;
     }
+    logger.debug("Semantic cache stopped");
   }
 
   /**
-   * Cleanup expired entries
+   * Clear all cache entries
    */
-  async cleanup(): Promise<void> {
-    try {
-      const client = await getQdrantClient();
-      const now = Date.now();
-
-      logger.debug("Running semantic cache cleanup...");
-
-      // Find expired entries
-      const scrollResult = await client.scroll(this.collectionName, {
-        limit: 1000,
-        with_payload: true,
-      });
-
-      const expiredIds: string[] = [];
-
-      for (const point of scrollResult.points) {
-        const payload = point.payload as unknown as CacheEntry;
-        const age = now - payload.timestamp;
-
-        if (age > payload.ttl) {
-          expiredIds.push(point.id as string);
-        }
-      }
-
-      if (expiredIds.length > 0) {
-        await client.delete(this.collectionName, {
-          points: expiredIds,
-        });
-
-        logger.info(`✓ Cleaned up ${expiredIds.length} expired cache entries`);
-      }
-    } catch (error: any) {
-      logger.warn(`Cache cleanup error: ${error.message}`);
-    }
-  }
-
-  /**
-   * Clear entire cache
-   */
-  async clear(): Promise<void> {
-    try {
-      const client = await getQdrantClient();
-
-      // Delete and recreate collection
-      await client.deleteCollection(this.collectionName);
-      this.initialized = false;
-      await this.initialize();
-
-      // Reset metrics
-      this.metrics = {
-        hits: 0,
-        misses: 0,
-        stores: 0,
-        evictions: 0,
-      };
-
-      logger.info("✓ Semantic cache cleared");
-    } catch (error: any) {
-      logger.error(`Failed to clear cache: ${error.message}`);
-    }
+  clear(): void {
+    this.cache.clear();
+    this.metrics = { hits: 0, misses: 0, stores: 0, evictions: 0 };
+    logger.info("Semantic cache cleared");
   }
 
   /**
    * Get cache statistics
    */
-  async stats(): Promise<CacheStats> {
-    try {
-      const client = await getQdrantClient();
+  stats(): CacheStats {
+    const totalRequests = this.metrics.hits + this.metrics.misses;
+    const hitRate = totalRequests > 0 ? (this.metrics.hits / totalRequests) * 100 : 0;
 
-      // Count total entries
-      const countResult = await client.count(this.collectionName);
+    let totalAge = 0;
+    const now = Date.now();
 
-      // Get sample of entries for stats
-      const scrollResult = await client.scroll(this.collectionName, {
-        limit: 1000,
-        with_payload: true,
-      });
-
-      const now = Date.now();
-      let totalAge = 0;
-      let oldestAge = 0;
-      let newestAge = Infinity;
-      let totalHits = 0;
-
-      for (const point of scrollResult.points) {
-        const payload = point.payload as unknown as CacheEntry;
-        const age = now - payload.timestamp;
-
-        totalAge += age;
-        totalHits += payload.hits;
-
-        if (age > oldestAge) oldestAge = age;
-        if (age < newestAge) newestAge = age;
-      }
-
-      const avgAge = scrollResult.points.length > 0 ? totalAge / scrollResult.points.length : 0;
-      const totalRequests = this.metrics.hits + this.metrics.misses;
-      const hitRate = totalRequests > 0 ? (this.metrics.hits / totalRequests) * 100 : 0;
-
-      return {
-        totalEntries: countResult.count,
-        avgAge: Math.round(avgAge / 1000), // Convert to seconds
-        totalHits,
-        totalMisses: this.metrics.misses,
-        hitRate,
-        oldestEntry: Math.round(oldestAge / 1000),
-        newestEntry: newestAge !== Infinity ? Math.round(newestAge / 1000) : 0,
-      };
-    } catch (error: any) {
-      logger.error(`Failed to get cache stats: ${error.message}`);
-      return {
-        totalEntries: 0,
-        avgAge: 0,
-        totalHits: 0,
-        totalMisses: this.metrics.misses,
-        hitRate: 0,
-        oldestEntry: 0,
-        newestEntry: 0,
-      };
+    for (const entry of this.cache.values()) {
+      totalAge += now - entry.timestamp;
     }
+
+    const avgAge = this.cache.size > 0 ? totalAge / this.cache.size / 1000 : 0;
+
+    // Rough memory estimate (bytes)
+    let memoryUsage = 0;
+    for (const entry of this.cache.values()) {
+      memoryUsage += entry.response.length * 2; // UTF-16
+      memoryUsage += entry.embedding.length * 8; // Float64
+      memoryUsage += 200; // Overhead
+    }
+
+    return {
+      totalEntries: this.cache.size,
+      hits: this.metrics.hits,
+      misses: this.metrics.misses,
+      hitRate,
+      avgAge,
+      memoryUsage,
+    };
   }
 
   /**
    * Get formatted stats string for CLI display
    */
-  async getStatsString(): Promise<string> {
-    const stats = await this.stats();
+  getStatsString(): string {
+    const s = this.stats();
+    const memMB = (s.memoryUsage / 1024 / 1024).toFixed(2);
 
     return `
 📊 Semantic Cache Statistics:
-  Total Entries: ${stats.totalEntries.toLocaleString()}
-  Cache Hit Rate: ${stats.hitRate.toFixed(1)}% (${this.metrics.hits} hits, ${this.metrics.misses} misses)
-  Total Hits: ${stats.totalHits.toLocaleString()}
-  Total Stores: ${this.metrics.stores.toLocaleString()}
-  Total Evictions: ${this.metrics.evictions.toLocaleString()}
-  Average Age: ${stats.avgAge}s
-  Oldest Entry: ${stats.oldestEntry}s
-  Newest Entry: ${stats.newestEntry}s
+  Entries: ${s.totalEntries}/${this.MAX_CACHE_SIZE}
+  Hit Rate: ${s.hitRate.toFixed(1)}% (${s.hits} hits, ${s.misses} misses)
+  Stores: ${this.metrics.stores}
+  Evictions: ${this.metrics.evictions}
+  Avg Age: ${s.avgAge.toFixed(0)}s
+  Memory: ~${memMB} MB
+  Mode: in-memory (threshold: ${this.DEFAULT_SIMILARITY_THRESHOLD})
     `.trim();
   }
-
 }

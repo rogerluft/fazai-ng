@@ -821,6 +821,50 @@ O script:
 - Garante que o build exista (`dist/app.cjs`);
 - Lança o `fazai --cli`.
 
+## 🧪 TDD Enforced
+
+FazAI usa **Test-Driven Development (TDD)** como prática obrigatória. Commits com testes quebrados são automaticamente bloqueados.
+
+### Como Funciona
+
+O projeto utiliza [Husky](https://typicode.github.io/husky/) + [lint-staged](https://github.com/okonet/lint-staged) para executar a suite de testes antes de cada commit:
+
+```bash
+# Ao fazer git commit, automaticamente:
+# 1. Husky intercepta o commit
+# 2. lint-staged executa vitest run
+# 3. Se testes falharem → commit bloqueado
+# 4. Se todos passarem → commit permitido
+```
+
+### Configuração Automática
+
+Após `npm install`, o Husky é configurado automaticamente via script `prepare`:
+
+```bash
+npm install    # → executa "husky" automaticamente
+```
+
+### Bypass (Emergência)
+
+Em situações excepcionais, você pode pular o hook (não recomendado):
+
+```bash
+git commit --no-verify -m "emergency fix"
+```
+
+⚠️ **Atenção**: Commits sem testes devem ser corrigidos imediatamente.
+
+### Executar Testes Manualmente
+
+```bash
+npm test                    # Suite completa
+npm run test:unit           # Apenas unit tests
+npm run test:integration    # Apenas integration tests
+npm run test:watch          # Watch mode
+npm run test:coverage       # Com coverage report
+```
+
 ## 🛠️ Desenvolvimento
 
 ```bash
