@@ -72,8 +72,9 @@ Se não existir, inicia com estado vazio.
 Dois serviços são inicializados:
 
 **Embedding Service** (`createEmbeddingService()`):
-- Tenta Ollama primeiro (`mxbai-embed-large`, 1024 dim)
-- Fallback para OpenAI (`text-embedding-3-small`, 1536 dim)
+- Tenta Ollama primeiro (`nomic-embed-text`, 768 dim, 8192 tokens de contexto)
+- Fallback para `mxbai-embed-large` (1024 dim, 512 tokens de contexto)
+- Fallback final para OpenAI (`text-embedding-3-small`, 1536 dim)
 - Aplica zero-padding para padronizar em 1536 dimensões
 
 **Qdrant Client** (`getQdrantClient()`):
@@ -198,12 +199,13 @@ O chunking respeita boundaries naturais (funções, classes, parágrafos) e mant
 Para cada chunk:
 
 1. **Ollama API** (`/api/embeddings`):
-   - Modelo: `mxbai-embed-large`
-   - Dimensão nativa: 1024
-   - Aplica truncamento (max 1500 chars)
+   - Modelo preferido: `nomic-embed-text` (8192 tokens de contexto)
+   - Dimensão nativa: 768
+   - Aplica truncamento (max 24000 chars para nomic)
+   - Fallback: `mxbai-embed-large` (512 tokens de contexto, 1024 dim)
 
 2. **Zero Padding**:
-   - Vetor 1024 dim → padded para 1536 dim
+   - Vetor 768 ou 1024 dim → padded para 1536 dim
    - Padrão ECOA (compatibilidade OpenAI)
 
 3. **Fallback OpenAI** (se Ollama indisponível):
@@ -331,10 +333,10 @@ Isso permite indexação incremental na próxima execução.
 │      OLLAMA SERVER      │   │      QDRANT SERVER      │
 │   192.168.0.101:11434   │   │     localhost:6333      │
 │                         │   │                         │
-│  mxbai-embed-large      │   │  Collection:            │
-│  (1024 dim → 1536 pad)  │   │  fazai_source           │
-└─────────────────────────┘   │  (1536 dim, Cosine)     │
-                              └─────────────────────────┘
+│  nomic-embed-text       │   │  Collection:            │
+│  (768 dim → 1536 pad)   │   │  fazai_source           │
+│  (8192 token context)   │   │  (1536 dim, Cosine)     │
+└─────────────────────────┘   └─────────────────────────┘
 ```
 
 ---
@@ -467,7 +469,8 @@ Error: Qdrant circuit breaker is OPEN
 ```
 Ollama available but no embedding models found
 ```
-**Solução**: `ollama pull mxbai-embed-large`
+**Solução**: `ollama pull nomic-embed-text` (preferido, 8192 tokens de contexto)
+Alternativa: `ollama pull mxbai-embed-large` (512 tokens de contexto)
 
 ### Re-indexação Não Detecta Mudanças
 **Solução**: Use `fazai index --force` ou delete `/opt/fazai/data/source-index.json`
