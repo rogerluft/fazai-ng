@@ -1,11 +1,13 @@
 FazAI - Administrador Linux Inteligente com IA
-Copyright (c) 2024 Roger Luft (VeilWalker)
-Contact: roger@webstorage.com.br
+Copyright (c) 2024-2025 Roger Luft
+Email: roger@webstorage.com.br
+Website: https://github.com/rogerluft/fazai-ng
 
-This project is a derivative of Mandark by Hrishi Olickel.
-Mandark is licensed under the Apache License, Version 2.0.
+Licensed under Creative Commons Attribution 4.0 International (CC BY 4.0)
+https://creativecommons.org/licenses/by/4.0/
 
-All FazAI source code continues to be distributed under the Apache License, Version 2.0.
+---
 
-FazAI documentation, examples, prompts, and marketing assets authored for this fork
-are additionally provided under the Creative Commons Attribution 4.0 International License (CC BY 4.0).
+Historical Note:
+This project was originally inspired by Mandark (https://github.com/hrishioa/mandark).
+The current codebase has been completely rewritten and shares no code with the original.
