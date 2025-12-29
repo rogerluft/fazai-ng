@@ -2,6 +2,23 @@
 
 ## [Unreleased]
 
+### 🐛 Fix: CLI Exit-on-EOF Bug
+
+**Problema:** O modo `fazai --cli` com `/exec` saía imediatamente quando recebia EOF (pipe input), antes das operações assíncronas terminarem.
+
+**Causa raiz:** O handler `rl.on("close")` chamava `process.exit(0)` imediatamente, sem aguardar operações pendentes.
+
+**Correções:**
+| Arquivo | Correção |
+|---------|----------|
+| `src/cli-mode.ts:222-224` | ✅ Adicionado tracking de `pendingOperations` e `shouldExit` |
+| `src/cli-mode.ts:403,434-440` | ✅ `handleExec()` incrementa/decrementa contador e sai após completar |
+| `src/cli-mode.ts:682-698` | ✅ Close handler detecta TTY vs pipe, aguarda operações pendentes |
+
+**Resultado:** CLI agora espera operações assíncronas completarem antes de sair.
+
+---
+
 ### 🐛 Fix: Fallback Chain para Llama Timeout
 
 **Problema:** Quando llama-server (Phi-3) demorava muito, o erro "Request timed out." não ativava o fallback chain.
