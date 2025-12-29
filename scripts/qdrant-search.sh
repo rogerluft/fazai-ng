@@ -23,7 +23,7 @@ RAW_EMBED=$(curl -s -X POST "$OLLAMA_URL/api/embeddings" \
   -H "Content-Type: application/json" \
   -d "{\"model\":\"nomic-embed-text\",\"prompt\":\"$QUERY\"}" | jq -c '.embedding')
 
-if [ "$RAW_EMBED" == "null" ] || [ -z "$RAW_EMBED" ]; then
+if [ "$RAW_EMBED" = "null" ] || [ -z "$RAW_EMBED" ]; then
   echo "Erro: Falha ao gerar embedding. Ollama esta rodando?"
   exit 1
 fi
