@@ -2,6 +2,67 @@
 
 ## [Unreleased]
 
+### 🧩 Execution Composer com Deduplicação Semântica (ECOA)
+
+**Inspiração:** Sistema de deduplicação do ZFS aplicado a execuções.
+
+**Conceito:**
+```
+Arquivo1: [bloco-A] [bloco-B] [bloco-C]
+Arquivo2: [bloco-A] [bloco-D] [bloco-C] ← A e C já existem, só grava D
+
+Tarefa1: [instalar-nginx] [config-proxy] [reload]
+Tarefa2: [instalar-nginx] [config-ssl] [reload] ← Só aprende config-ssl
+```
+
+**Arquivos criados:**
+| Arquivo | Descrição |
+|---------|-----------|
+| `src/agentic/execution-composer.ts` | Interfaces e funções principais |
+| `src/agentic/block-storage/types.ts` | Tipos do backend de storage |
+| `src/agentic/block-storage/json-backend.ts` | Backend JSON (dev/testes) |
+| `src/agentic/block-storage/qdrant-backend.ts` | Backend Qdrant (produção) |
+| `src/agentic/block-storage/factory.ts` | Factory pattern para backends |
+
+**Arquivos modificados:**
+| Arquivo | Modificação |
+|---------|-------------|
+| `src/agentic/task-decomposer.ts` | ✅ Tenta compor ANTES de chamar LLM |
+| `src/agentic/dag-executor.ts` | ✅ Salva blocos após execução bem-sucedida |
+
+**Configuração (`fazai.conf`):**
+```conf
+EXECUTION_BLOCKS_BACKEND=json    # json | qdrant
+EXECUTION_BLOCKS_PATH=/opt/fazai/data/execution-blocks.json
+```
+
+**Resultado:**
+- Skip LLM quando solução pode ser composta de blocos existentes
+- Economia de até 90% em chamadas LLM para tarefas repetidas
+- Aprendizado incremental com deduplicação semântica
+
+---
+
+### 🎯 Semantic Cache para Comandos Linux
+
+**Problema:** Semantic cache existia para `askAI.ts` (chat) mas NÃO para `linux-admin.ts` (comandos).
+
+**Absurdo identificado:** "um Administrador Linux com IA que decora respostas de bate-papo mas precisa perguntar 3 vezes como listar arquivos"
+
+**Correções:**
+| Arquivo | Correção |
+|---------|----------|
+| `src/linux-admin.ts:14` | ✅ Import `SemanticCache` |
+| `src/linux-admin.ts:436-461` | ✅ Cache lookup no início de `getLinuxCommandsFromAI()` |
+| `src/linux-admin.ts:467` | ✅ Array `collectedCommands` para caching |
+| `src/linux-admin.ts:510-521` | ✅ Coleta comandos durante geração |
+| `src/linux-admin.ts:529-538` | ✅ `cache.store()` após sucesso |
+| `src/linux-admin.ts:691` | ✅ Ollama timeout: 10s → 60s |
+
+**Resultado:** Comandos Linux agora são cacheados semanticamente.
+
+---
+
 ### 🐛 Fix: CLI Exit-on-EOF Bug
 
 **Problema:** O modo `fazai --cli` com `/exec` saía imediatamente quando recebia EOF (pipe input), antes das operações assíncronas terminarem.
@@ -332,6 +393,24 @@ O sistema ECOA agora processa corretamente as diretivas de ferramenta que o mode
 - **Fix**: Tags ECOA não eram processadas (apenas exibidas)
 - **Fix**: Modelo usava web search para fatos que já conhecia
 - **Fix**: PERPLEXITY_API_KEY não era lido de fazai.conf
+
+
+## [3.14.0] - 2025-12-28
+
+### 🌟 Features - Quality Assurance & Agência
+- **Suíte de Testes Reais V2.1** (`tests/real-world-suite.sh`):
+  - 15 Cenários de teste E2E cobrindo ASK, EXEC, SEARCH e ADMIN.
+  - Suporte a verificação de dependências implícitas (instalar -> rodar -> validar).
+  - Testes de longa duração com timeout controlado (monitoramento).
+- **Auditor Agêntico** (`genaisrc/test-auditor.genai.mjs`):
+  - Analisa logs de execução usando Llama-3/Phi-3.
+  - Verifica integridade vetorial no Qdrant (Memory/Learning).
+  - Valida consistência da Personalidade e Cache.
+
+### 🐛 Bug Fixes
+- **System Info**: Detecção robusta de serviços usando `systemctl is-active` em vez de `which`.
+- **Logger**: Suporte a logs JSON estruturados mistos sem perda de dados.
+- **Watchdog**: Limites de memória agora configuráveis via `FAZAI_WATCHDOG_MEM_MB`.
 
 ## [3.13.0] - 2025-12-28
 

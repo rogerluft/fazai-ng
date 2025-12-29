@@ -6,6 +6,7 @@ import { logger } from "../logger";
 import chalk from "chalk";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { saveExecutionBlock, updateBlockStats } from "./execution-composer";
 
 const execAsync = promisify(exec);
 
@@ -151,6 +152,26 @@ export class DAGExecutor {
     const duration = ((node.endTime - node.startTime!) / 1000).toFixed(2);
     const statusIcon = node.status === "completed" ? "✅" : node.status === "failed" ? "❌" : "⏭️";
     logger.info(chalk.gray(`${statusIcon} Concluído em ${duration}s`));
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // 🧩 ECOA: Salva bloco atômico após execução bem-sucedida
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (node.status === "completed" && subtask.command) {
+      try {
+        await saveExecutionBlock({
+          intent: subtask.description,
+          steps: [{
+            command: subtask.command,
+            description: subtask.description,
+            validation: subtask.verificationCommand,
+          }],
+          validation_command: subtask.verificationCommand,
+        });
+      } catch (saveError) {
+        logger.debug(`Failed to save execution block: ${saveError}`);
+      }
+    }
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   }
 
   private async checkIfExists(command: string): Promise<boolean> {

@@ -11,6 +11,7 @@ import { neuralQuery } from "./rag/neural-flow";
 import { captureLearning } from "./rag/auto-learning";
 import { createEmbeddingService } from "./services/embeddings";
 import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
+import { SemanticCache } from "./services/semantic-cache";
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google" | "llama";
 
@@ -432,10 +433,38 @@ export async function* getLinuxCommandsFromAI(
   let commandsYielded = false;
   const triedProviders: Provider[] = [];
 
+  // 🎯 SEMANTIC CACHE: Verifica se já temos comandos cacheados para esta tarefa
+  if (semanticSearchEnabled) {
+    try {
+      const cache = await SemanticCache.getInstance();
+      const cachedResponse = await cache.lookup(task, model, provider);
+
+      if (cachedResponse) {
+        logger.info(chalk.green("🎯 Cache hit! Usando comandos cacheados"));
+        try {
+          const cachedCommands: LinuxCommand[] = JSON.parse(cachedResponse);
+          if (Array.isArray(cachedCommands) && cachedCommands.length > 0) {
+            for (const cmd of cachedCommands) {
+              yield { type: "command", command: cmd };
+            }
+            yield { type: "allcommands", commands: cachedCommands };
+            return;
+          }
+        } catch {
+          logger.debug("Cache inválido, ignorando...");
+        }
+      }
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`Cache lookup failed: ${err.message}`);
+    }
+  }
+
   // 🧠 NEURAL FLOW: Tenta buscar padrão aprendido primeiro
   const learnedCommands = semanticSearchEnabled ? await consultNeuralFlow(task, systemInfo) : null;
 
   let enhancedSystemInfo = systemInfo;
+  const collectedCommands: LinuxCommand[] = []; // Para cachear depois
 
   if (learnedCommands && learnedCommands.length > 0) {
     // Enrich learned commands with RAG context for validation
@@ -479,8 +508,15 @@ export async function* getLinuxCommandsFromAI(
       const generator = getGeneratorForProvider(currentProvider, enhancedSystemInfo, task, currentModel);
 
       for await (const result of generator) {
-        if (result.type === "command" || result.type === "allcommands") {
+        if (result.type === "command") {
           commandsYielded = true;
+          collectedCommands.push(result.command);
+        } else if (result.type === "allcommands") {
+          commandsYielded = true;
+          // Usa allcommands se collectedCommands estiver vazio
+          if (collectedCommands.length === 0 && result.commands) {
+            collectedCommands.push(...result.commands);
+          }
         }
         yield result;
       }
@@ -488,6 +524,17 @@ export async function* getLinuxCommandsFromAI(
       // If we got here without yielding commands, consider it a failure
       if (!commandsYielded) {
         throw new Error(`Provider ${currentProvider} returned no commands`);
+      }
+
+      // 🎯 SEMANTIC CACHE: Armazena comandos bem-sucedidos
+      if (semanticSearchEnabled && collectedCommands.length > 0) {
+        try {
+          const cache = await SemanticCache.getInstance();
+          await cache.store(task, JSON.stringify(collectedCommands), currentModel, currentProvider);
+          logger.debug(chalk.gray(`💾 Cache stored: ${collectedCommands.length} comandos`));
+        } catch (cacheErr) {
+          logger.debug(`Cache store failed: ${cacheErr}`);
+        }
       }
 
       break; // Success, exit loop
@@ -688,7 +735,7 @@ IMPORTANTE: Responda APENAS com um objeto JSON válido no formato:
   const response = await withRetry(
     async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout (same as llama)
 
       try {
         const res = await fetch(`${baseUrl}/api/generate`, {
