@@ -19,14 +19,17 @@ echo "Buscando: \"$QUERY\" em fazai_$COLLECTION..."
 echo ""
 
 # Gerar embedding
-EMBED=$(curl -s -X POST "$OLLAMA_URL/api/embeddings" \
+RAW_EMBED=$(curl -s -X POST "$OLLAMA_URL/api/embeddings" \
   -H "Content-Type: application/json" \
   -d "{\"model\":\"nomic-embed-text\",\"prompt\":\"$QUERY\"}" | jq -c '.embedding')
 
-if [ "$EMBED" == "null" ] || [ -z "$EMBED" ]; then
+if [ "$RAW_EMBED" == "null" ] || [ -z "$RAW_EMBED" ]; then
   echo "Erro: Falha ao gerar embedding. Ollama esta rodando?"
   exit 1
 fi
+
+# Pad to 1536 dimensions (ECOA standard)
+EMBED=$(echo "$RAW_EMBED" | jq -c '. + [range(768;1536) | 0]')
 
 # Buscar no Qdrant
 curl -s -X POST "$QDRANT_URL/collections/fazai_$COLLECTION/points/search" \
