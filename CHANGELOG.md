@@ -35,6 +35,37 @@ Refatoração completa do gerador de completions para descoberta automática de 
 - `completion/fazai-completion.bash` - Regenerado automaticamente
 - `completion/fazai-completion.zsh` - Regenerado automaticamente
 
+### 🔧 Novo Comando: `fazai completion`
+
+Comando CLI para gerar e instalar scripts de completion.
+
+#### Subcomandos
+
+| Subcomando | Descrição |
+|------------|-----------|
+| `bash` | Output script bash para stdout |
+| `zsh` | Output script zsh para stdout |
+| `install` | Instala em `/etc/bash_completion.d/` |
+| `list` | Lista comandos e modelos (legacy) |
+| `help` | Mostra ajuda |
+
+#### Uso
+
+```bash
+# Gerar script
+fazai completion bash > /tmp/fazai.bash
+
+# Instalar no sistema
+sudo fazai completion install
+
+# Legacy (compatibilidade)
+fazai completion list
+```
+
+#### Arquivos
+
+- `src/commands/completion.ts` - Handler do comando
+
 ### 🛡️ Threat Intelligence Agent
 
 Novo agente GenAIScript para análise de ameaças cibernéticas.

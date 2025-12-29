@@ -20,6 +20,7 @@ import { handleAskCommand } from "./commands/ask";
 import { handleVectorCommand } from "./commands/vector";
 import { handleImportCommand } from "./commands/import";
 import { handleIndexCommand } from "./commands/index-command";
+import { handleCompletionCommand } from "./commands/completion";
 
 import { getConfigValue } from "./config";
 import { normalizeTask } from "./utils/task-normalizer";
@@ -174,7 +175,7 @@ async function main() {
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
     "config", "search", "inference", "agent", "ingest",
-    "dashboard", "samba"
+    "dashboard", "samba", "completion"
   ];
 
   const firstArg = inputs[0];
@@ -280,36 +281,7 @@ async function main() {
   }
 
   if (inputs[0] === "completion") {
-    const suggestions = [
-      "ask",
-      "alias",
-      "config",
-      "completion",
-      "search",
-      "vector",
-      "import",
-      "ingest",
-      "sync",
-      "cf",
-      "cloudflare",
-      "github",
-      "qdrant",
-      "inference",
-      "agent",
-      "dashboard",
-      "samba",
-      "--debug",
-      "--verbose",
-      "--log-file",
-      "--help",
-      "--dry-run",
-      "--cli",
-      "--auto-research",
-      "--yolo",
-      // Add model names for completion (exact names, no nicknames)
-      ...models.map((model) => model.name),
-    ];
-    logger.info(suggestions.join("\n"));
+    await handleCompletionCommand(inputs.slice(1));
     process.exit(0);
   }
 

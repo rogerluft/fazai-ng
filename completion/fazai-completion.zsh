@@ -39,6 +39,7 @@ _fazai() {
         'ingest:Personality data ingestion'
         'dashboard:Gerencia REST API Dashboard (start, stop, status)'
         'samba:Gerencia compartilhamentos Samba (list, add, del, etc)'
+        'completion:Print available CLI completions'
     )
 
     # Load models dynamically (cached)
