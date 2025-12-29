@@ -8,10 +8,12 @@ import { logger } from "./logger";
 export class LinuxCommandExecutor {
   private executedCommands: Array<{ command: LinuxCommand; output: string; success: boolean }> = [];
   private dryRun: boolean = false;
+  private autoConfirm: boolean = false;
   private researchCoordinator?: ResearchCoordinator;
 
-  constructor(dryRun: boolean = false, researchCoordinator?: ResearchCoordinator) {
+  constructor(dryRun: boolean = false, researchCoordinator?: ResearchCoordinator, autoConfirm: boolean = false) {
     this.dryRun = dryRun;
+    this.autoConfirm = autoConfirm;
     this.researchCoordinator = researchCoordinator;
   }
 
@@ -68,6 +70,12 @@ export class LinuxCommandExecutor {
     // FIX: Lógica real de confirmação baseada no risco
     // O código anterior retornava true automaticamente, ignorando o riskLevel
     const risk = command.riskLevel || this.assessRiskLevel(command);
+
+    // YOLO mode: skip all confirmations (except critical)
+    if (this.autoConfirm && risk !== 'critical') {
+        logger.debug(`[YOLO] Auto-confirming command (risk: ${risk})`);
+        return true;
+    }
 
     // Se for baixo risco e não exigir confirmação explícita, permite.
     if (risk === 'low' && !command.requiresConfirmation) {

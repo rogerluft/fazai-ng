@@ -448,8 +448,8 @@ async function main() {
     selectedModel.provider
   );
 
-  // Execute commands
-  const executor = new LinuxCommandExecutor(dryRun, researchCoordinator);
+  // Execute commands (pass yoloMode for auto-confirmation)
+  const executor = new LinuxCommandExecutor(dryRun, researchCoordinator, yoloMode);
   let commandCount = 0;
   const attemptedCommands = new Set<string>();
   const maxRetryCycles = 2;
