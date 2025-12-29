@@ -29,17 +29,28 @@ This skill transforms you into a specialized developer for the FazAI-NG codebase
 | Qdrant semantic search (5 chunks) | ~3k tokens |
 | **Savings** | **~94%** |
 
-**How to query:**
+**How to query (use the script to avoid shell escaping issues):**
 ```bash
-# 1. Generate embedding
-QUERY="how does circuit breaker work"
-EMBED=$(curl -s -X POST 'http://192.168.0.101:11434/api/embeddings' \
-  -d "{\"model\":\"nomic-embed-text\",\"prompt\":\"$QUERY\"}" | jq -c '.embedding')
+# Use the helper script (recommended - avoids $() escaping bug)
+./scripts/qdrant-search.sh "how does circuit breaker work" source
 
-# 2. Search relevant chunks
+# Collections: source, learning, kb, memory, personality, inference
+./scripts/qdrant-search.sh "error patterns" learning
+./scripts/qdrant-search.sh "chats anteriores" personality
+```
+
+**Alternative (two-step, avoids subshell):**
+```bash
+# Step 1: Generate embedding to temp file
+curl -s -X POST 'http://192.168.0.101:11434/api/embeddings' \
+  -d '{"model":"nomic-embed-text","prompt":"circuit breaker"}' \
+  | jq -c '.embedding' > /tmp/embed.json
+
+# Step 2: Search with the embedding
 curl -s -X POST 'http://localhost:6333/collections/fazai_source/points/search' \
-  -d "{\"vector\":$EMBED,\"limit\":5,\"with_payload\":true}" | \
-  jq '.result[] | {path: .payload.path, score: .score, content: .payload.content[:300]}'
+  -H 'Content-Type: application/json' \
+  -d '{"vector":'$(cat /tmp/embed.json)',"limit":5,"with_payload":true}' \
+  | jq '.result[] | {path: .payload.path, score: .score}'
 ```
 
 **Collections available:**
