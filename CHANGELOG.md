@@ -2,6 +2,32 @@
 
 ## [Unreleased]
 
+### 🛡️ Threat Intelligence Agent
+
+Novo agente GenAIScript para análise de ameaças cibernéticas.
+
+#### Features
+
+- **threat-intel.genai.mjs** - Script de inteligência de ameaças
+  - `check_ip_rbl`: Verifica IP em 10 RBLs (Spamhaus, Barracuda, SORBS, etc.)
+  - `check_domain_reputation`: Verifica domínio em 4 blacklists
+  - `check_hash_virustotal`: Consulta VirusTotal API
+  - `check_abuseipdb`: Consulta AbuseIPDB API
+  - `index_threat`: Indexa ameaça no Qdrant (`fazai_threats`)
+  - `search_threats`: Busca ameaças conhecidas
+
+- **threat-intel-agent.md** - Documentação do agente
+  - Uso via GenAIScript
+  - Níveis de risco (LOW/HIGH/CRITICAL)
+  - Configuração de API keys
+
+#### Uso
+
+```bash
+genaiscript run threat-intel --vars "target=1.2.3.4" --vars "type=ip"
+genaiscript run threat-intel --vars "target=evil.com" --vars "type=domain"
+```
+
 ## [3.14.0] - 2025-12-29
 
 ### 🧠 Coração Agêntico V2.1 - Maestro Unificado
