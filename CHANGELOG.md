@@ -2,6 +2,19 @@
 
 ## [Unreleased]
 
+### 🛠️ Fix: YOLO Mode (-y) Now Works Correctly
+
+**Bug:** The `-y`/`--yolo` flag was detected and displayed the message, but never actually skipped confirmation prompts. Commands still asked "Executar este comando (Risco: MEDIUM)?" even with YOLO enabled.
+
+**Fix:** Added `autoConfirm` parameter to `LinuxCommandExecutor` and properly passed `yoloMode` to it.
+
+**Behavior:**
+- YOLO mode now auto-confirms low, medium, and high risk commands
+- Critical commands STILL require confirmation (safety measure)
+- Tests can now run in batch mode with `-y` flag
+
+---
+
 ### 🧩 Execution Composer com Deduplicação Semântica (ECOA)
 
 **Inspiração:** Sistema de deduplicação do ZFS aplicado a execuções.
