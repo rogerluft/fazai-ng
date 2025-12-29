@@ -13,6 +13,9 @@ export interface SystemInfo {
   memory: string;
   cpu: string;
   network: string[];
+  firewall: string;
+  users: string[];
+  essentialPackages: Record<string, boolean>;
 }
 
 export async function collectSystemInfo(): Promise<string> {
@@ -79,6 +82,40 @@ export async function collectSystemInfo(): Promise<string> {
       systemInfo.network = ["Não disponível"];
     }
 
+    // Firewall Detection
+    const fws = ["ufw", "firewalld", "iptables", "nft"];
+    systemInfo.firewall = "None";
+    for (const fw of fws) {
+      if (findExecutable([fw])) {
+        systemInfo.firewall = fw;
+        break;
+      }
+    }
+
+    // Users with shell
+    try {
+      systemInfo.users = execSync("grep -E '/bin/(bash|zsh|sh)$' /etc/passwd | cut -d: -f1", { encoding: "utf8" })
+        .split("\n").filter(u => u && !u.startsWith("_") && u !== "root");
+    } catch { systemInfo.users = []; }
+
+    // Essential Packages Check (Service vs Binary)
+    systemInfo.essentialPackages = {};
+    const services = ["nginx", "apache2", "docker", "cron", "ssh"];
+    const binaries = ["python3", "node", "git", "curl", "wget"];
+
+    for (const svc of services) {
+      try {
+        execSync(`systemctl is-active --quiet ${svc}`, { stdio: "ignore" });
+        systemInfo.essentialPackages[svc] = true;
+      } catch { systemInfo.essentialPackages[svc] = false; }
+    }
+    for (const bin of binaries) {
+      try {
+        execSync(`which ${bin}`, { stdio: "ignore" });
+        systemInfo.essentialPackages[bin] = true;
+      } catch { systemInfo.essentialPackages[bin] = false; }
+    }
+
   } catch (error) {
     logger.warn("Erro ao coletar informações do sistema:", error);
   }
@@ -101,6 +138,10 @@ ${(systemInfo.services || []).slice(0, 5).map(s => `- ${s}`).join("\n")}
 
 INTERFACES DE REDE:
 ${(systemInfo.network || []).slice(0, 3).map(n => `- ${n}`).join("\n")}
+
+FIREWALL ATIVO: ${systemInfo.firewall}
+PACOTES ESSENCIAIS: ${Object.entries(systemInfo.essentialPackages || {}).filter(([,v]) => v).map(([k]) => k).join(", ")}
+USUÁRIOS: ${(systemInfo.users || []).join(", ")}
 `.trim();
 }
 

@@ -117,13 +117,21 @@ function formatArgs(args: unknown[]): string {
     .join(" ");
 }
 
-function writeToFile(level: LogLevel, message: string): void {
+function writeToFile(level: LogLevel, rawArgs: unknown[]): void {
   if (!logStream || !logFilePath) {
     return;
   }
   const timestamp = new Date().toISOString();
-  const plain = stripAnsi(message);
-  logStream.write(`${timestamp} [${level.toUpperCase()}] ${plain}\n`);
+
+  // Structured Logging Logic
+  let content = "";
+  if (rawArgs.length === 1 && typeof rawArgs[0] === 'object' && rawArgs[0] !== null) {
+    content = JSON.stringify(rawArgs[0]);
+  } else {
+    content = stripAnsi(formatArgs(rawArgs));
+  }
+
+  logStream.write(`${timestamp} [${level.toUpperCase()}] ${content}\n`);
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -134,8 +142,8 @@ function log(level: LogLevel, ...args: unknown[]): void {
   // Rate limit para evitar loop infinito consumir memória
   if (!checkRateLimit()) return;
 
-  const message = formatArgs(args);
-  writeToFile(level, message);
+  const message = formatArgs(args); // For console/tracker (human readable)
+  writeToFile(level, args); // Pass raw args to file writer for structure check
 
   // BUGFIX: Captura erros reais no error-tracker
   if (level === "error") {

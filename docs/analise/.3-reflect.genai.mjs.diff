@@ -1,0 +1,79 @@
+--- a/genaisrc/reflect.genai.mjs
++++ b/genaisrc/reflect.genai.mjs
+@@ -1,13 +1,19 @@
+ /**
+- * FazAI Reflect - Script de Reflexão Autônoma
+- * Analisa ações recentes e gera insights
++ * FazAI Reasoning Engine (Reflect & Plan)
++ * 
++ * Modes:
++ * - mode="reflect": Retrospective analysis of learnings (Default)
++ * - mode="plan": Proactive task planning with dependencies (Maestro)
+  */
+ 
++const mode = env.vars.mode || "reflect";
++const model = mode === "plan" ? (env.vars.model_local || "ollama:llama3") : "anthropic:claude-3-5-sonnet-latest";
++
+ script({
+-  title: "FazAI Reflect",
+-  description: "Reflexão autônoma sobre ações e aprendizados recentes",
+-  model: "anthropic:claude-3-5-sonnet-latest",
+-  temperature: 0.5,
++  title: `FazAI Reasoning (${mode})`,
++  description: mode === "plan" ? "Maestro Task Planner" : "Autonomous Reflection",
++  model: model,
++  temperature: mode === "plan" ? 0.1 : 0.5,
+   maxTokens: 2048,
+ });
+ 
+@@ -88,6 +94,7 @@
+   }
+ );
+ 
++if (mode === "reflect") {
+ $`
+ Execute uma reflexão autônoma:
+ 
+@@ -98,4 +105,43 @@
+ 
+ Seja objetivo e focado em ações práticas.
+ `;
++} else {
++
++// === MAESTRO PLANNER LOGIC ===
++const userTask = env.vars.task;
++const systemContext = env.vars.system_info || "Linux Generic";
++
++if (!userTask) throw new Error("Task required for plan mode");
++
++$`
++You are the SYSTEM MAESTRO for FazAI.
++Your goal is to create a robust execution plan for a Linux system.
++
++INPUT CONTEXT:
++${systemContext}
++
++USER ORDER: "${userTask}"
++
++THINKING PROCESS (Internal Monologue):
++1.  **Analyze Intent:** What is the core goal?
++2.  **Check Context:** Does the user already have the tools?
++3.  **Dependency Tree:** What must happen first?
++4.  **Redundancy:** If the primary plan fails, what is the alternative?
++
++OUTPUT FORMAT (JSON ONLY):
++{
++  "plan_id": "slug_unique",
++  "intent": "summary in portuguese",
++  "primary_plan": [
++    {
++      "step": 1,
++      "action": "install/config/exec",
++      "description": "technical instruction in portuguese",
++      "tool": "apt/systemctl/bash",
++      "validation": "command to verify success"
++    }
++  ]
++}
++`;
++}

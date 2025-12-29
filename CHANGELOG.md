@@ -2,6 +2,54 @@
 
 ## [Unreleased]
 
+## [3.14.0] - 2025-12-29
+
+### 🧠 Coração Agêntico V2.1 - Maestro Unificado
+
+Implementação do "cérebro" agêntico do FazAI com motor de raciocínio unificado,
+monitoramento de recursos e coleta de contexto aprimorada.
+
+#### Features
+
+- **Reasoning Engine** (`genaisrc/reflect.genai.mjs`)
+  - Motor de raciocínio com dois modos: `plan` e `reflect`
+  - `mode=plan`: Maestro proativo usando Phi-3/Llama local
+  - `mode=reflect`: Reflexão retrospectiva usando Claude
+  - Saída JSON estruturada para planos de execução
+  - Temperatura dinâmica (0.1 para plan, 0.5 para reflect)
+
+- **System Info Híbrido** (`src/system-info.ts`)
+  - Detecção de firewall ativo (ufw, firewalld, iptables, nft)
+  - Lista de usuários com shell válido
+  - Checagem híbrida de pacotes essenciais:
+    - `systemctl is-active` para serviços (nginx, docker, cron, ssh)
+    - `which` para binários (python3, node, git, curl, wget)
+
+- **Resource Watchdog** (`src/services/watchdog.ts`)
+  - Monitoramento de memória via `/proc/[pid]/status`
+  - Limite configurável via `FAZAI_WATCHDOG_MEM_MB` (default: 1024MB)
+  - Termination automático em caso de memory leak
+
+- **Structured Logging** (`src/logger.ts`)
+  - Detecção inteligente de objetos JSON
+  - Objetos únicos são serializados como JSON puro
+  - Mensagens mistas mantêm formatação human-readable
+
+- **Config Helper** (`src/config.ts`)
+  - Nova função `getLocalInferenceModel()` para ler modelo local
+
+- **Skill fazai-agentic-developer**
+  - Qdrant-first approach para economia de tokens (~94%)
+  - Task decomposition com execução DAG
+  - Checklist de reflexão de mudanças (CHANGELOG, README, CLI, install)
+  - Hook pós-commit para verificação de artefatos
+
+#### Documentation
+
+- `docs/analise/.gege.md` - Análise técnica por Grok & GeGe (Gemini 3 Pro)
+- `.claude/skills/fazai-agentic-developer/` - Skill de desenvolvimento agêntico
+- `.claude/hookify.change-reflection.local.md` - Hook de reflexão
+
 ## [3.13.1] - 2025-12-28
 
 ### 🧠 ECOA Tool Execution

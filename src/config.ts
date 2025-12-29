@@ -195,6 +195,10 @@ export function getSystemConfigPath(): string {
   return SYSTEM_CONFIG_PATH;
 }
 
+export function getLocalInferenceModel(): string {
+  return getConfigValue("LOCAL_INFERENCE_MODEL") || "ollama:llama3";
+}
+
 /**
  * Load all config values as an object with camelCase keys
  */
