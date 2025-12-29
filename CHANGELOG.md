@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+### 📦 Instalador: Bash Completion Automático
+
+O `install.sh` agora instala automaticamente o bash completion do fazai.
+
+- **Nova função:** `install_fazai_completion()`
+- **Arquivo instalado:** `/etc/bash_completion.d/fazai-completion.bash`
+- **Fallback:** Se arquivo não existir, gera dinamicamente via `fazai completion bash`
+
 ### 🔧 Auto-Discovery Completion Generator v2.0
 
 Refatoração completa do gerador de completions para descoberta automática de features.

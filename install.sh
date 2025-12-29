@@ -400,6 +400,38 @@ install_fzsamba() {
   fi
 }
 
+# Instalar bash completion do fazai
+install_fazai_completion() {
+  info "Instalando bash completion do fazai..."
+
+  local COMPLETION_SOURCE="$INSTALL_DIR/completion/fazai-completion.bash"
+  local COMPLETION_TARGET="/etc/bash_completion.d/fazai-completion.bash"
+
+  if [ -f "$COMPLETION_SOURCE" ]; then
+    if [ -d /etc/bash_completion.d ]; then
+      if [ "$EUID" -eq 0 ]; then
+        cp "$COMPLETION_SOURCE" "$COMPLETION_TARGET"
+      else
+        sudo cp "$COMPLETION_SOURCE" "$COMPLETION_TARGET"
+      fi
+      success "Bash completion instalado em $COMPLETION_TARGET"
+    else
+      warning "Diretório /etc/bash_completion.d não existe. Completion não instalado."
+    fi
+  else
+    # Tentar gerar dinamicamente usando o comando fazai completion
+    if command -v fazai &> /dev/null; then
+      if [ -d /etc/bash_completion.d ]; then
+        info "Gerando completion dinamicamente..."
+        fazai completion bash | sudo tee "$COMPLETION_TARGET" > /dev/null 2>&1
+        success "Bash completion gerado e instalado"
+      fi
+    else
+      warning "Arquivo de completion não encontrado em $COMPLETION_SOURCE"
+    fi
+  fi
+}
+
 # Instalar fzalias
 install_fzalias_system() {
   info "Instalando fzalias (sistema de aliases global)..."
@@ -1511,6 +1543,7 @@ main() {
   setup_path
   install_fzalias_system  # Instalar sistema de aliases global
   install_fzsamba         # Instalar gerenciador Samba
+  install_fazai_completion  # Instalar bash completion do fazai
   setup_config
   install_qdrant  # Instalação interativa do Qdrant
   install_llama_cpp  # Instalação llama.cpp + Phi-3-mini (modelo local)
