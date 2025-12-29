@@ -405,7 +405,8 @@ install_fazai_completion() {
   info "Instalando bash completion do fazai..."
 
   local COMPLETION_SOURCE="$INSTALL_DIR/completion/fazai-completion.bash"
-  local COMPLETION_TARGET="/etc/bash_completion.d/fazai-completion.bash"
+  # Use simple name 'fazai' to avoid duplicates
+  local COMPLETION_TARGET="/etc/bash_completion.d/fazai"
 
   if [ -f "$COMPLETION_SOURCE" ]; then
     if [ -d /etc/bash_completion.d ]; then
@@ -524,7 +525,7 @@ configure_api_keys() {
   
   echo -e "${YELLOW}Escolha qual provider de IA deseja configurar:${NC}"
   echo -e "  ${BLUE}1.${NC} OpenRouter (GRÁTIS: Qwen3 Coder 480B) - Recomendado"
-  echo -e "  ${BLUE}2.${NC} Ollama Remoto (192.168.0.101) - gptoss-20b"
+  echo -e "  ${BLUE}2.${NC} Ollama (Local ou Remoto)"
   echo -e "  ${BLUE}3.${NC} Ambos (OpenRouter + Ollama)"
   echo -e "  ${BLUE}4.${NC} Pular (configurar manualmente depois)"
   echo ""
@@ -582,9 +583,9 @@ configure_api_keys() {
 # Função separada para configurar Ollama
 configure_ollama() {
   echo -e "${CYAN}Ollama (Local ou Remoto):${NC}"
-  echo -e "→ Local: http://localhost:11434"
-  echo -e "→ Remoto: http://192.168.0.101:11434 (servidor gptoss-20b)"
-  local ollama_url="http://192.168.0.101:11434"
+  echo -e "→ Local: http://localhost:11434 (padrão)"
+  echo -e "→ Remoto: Configure URL personalizada se usar servidor remoto"
+  local ollama_url="http://localhost:11434"
   read -p "URL do Ollama [$ollama_url]: " custom_ollama_url
   ollama_url="${custom_ollama_url:-$ollama_url}"
   
@@ -600,7 +601,7 @@ configure_ollama() {
     warning "Ollama não acessível em $ollama_url"
     echo -e "→ Se local, instale: ${CYAN}curl -fsSL https://ollama.com/install.sh | sh${NC}"
     echo -e "→ Depois rode: ${CYAN}ollama pull gptoss-20b${NC}"
-    echo -e "→ Se remoto (192.168.0.101), verifique:"
+    echo -e "→ Se remoto, verifique:"
     echo -e "   - Servidor está rodando?"
     echo -e "   - Firewall permite porta 11434?"
     echo -e "   - Rede local acessível?"

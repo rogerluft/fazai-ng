@@ -13,7 +13,7 @@
  * - Progress tracking for large batches
  */
 
-import { getConfigValue } from "../config";
+import { getConfigValue, getOllamaUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -64,7 +64,7 @@ class OllamaEmbeddingService implements EmbeddingService {
   private readonly MAX_TOKENS = 8192; // nomic-embed-text context limit
 
   constructor(
-    baseUrl: string = "http://192.168.0.101:11434",
+    baseUrl: string = getOllamaUrl(),
     model: string = "nomic-embed-text",
     dimension: number = 768
   ) {
@@ -360,7 +360,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
     // Check 1: Ollama
     async (): Promise<EmbeddingService | null> => {
       try {
-        const ollamaBaseUrl = getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
+        const ollamaBaseUrl = getOllamaUrl();
         const preferredOllamaModel = "nomic-embed-text"; // 8192 context - preferred!
         const fallbackOllamaModel = "mxbai-embed-large"; // 512 context - fallback only
 

@@ -19,6 +19,7 @@
  * @module services/universal-embedder
  */
 
+import { getOllamaUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -77,7 +78,7 @@ export function padVector(vector: number[], targetDim: number = 1536): number[] 
  * for single-text embeddings.
  *
  * @param text Input text to embed
- * @param ollamaUrl Ollama server URL (default: http://192.168.0.101:11434)
+ * @param ollamaUrl Ollama server URL (from config or default: http://localhost:11434)
  * @returns 1536-dimensional embedding vector
  *
  * @example
@@ -88,7 +89,7 @@ export function padVector(vector: number[], targetDim: number = 1536): number[] 
  */
 export async function generateUniversalEmbedding(
   text: string,
-  ollamaUrl: string = "http://192.168.0.101:11434"
+  ollamaUrl: string = getOllamaUrl()
 ): Promise<number[]> {
   const embedder = new UniversalLocalEmbedder(ollamaUrl);
   return embedder.embed(text);
@@ -123,14 +124,14 @@ export class UniversalLocalEmbedder {
   /**
    * Create a new Universal Local Embedder
    *
-   * @param ollamaUrl Ollama server URL (default: http://192.168.0.101:11434)
+   * @param ollamaUrl Ollama server URL (from config or default: http://localhost:11434)
    * @param model Ollama model name (default: nomic-embed-text)
    * @param nativeDimension Native model dimension (default: 768)
    * @param targetDimension Target dimension after padding (default: 1536)
    * @param useCache Enable embedding cache (default: true)
    */
   constructor(
-    ollamaUrl: string = "http://192.168.0.101:11434",
+    ollamaUrl: string = getOllamaUrl(),
     model: string = "nomic-embed-text",
     nativeDimension: number = 768,
     targetDimension: number = 1536,

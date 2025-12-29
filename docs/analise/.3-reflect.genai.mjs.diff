@@ -12,7 +12,7 @@
   */
  
 +const mode = env.vars.mode || "reflect";
-+const model = mode === "plan" ? (env.vars.model_local || "ollama:llama3") : "anthropic:claude-3-5-sonnet-latest";
++const model = mode === "plan" ? (env.vars.model_local || "llama:llama3") : "anthropic:claude-3-5-sonnet-latest";
 +
  script({
 -  title: "FazAI Reflect",

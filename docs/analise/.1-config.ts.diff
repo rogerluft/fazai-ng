@@ -5,7 +5,7 @@
  }
  
 +export function getLocalInferenceModel(): string {
-+  return getConfigValue("LOCAL_INFERENCE_MODEL") || "ollama:llama3";
++  return getConfigValue("LOCAL_INFERENCE_MODEL") || "llama:llama3";
 +}
 +
  /**

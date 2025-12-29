@@ -26,7 +26,7 @@ export default {
   // Configuração de providers
   providers: {
     ollama: {
-      baseUrl: process.env.OLLAMA_BASE_URL || "http://192.168.0.101:11434",
+      baseUrl: process.env.OLLAMA_BASE_URL || "http://localhost:11434",
     },
     anthropic: {
       // Usa ANTHROPIC_API_KEY do ambiente

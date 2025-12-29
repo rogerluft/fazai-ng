@@ -354,27 +354,32 @@ Simula tudo sem executar, perfeito para testar.
 
 ---
 
-## 🧪 TDD Enforced
+## 🧪 Testes de Integração Reais
 
-FazAI usa **Test-Driven Development (TDD)** como prática obrigatória. Commits com testes quebrados são automaticamente bloqueados.
+O FazAI-NG inclui uma suíte de testes de ponta a ponta para garantir a robustez e a inteligência agêntica. Estes testes simulam cenários reais de uso, interagindo diretamente com o sistema e as IAs.
 
-```bash
-# Ao fazer git commit, automaticamente:
-# 1. Husky intercepta o commit
-# 2. lint-staged executa vitest run
-# 3. Se testes falharem → commit bloqueado
-# 4. Se todos passarem → commit permitido
+### Executando a Suíte de Testes
 
-# Executar testes manualmente
-npm test                    # Suite completa
-npm run test:watch          # Watch mode
-npm run test:coverage       # Com coverage report
+1.  **Gere os Testes:** Execute o script principal para rodar todos os cenários e capturar logs brutos:
+    ```bash
+    ./tests/real-world-suite.sh
+    ```
+    *(Este script requer permissões de sudo para alguns testes administrativos).*
 
-# Bypass (emergência)
-git commit --no-verify -m "emergency fix"
-```
+2.  **Auditoria Automática:** Após a execução, o script chama automaticamente o auditor agêntico para analisar os resultados e o estado do sistema (Qdrant, Cache, Personalidade):
+    ```bash
+    genaiscript run qa-reporter
+    ```
 
----
+### Relatório de Erros
+
+O auditor gerará um relatório detalhado em `${LOG_FILE}` indicando falhas, prováveis causas e sugestões de correção.
+
+### Contribuição de Testes
+
+Para adicionar novos cenários de teste, crie um novo bloco de `run_test` no script `tests/real-world-suite.sh` e um novo prompt no `genaisrc/qa-reporter.genai.mjs` para análise, se necessário.
+
+
 
 ## 🗂️ Estrutura do Projeto
 

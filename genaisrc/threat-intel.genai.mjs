@@ -16,6 +16,7 @@
 const target = env.vars.target;
 const targetType = env.vars.type || "ip"; // ip, domain, hash
 const saveToQdrant = env.vars.save !== "false";
+const ollamaUrl = env.vars.ollama_url || process.env.OLLAMA_BASE_URL || "http://localhost:11434";
 
 if (!target) {
   throw new Error("Target required: --vars 'target=1.2.3.4'");
@@ -317,7 +318,7 @@ defTool(
     await ensureCollection(collectionName);
 
     // Gerar embedding do target
-    const response = await fetch("http://192.168.0.101:11434/api/embeddings", {
+    const response = await fetch(`${ollamaUrl}/api/embeddings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -377,7 +378,7 @@ defTool(
     await ensureCollection(collectionName);
 
     // Gerar embedding da query
-    const response = await fetch("http://192.168.0.101:11434/api/embeddings", {
+    const response = await fetch(`${ollamaUrl}/api/embeddings`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

@@ -16,7 +16,7 @@
  * @module services/embeddings
  */
 
-import { getConfigValue } from "../config";
+import { getConfigValue, getOllamaUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -85,7 +85,7 @@ class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private modelCache: Map<CollectionType, EmbeddingModel>;
 
-  constructor(baseUrl: string = "http://192.168.0.101:11434") {
+  constructor(baseUrl: string = getOllamaUrl()) {
     this.baseUrl = baseUrl;
     this.modelCache = new Map();
   }
@@ -505,8 +505,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
   let underlyingService: EmbeddingService;
 
   // Try Ollama first
-  const ollamaBaseUrl =
-    getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
+  const ollamaBaseUrl = getOllamaUrl();
 
   try {
     logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);

@@ -200,6 +200,30 @@ export function getLocalInferenceModel(): string {
 }
 
 /**
+ * Get Ollama base URL from config or environment
+ * Priority: OLLAMA_BASE_URL from config > env > default (localhost:11434)
+ */
+export function getOllamaUrl(): string {
+  return (
+    getConfigValue("OLLAMA_BASE_URL") ||
+    process.env.OLLAMA_BASE_URL ||
+    "http://localhost:11434"
+  );
+}
+
+/**
+ * Get Qdrant URL from config or environment
+ * Priority: QDRANT_URL from config > env > default (localhost:6333)
+ */
+export function getQdrantUrl(): string {
+  return (
+    getConfigValue("QDRANT_URL") ||
+    process.env.QDRANT_URL ||
+    "http://localhost:6333"
+  );
+}
+
+/**
  * Load all config values as an object with camelCase keys
  */
 export function loadConfig(): Record<string, string> {

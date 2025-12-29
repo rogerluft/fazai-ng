@@ -199,9 +199,9 @@ MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
 # =============================================================================
 
 # Ollama Base URL
-# Local: http://localhost:11434
-# Remote: http://192.168.0.101:11434
-OLLAMA_BASE_URL=http://192.168.0.101:11434
+# Default: http://localhost:11434 (local Ollama instance)
+# Remote: Configure to your Ollama server IP if running on another machine
+OLLAMA_BASE_URL=http://localhost:11434
 
 # MCP Context7 integration (optional)
 # Provide either an HTTP endpoint or a CLI command

@@ -42,7 +42,8 @@ This skill transforms you into a specialized developer for the FazAI-NG codebase
 **Alternative (two-step, avoids subshell):**
 ```bash
 # Step 1: Generate embedding to temp file
-curl -s -X POST 'http://192.168.0.101:11434/api/embeddings' \
+# Uses OLLAMA_BASE_URL from environment or defaults to localhost
+curl -s -X POST "${OLLAMA_BASE_URL:-http://localhost:11434}/api/embeddings" \
   -d '{"model":"nomic-embed-text","prompt":"circuit breaker"}' \
   | jq -c '.embedding' > /tmp/embed.json
 
@@ -105,7 +106,7 @@ FazAI uses GenAIScript (v2.5.1) for agentic automation. Key scripts:
 
 For planning and simple tasks, prefer local models to save costs.
 
-**Ollama endpoint:** http://192.168.0.101:11434
+**Ollama endpoint:** Configured via OLLAMA_BASE_URL (default: http://localhost:11434)
 
 ### 5. External Sources (Context7)
 

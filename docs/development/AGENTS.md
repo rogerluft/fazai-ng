@@ -86,7 +86,7 @@ When adding **any** new feature:
 ### 7. Dependency Management
 - **Lock versions** in `package.json` for stability
 - **No global npm packages** (except tooling: tsup, tsx)
-- **Ollama models**: Remote server (192.168.0.101:11434)
+- **Ollama models**: Local (localhost:11434) or remote (configure OLLAMA_BASE_URL)
 - **Cloud APIs**: OpenRouter (fallback), Cloudflare Workers
 
 ### 8. Code Quality Standards

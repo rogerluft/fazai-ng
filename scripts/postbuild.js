@@ -107,7 +107,8 @@ try {
 async function installBashCompletion() {
   const sourceFile = path.join(projectRoot, "completion/fazai-completion.bash");
   const targetDir = "/etc/bash_completion.d";
-  const targetFile = path.join(targetDir, "fazai-completion.bash");
+  // Use simple name 'fazai' to avoid duplicates with completion-sync.mjs
+  const targetFile = path.join(targetDir, "fazai");
 
   // Skip installation in CI/CD environments
   if (process.env.CI === "true" || process.env.CONTINUOUS_INTEGRATION === "true") {

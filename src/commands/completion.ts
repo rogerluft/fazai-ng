@@ -5,22 +5,48 @@
  * Parses src/commands/*.ts files to extract subcommands dynamically.
  *
  * Usage:
- *   fazai completion              # Show help
+ *   fazai completion              # Full sync (discover, validate, install, index)
+ *   fazai completion sync         # Alias for full sync
  *   fazai completion bash         # Output bash completion script
  *   fazai completion zsh          # Output zsh completion script
  *   fazai completion install      # Install to system
+ *   fazai completion validate     # Validate installed completion
+ *   fazai completion discover     # Show discovered features
  *   fazai completion list         # List available commands (legacy)
  */
 
 import chalk from "chalk";
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { execSync, spawnSync } from "node:child_process";
 import { models } from "../models";
 
-// ESM compatibility: get __dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// Get __dirname for both ESM and CommonJS
+// In ESM: use import.meta.url
+// In CommonJS: use global __dirname
+function getModuleDir(): string {
+  // Try CommonJS first (more reliable in bundled code)
+  if (typeof __dirname !== "undefined") {
+    return __dirname;
+  }
+
+  // ESM fallback
+  try {
+    // Dynamic import to avoid compile-time errors
+    const { fileURLToPath } = require("node:url");
+    // @ts-ignore - import.meta only exists in ESM
+    if (typeof import.meta !== "undefined" && import.meta.url) {
+      // @ts-ignore
+      return path.dirname(fileURLToPath(import.meta.url));
+    }
+  } catch {
+    // Fallback to process.cwd() if all else fails
+  }
+
+  return process.cwd();
+}
+
+const moduleDir = getModuleDir();
 
 // Source of truth for main commands: SUBCOMMANDS_WITH_HELP in app.ts
 const COMMANDS = [
@@ -65,11 +91,21 @@ const OPTIONS = [
 function discoverSubcommands(): Record<string, string[]> {
   const subcommands: Record<string, string[]> = {};
 
-  // Find project root and source directories
-  // __dirname could be src/commands or dist/commands depending on how we're running
-  const projectRoot = path.resolve(__dirname, "../..");
+  // Find project root - try multiple strategies
+  // 1. If running from source: moduleDir is src/commands, go up 2 levels
+  // 2. If running compiled: dist/app.cjs, go up 1 level
+  // 3. Fallback to cwd
+  let projectRoot = process.cwd();
+
+  // Check if we're in a src/commands or dist directory
+  if (moduleDir.includes("src/commands") || moduleDir.includes("src\\commands")) {
+    projectRoot = path.resolve(moduleDir, "../..");
+  } else if (moduleDir.includes("dist") || moduleDir.includes("build")) {
+    projectRoot = path.resolve(moduleDir, "..");
+  }
+
+  // Source directory should always be at projectRoot/src/commands
   const srcCommandsDir = path.join(projectRoot, "src/commands");
-  const distCommandsDir = path.join(projectRoot, "dist/commands");
 
   // Map of command name to file name (when different)
   const fileMapping: Record<string, string> = {
@@ -79,13 +115,10 @@ function discoverSubcommands(): Record<string, string[]> {
   for (const cmd of COMMANDS) {
     const fileName = fileMapping[cmd] || cmd;
 
-    // Possible file locations (prefer source for better parsing)
+    // Always look for source files - they have the case statements
     const possiblePaths = [
       path.join(srcCommandsDir, `${fileName}.ts`),
-      path.join(distCommandsDir, `${fileName}.js`),
-      path.join(distCommandsDir, `${fileName}.cjs`),
-      path.join(__dirname, `${fileName}.ts`),
-      path.join(__dirname, `${fileName}.js`),
+      path.join(projectRoot, "src", "commands", `${fileName}.ts`),
     ];
 
     let content = "";
@@ -134,7 +167,7 @@ function discoverSubcommands(): Record<string, string[]> {
   }
 
   // Completion's own subcommands
-  subcommands["completion"] = ["bash", "zsh", "install", "list", "help"];
+  subcommands["completion"] = ["sync", "bash", "zsh", "install", "validate", "discover", "list", "help"];
 
   return subcommands;
 }
@@ -151,15 +184,18 @@ function getSubcommands(): Record<string, string[]> {
 
 function showCompletionHelp(): void {
   console.log(chalk.bold.cyan("\n🔧 FazAI Completion Command\n"));
-  console.log("Generate and manage shell completion scripts.\n");
+  console.log("Generate and manage shell completion scripts with TRUE auto-discovery.\n");
 
   console.log(chalk.bold("USAGE:"));
   console.log("  fazai completion <subcommand>\n");
 
   console.log(chalk.bold("SUBCOMMANDS:"));
+  console.log("  sync       Full sync: discover, validate, install, index (default)");
   console.log("  bash       Output bash completion script to stdout");
   console.log("  zsh        Output zsh completion script to stdout");
   console.log("  install    Install completion to system (/etc/bash_completion.d/)");
+  console.log("  validate   Validate installed completion against source code");
+  console.log("  discover   Show all discovered commands and subcommands");
   console.log("  list       List available commands and models (legacy)");
   console.log("  help       Show this help message\n");
 
@@ -439,15 +475,76 @@ function listCompletions(): void {
   console.log(suggestions.join("\n"));
 }
 
+/**
+ * Get project root directory
+ */
+function getProjectRoot(): string {
+  const moduleDir = getModuleDir();
+  if (moduleDir.includes("src/commands") || moduleDir.includes("src\\commands")) {
+    return path.resolve(moduleDir, "../..");
+  } else if (moduleDir.includes("dist") || moduleDir.includes("build")) {
+    return path.resolve(moduleDir, "..");
+  }
+  return process.cwd();
+}
+
+/**
+ * Run the completion-sync.mjs script with specified mode
+ */
+function runSyncScript(mode: string): void {
+  const projectRoot = getProjectRoot();
+  const scriptPath = path.join(projectRoot, "scripts/completion-sync.mjs");
+
+  if (!fs.existsSync(scriptPath)) {
+    console.log(chalk.red(`❌ Sync script not found: ${scriptPath}`));
+    console.log(chalk.dim("   Run from FazAI project root or ensure scripts/completion-sync.mjs exists"));
+    process.exit(1);
+  }
+
+  try {
+    const args = mode === "full" ? [] : [`--${mode}`];
+    const result = spawnSync("node", [scriptPath, ...args], {
+      cwd: projectRoot,
+      stdio: "inherit",
+      env: { ...process.env },
+    });
+
+    if (result.status !== 0) {
+      process.exit(result.status || 1);
+    }
+  } catch (error) {
+    console.log(chalk.red(`❌ Failed to run sync script: ${(error as Error).message}`));
+    process.exit(1);
+  }
+}
+
 export async function handleCompletionCommand(args: string[]): Promise<void> {
   const subcommand = args[0]?.toLowerCase();
 
-  if (!subcommand || subcommand === "help" || subcommand === "--help" || subcommand === "-h") {
+  // Default behavior: run full sync
+  if (!subcommand) {
+    runSyncScript("full");
+    return;
+  }
+
+  if (subcommand === "help" || subcommand === "--help" || subcommand === "-h") {
     showCompletionHelp();
     return;
   }
 
   switch (subcommand) {
+    case "sync":
+      runSyncScript("full");
+      break;
+
+    case "discover":
+      runSyncScript("discover");
+      break;
+
+    case "validate":
+      runSyncScript("validate");
+      break;
+
     case "bash":
       console.log(generateBashCompletion());
       break;

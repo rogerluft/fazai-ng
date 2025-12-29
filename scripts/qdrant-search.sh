@@ -12,8 +12,9 @@ if [ -z "$QUERY" ]; then
   exit 1
 fi
 
-OLLAMA_URL="http://192.168.0.101:11434"
-QDRANT_URL="http://localhost:6333"
+# Get URLs from environment or config, with localhost defaults
+OLLAMA_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
+QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
 
 echo "Buscando: \"$QUERY\" em fazai_$COLLECTION..."
 echo ""
