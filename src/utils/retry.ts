@@ -90,11 +90,18 @@ export const DEFAULT_RETRY_CONFIG: Record<string, RetryOptions> = {
     useJitter: 1000,
   },
   ollama: {
-    maxRetries: 2,
-    initialDelay: 2000,
-    maxDelay: 30000,
-    backoffMultiplier: 2,
-    useJitter: 500,
+    maxRetries: 1, // Fast fail for local server - let fallback chain handle it
+    initialDelay: 1000,
+    maxDelay: 5000,
+    backoffMultiplier: 1.5,
+    useJitter: 250,
+  },
+  llama: {
+    maxRetries: 1, // Fast fail for local server - let fallback chain handle it
+    initialDelay: 500,
+    maxDelay: 2000,
+    backoffMultiplier: 1.5,
+    useJitter: 250,
   },
   google: {
     maxRetries: 3,
@@ -130,12 +137,19 @@ export function isRetryableError(error: RetryableError): boolean {
 
   // Check for error message patterns
   const message = error.message?.toLowerCase() || "";
+  const errorName = error.name?.toLowerCase() || "";
+  const errorType = (error as any).error?.type?.toLowerCase() || "";
   if (
     message.includes("network") ||
     message.includes("timeout") ||
+    message.includes("timed out") || // OpenAI SDK: "Request timed out."
     message.includes("connection") ||
     message.includes("socket") ||
-    message.includes("econnrefused")
+    message.includes("econnrefused") ||
+    message.includes("abort") ||
+    message.includes("exceeds the available context") ||
+    errorName === "aborterror" || // AbortController timeout
+    errorType === "exceed_context_size_error" // llama.cpp context limit
   ) {
     return true;
   }

@@ -2,30 +2,168 @@
 
 ## [Unreleased]
 
+### 🐛 Fix: Fallback Chain para Llama Timeout
+
+**Problema:** Quando llama-server (Phi-3) demorava muito, o erro "Request timed out." não ativava o fallback chain.
+
+**Causa raiz:** `isRecoverableError()` verificava `"timeout"` mas OpenAI SDK retorna `"timed out"`.
+
+**Correções:**
+| Arquivo | Correção |
+|---------|----------|
+| `src/linux-admin.ts:103` | ✅ Adicionado `message.includes("timed out")` |
+| `src/linux-admin.ts:822` | ✅ Timeout reduzido: 300s → 60s (fail-fast) |
+| `src/linux-admin.ts:835` | ✅ Adicionado `max_tokens: 1024` e `temperature: 0` |
+| `src/utils/retry.ts:145` | ✅ Adicionado `message.includes("timed out")` |
+
+**Resultado:** Agora llama timeout ativa fallback → ollama → openrouter automaticamente.
+
+---
+
+### 🔧 Config-Driven Ollama URLs - Eliminando Hardcoded
+
+**Problema:** URLs do Ollama (`http://192.168.0.101:11434`) estavam hardcoded em múltiplos arquivos.
+
+**Solução:** Centralizado via `getOllamaUrl()` em `src/config.ts`:
+- Prioridade: config → env → default (`localhost:11434`)
+- Padrão alterado de IP específico para `localhost:11434`
+
+**Arquivos Corrigidos:**
+| Arquivo | Correção |
+|---------|----------|
+| `src/config.ts` | ✅ Adicionado `getOllamaUrl()` e `getQdrantUrl()` |
+| `src/services/embeddings.ts` | ✅ Usa `getOllamaUrl()` |
+| `src/services/embeddings-refactored.ts` | ✅ Usa `getOllamaUrl()` |
+| `src/services/embedding-strategies.ts` | ✅ Usa `getOllamaUrl()` |
+| `src/services/universal-embedder.ts` | ✅ Usa `getOllamaUrl()` |
+| `src/linux-admin.ts` | ✅ Usa `getOllamaUrl()` |
+| `scripts/completion-sync.mjs` | ✅ Usa env vars com fallback localhost |
+| `scripts/qdrant-search.sh` | ✅ Usa `OLLAMA_BASE_URL` do ambiente |
+| `genaisrc/genaiscript.config.mjs` | ✅ Fallback para localhost |
+| `genaisrc/completion-sync.genai.mjs` | ✅ Usa env vars |
+| `genaisrc/threat-intel.genai.mjs` | ✅ Usa variável ollamaUrl |
+| `install.sh` | ✅ Default para localhost |
+| `fazai.conf.example` | ✅ Default para localhost |
+| `docs/development/AGENTS.md` | ✅ Documentação atualizada |
+| `skills/fazai-agentic-developer/SKILL.md` | ✅ Exemplos atualizados |
+
+**Regra estabelecida:** PROIBIDO URLs hardcoded - sempre usar config ou env vars.
+
+---
+
+### 🚀 Completion Sync v4.0 - Sistema Automatizado de Completion
+
+Nova arquitetura de sincronização de completion que resolve definitivamente o problema de features faltando.
+
+#### Problema Resolvido
+
+Usuário reportou: "falta features... pq vc nao consegue arrumar isso decentemente"
+
+O problema era que listas hardcoded ficavam desatualizadas quando novos comandos/subcomandos eram adicionados. Agora o sistema:
+
+1. **Auto-descobre** tudo do código fonte (TRUE auto-discovery)
+2. **Valida** contra a versão instalada
+3. **Re-indexa** no Qdrant se houver discrepâncias
+4. **Instala** automaticamente com fallbacks
+
+#### Novo Comando: `fazai completion`
+
+```bash
+fazai completion              # Full sync (default)
+fazai completion sync         # Alias para full sync
+fazai completion discover     # Mostra features descobertas
+fazai completion validate     # Valida instalação
+fazai completion bash         # Output bash script
+fazai completion zsh          # Output zsh script
+fazai completion install      # Instala no sistema
+```
+
+#### Arquivos Criados/Modificados
+
+- `scripts/completion-sync.mjs` - **NOVO** Script Node.js puro para sync
+- `src/commands/completion.ts` - Integrado com sync script
+- `genaisrc/completion-sync.genai.mjs` - GenAIScript (alternativo, requer LLM)
+
+#### Resultados
+
+```
+✓ Found 132 features (18 commands, 72 subcommands, 14 models)
+✅ Indexed 18 commands to Qdrant
+✅ Completion sync complete!
+```
+
+#### Correção: Arquivos Duplicados
+
+**Problema encontrado:** Existiam DOIS arquivos de completion no sistema:
+- `/etc/bash_completion.d/fazai` (gerado por completion-sync.mjs)
+- `/etc/bash_completion.d/fazai-completion.bash` (gerado por generate-completions.js)
+
+**Features faltando no completion-sync.mjs:**
+| Feature | Status |
+|---------|--------|
+| `--yolo` nas opções globais | ✅ Corrigido |
+| case para `ingest)` | ✅ Corrigido |
+| `alias` com completion dinâmico | ✅ Corrigido |
+
+**Solução:**
+1. Consolidado para único arquivo: `/etc/bash_completion.d/fazai`
+2. Atualizado `postbuild.js` para usar nome consistente
+3. Atualizado `install.sh` para usar nome consistente
+4. Adicionadas features faltando no `completion-sync.mjs`
+
+#### Tecnologias
+
+- **ECOA Standard**: Embeddings zero-padded para 1536 dimensões
+- **Qdrant Indexing**: CLI features indexadas em `fazai_source`
+- **Smart Install**: Fallback de `/etc/bash_completion.d/` para `/opt/fazai/scripts/`
+- **Validation**: Detecta discrepâncias entre código e completion instalado
+
+---
+
 ### 📦 Instalador: Bash Completion Automático
 
 O `install.sh` agora instala automaticamente o bash completion do fazai.
 
 - **Nova função:** `install_fazai_completion()`
-- **Arquivo instalado:** `/etc/bash_completion.d/fazai-completion.bash`
+- **Arquivo instalado:** `/etc/bash_completion.d/fazai`
 - **Fallback:** Se arquivo não existir, gera dinamicamente via `fazai completion bash`
 
-### 🔧 Auto-Discovery Completion Generator v2.0
+### 🔧 TRUE Auto-Discovery Completion v3.0
 
-Refatoração completa do gerador de completions para descoberta automática de features.
+Refatoração para auto-descoberta REAL de subcomandos - **sem listas hardcoded**.
 
-#### Problema Resolvido
+#### Problema Anterior (v2.0)
 
-- Commands eram HARDCODED em `scripts/generate-completions.js` (linhas 83-170)
-- Novos comandos adicionados em `app.ts` não apareciam no completion
-- Duplicação entre `scripts/generate-completions.js` e `src/utils/completion-generator.ts`
+Subcomandos ainda estavam HARDCODED em `knownPatterns`:
+- Subcomandos faltando (native, issue, repo, starred, logs, recommend, etc.)
+- Subcomandos inexistentes (collections no qdrant)
+- Opções do dashboard não apareciam (--port, --host, --no-cors, etc.)
 
-#### Nova Implementação
+#### Nova Implementação (v3.0)
 
-- **Auto-Discovery de Comandos** - Parse automático de `SUBCOMMANDS_WITH_HELP` do `app.ts`
-- **Auto-Discovery de Subcommands** - Parse de arquivos em `src/commands/*.ts`
-- **Auto-Discovery de Opções** - Extração de flags do help text
-- **Modelos Dinâmicos** - Continua lendo de `models.ts` + runtime de `fazai.conf`
+Parseia `case "xxx":` statements diretamente dos arquivos `src/commands/*.ts`:
+
+| Comando | Antes | Agora |
+|---------|-------|-------|
+| qdrant | 9 | **13** (+logs, recommend, recommendations, restart, start, stop) |
+| github | 8 | **11** (+issue, repo, starred) |
+| dashboard | 4 | **8** (+--port, --host, --no-cors, --no-logs, --no-rate-limit) |
+| agent | 6 | **9** (+native, -h, --help) |
+
+**Total: 88 subcomandos descobertos automaticamente (vs ~50 antes)**
+
+#### Arquivos Modificados
+
+- `src/commands/completion.ts` - ESM compatibility + TRUE auto-discovery em runtime
+- `scripts/generate-completions.js` - Removido `knownPatterns` hardcoded
+- `completion/fazai-completion.bash` - Regenerado
+- `completion/fazai-completion.zsh` - Regenerado
+
+---
+
+### 🔧 Auto-Discovery Completion Generator v2.0 (Anterior)
+
+Refatoração inicial do gerador de completions.
 
 #### Resultado
 

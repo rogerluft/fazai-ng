@@ -13,6 +13,15 @@ export function checkAPIKey(provider: string): boolean {
     return true; // Ollama sempre retorna true
   }
 
+  // llama.cpp server também não precisa de API key
+  if (provider === "llama") {
+    const serverUrl = getLlamaServerUrl();
+    if (serverUrl) {
+      process.env.LLAMA_SERVER_URL = serverUrl;
+    }
+    return true; // llama.cpp sempre retorna true
+  }
+
   const apiKey = getAPIKeyFromConfig(provider);
   if (apiKey) {
     // Definir a variável de ambiente para o SDK
@@ -34,6 +43,19 @@ export async function getAndSetAPIKey(provider: string): Promise<string> {
       process.env.OLLAMA_BASE_URL = "http://localhost:11434";
     }
     return "ollama"; // Retorna string dummy
+  }
+
+  // llama.cpp server também não precisa de API key
+  if (provider === "llama") {
+    const serverUrl = getLlamaServerUrl();
+    if (serverUrl) {
+      process.env.LLAMA_SERVER_URL = serverUrl;
+      logger.info(chalk.green(`✅ llama.cpp configurado: ${serverUrl}`));
+    } else {
+      logger.warn(chalk.yellow(`⚠️  LLAMA_SERVER_URL não configurado no ${configFileLabel()}, usando http://localhost:11430`));
+      process.env.LLAMA_SERVER_URL = "http://localhost:11430";
+    }
+    return "llama"; // Retorna string dummy
   }
 
   let apiKey = getAPIKeyFromConfig(provider);
@@ -106,6 +128,10 @@ function getEnvVarName(provider: string): string {
 
 function getOllamaBaseUrl(): string | undefined {
   return getConfigValue("OLLAMA_BASE_URL");
+}
+
+function getLlamaServerUrl(): string | undefined {
+  return getConfigValue("LLAMA_SERVER_URL");
 }
 
 // Função para listar todas as chaves configuradas

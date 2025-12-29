@@ -78,58 +78,57 @@ _fazai() {
         qdrant)
             local -a qdrant_cmds
             qdrant_cmds=(
-                'status:status subcommand'
-                'metrics:metrics subcommand'
                 'backup:backup subcommand'
-                'restore:restore subcommand'
-                'import:import subcommand'
-                'export:export subcommand'
                 'container:container subcommand'
-                'collections:collections subcommand'
-                'help:help subcommand'
+                'export:export subcommand'
+                'import:import subcommand'
+                'logs:logs subcommand'
+                'metrics:metrics subcommand'
+                'recommend:recommend subcommand'
+                'recommendations:recommendations subcommand'
+                'restart:restart subcommand'
+                'restore:restore subcommand'
+                'start:start subcommand'
+                'status:status subcommand'
+                'stop:stop subcommand'
             )
             _describe 'qdrant subcommands' qdrant_cmds
-            ;;
-        vector)
-            local -a vector_cmds
-            vector_cmds=(
-                'validate:validate subcommand'
-                'recreate:recreate subcommand'
-                'reset:reset subcommand'
-            )
-            _describe 'vector subcommands' vector_cmds
             ;;
         alias)
             local -a alias_cmds
             alias_cmds=(
+                'delete:delete subcommand'
                 'list:list subcommand'
                 'ls:ls subcommand'
-                'show:show subcommand'
                 'remove:remove subcommand'
                 'rm:rm subcommand'
-                'delete:delete subcommand'
+                'show:show subcommand'
             )
             _describe 'alias subcommands' alias_cmds
             ;;
         cloudflare)
             local -a cloudflare_cmds
             cloudflare_cmds=(
-                'zones:zones subcommand'
+                'cache:cache subcommand'
                 'dns:dns subcommand'
+                'ssl:ssl subcommand'
+                'worker:worker subcommand'
                 'workers:workers subcommand'
-                'purge:purge subcommand'
-                'analytics:analytics subcommand'
+                'zone:zone subcommand'
+                'zones:zones subcommand'
             )
             _describe 'cloudflare subcommands' cloudflare_cmds
             ;;
         cf)
             local -a cf_cmds
             cf_cmds=(
-                'zones:zones subcommand'
+                'cache:cache subcommand'
                 'dns:dns subcommand'
+                'ssl:ssl subcommand'
+                'worker:worker subcommand'
                 'workers:workers subcommand'
-                'purge:purge subcommand'
-                'analytics:analytics subcommand'
+                'zone:zone subcommand'
+                'zones:zones subcommand'
             )
             _describe 'cf subcommands' cf_cmds
             ;;
@@ -137,13 +136,16 @@ _fazai() {
             local -a github_cmds
             github_cmds=(
                 'auth:auth subcommand'
-                'user:user subcommand'
-                'repos:repos subcommand'
-                'issues:issues subcommand'
                 'fork:fork subcommand'
-                'star:star subcommand'
-                'pr:pr subcommand'
                 'help:help subcommand'
+                'issue:issue subcommand'
+                'issues:issues subcommand'
+                'pr:pr subcommand'
+                'repo:repo subcommand'
+                'repos:repos subcommand'
+                'star:star subcommand'
+                'starred:starred subcommand'
+                'user:user subcommand'
             )
             _describe 'github subcommands' github_cmds
             ;;
@@ -151,24 +153,26 @@ _fazai() {
             local -a inference_cmds
             inference_cmds=(
                 'add:add subcommand'
+                'clear:clear subcommand'
                 'import:import subcommand'
                 'list:list subcommand'
-                'search:search subcommand'
                 'remove:remove subcommand'
-                'clear:clear subcommand'
-                'help:help subcommand'
+                'search:search subcommand'
             )
             _describe 'inference subcommands' inference_cmds
             ;;
         agent)
             local -a agent_cmds
             agent_cmds=(
-                'loop:loop subcommand'
-                'run:run subcommand'
-                'reflect:reflect subcommand'
-                'status:status subcommand'
-                'scripts:scripts subcommand'
                 'help:help subcommand'
+                'loop:loop subcommand'
+                'native:native subcommand'
+                'reflect:reflect subcommand'
+                'run:run subcommand'
+                'scripts:scripts subcommand'
+                'status:status subcommand'
+                '--help:--help subcommand'
+                '-h:-h subcommand'
             )
             _describe 'agent subcommands' agent_cmds
             ;;
@@ -185,25 +189,39 @@ _fazai() {
             local -a dashboard_cmds
             dashboard_cmds=(
                 'start:start subcommand'
-                'stop:stop subcommand'
                 'status:status subcommand'
-                'help:help subcommand'
+                'stop:stop subcommand'
+                '--host:--host subcommand'
+                '--no-cors:--no-cors subcommand'
+                '--no-logs:--no-logs subcommand'
+                '--no-rate-limit:--no-rate-limit subcommand'
+                '--port:--port subcommand'
             )
             _describe 'dashboard subcommands' dashboard_cmds
             ;;
         samba)
             local -a samba_cmds
             samba_cmds=(
-                'list:list subcommand'
                 'add:add subcommand'
-                'del:del subcommand'
-                'criauser:criauser subcommand'
+                'completion:completion subcommand'
                 'criadir:criadir subcommand'
                 'criagroup:criagroup subcommand'
-                'completion:completion subcommand'
-                'help:help subcommand'
+                'criauser:criauser subcommand'
+                'del:del subcommand'
+                'list:list subcommand'
             )
             _describe 'samba subcommands' samba_cmds
+            ;;
+        completion)
+            local -a completion_cmds
+            completion_cmds=(
+                'bash:bash subcommand'
+                'zsh:zsh subcommand'
+                'install:install subcommand'
+                'list:list subcommand'
+                'help:help subcommand'
+            )
+            _describe 'completion subcommands' completion_cmds
             ;;
 
                 ask)

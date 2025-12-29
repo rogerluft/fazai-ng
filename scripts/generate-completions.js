@@ -122,93 +122,74 @@ function parseHelpDescriptions(appContent) {
 }
 
 /**
- * Parse command handlers to extract subcommands
- * Searches for case statements and subcommand patterns
+ * Parse command handlers to extract subcommands via TRUE auto-discovery.
+ * Parses case statements from command files - NO HARDCODED LISTS.
  */
 function parseSubcommands(appContent, commandsDir) {
   const subcommands = {};
 
-  // Known subcommand patterns from app.ts
-  const knownPatterns = {
-    vector: ["validate", "recreate", "reset"],
-    alias: ["list", "ls", "show", "remove", "rm", "delete"],
-    github: ["auth", "user", "repos", "issues", "fork", "star", "pr", "help"],
-    qdrant: [
-      "status",
-      "metrics",
-      "backup",
-      "restore",
-      "import",
-      "export",
-      "container",
-      "collections",
-      "help",
-    ],
-    cloudflare: ["zones", "dns", "workers", "purge", "analytics"],
-    cf: ["zones", "dns", "workers", "purge", "analytics"],
-    inference: ["add", "import", "list", "search", "remove", "clear", "help"],
-    agent: ["loop", "run", "reflect", "status", "scripts", "help"],
-    dashboard: ["start", "stop", "status", "help"],
-    samba: [
-      "list",
-      "add",
-      "del",
-      "criauser",
-      "criadir",
-      "criagroup",
-      "completion",
-      "help",
-    ],
-    ingest: ["--batch", "--preview", "--help"],
+  // Map command names to their file names (when different)
+  const fileMapping = {
+    cf: "cloudflare", // cf uses cloudflare.ts
+    index: "index-command", // index uses index-command.ts
   };
 
-  // Try to parse from command files
+  // Parse command files if directory exists
   if (fs.existsSync(commandsDir)) {
-    const files = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".ts"));
+    const files = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".ts") && !f.includes("test"));
 
     for (const file of files) {
-      const cmdName = file.replace(/[-_]?command\.ts$/, "").replace(/-/g, "");
+      // Extract command name from file name
+      let cmdName = file.replace(/[-_]?command\.ts$/, "").replace(".ts", "").replace(/-/g, "");
       const filePath = path.join(commandsDir, file);
 
       try {
         const content = fs.readFileSync(filePath, "utf-8");
 
-        // Look for subcommand arrays or case statements
-        const subcmdMatch = content.match(/subcommands?\s*[:=]\s*\[([\s\S]*?)\]/i);
-        if (subcmdMatch) {
-          const subcmds = [];
-          const matches = subcmdMatch[1].matchAll(/["']([^"']+)["']/g);
-          for (const m of matches) {
-            subcmds.push(m[1]);
-          }
-          if (subcmds.length > 0) {
-            subcommands[cmdName] = subcmds;
+        // Extract ALL case statements: case "xxx": or case 'xxx':
+        // Exclude template variables like ${COMP_WORDS[1]}, ${prev}, etc.
+        const casePattern = /case\s+["']([^"'$]+)["']\s*:/g;
+        const matches = content.matchAll(casePattern);
+
+        const subs = new Set();
+        for (const m of matches) {
+          const sub = m[1].trim();
+          // Skip template variable references and empty strings
+          if (sub && !sub.includes("{") && !sub.includes("$") && !sub.includes("\\")) {
+            subs.add(sub);
           }
         }
 
-        // Look for case "subcmd": patterns
-        const caseMatches = content.matchAll(/case\s+["'](\w+)["']\s*:/g);
-        const caseCmds = [];
-        for (const m of caseMatches) {
-          if (!["default", "help"].includes(m[1])) {
-            caseCmds.push(m[1]);
-          }
-        }
-        if (caseCmds.length > 0 && !subcommands[cmdName]) {
-          subcommands[cmdName] = caseCmds;
+        if (subs.size > 0) {
+          // Sort: regular commands first, then options (starting with -)
+          const regular = [...subs].filter((s) => !s.startsWith("-")).sort();
+          const options = [...subs].filter((s) => s.startsWith("-")).sort();
+          subcommands[cmdName] = [...regular, ...options];
         }
       } catch (error) {
         // Ignore parse errors for individual files
+        console.warn(`  Warning: Could not parse ${file}: ${error.message}`);
       }
     }
   }
 
-  // Merge with known patterns (known patterns take priority for completeness)
-  for (const [cmd, subs] of Object.entries(knownPatterns)) {
-    if (!subcommands[cmd] || subcommands[cmd].length < subs.length) {
-      subcommands[cmd] = subs;
-    }
+  // Handle cf -> cloudflare mapping
+  if (subcommands["cloudflare"] && !subcommands["cf"]) {
+    subcommands["cf"] = subcommands["cloudflare"];
   }
+
+  // Manual additions for commands that don't use switch/case patterns
+  // (e.g., ingest uses args parsing, not switch statements)
+  if (!subcommands["ingest"] || subcommands["ingest"].length === 0) {
+    subcommands["ingest"] = ["--batch", "--preview", "--help"];
+  }
+
+  // Ensure completion has its own subcommands
+  subcommands["completion"] = ["bash", "zsh", "install", "list", "help"];
+
+  // Log discovery results
+  const totalSubs = Object.values(subcommands).reduce((acc, subs) => acc + subs.length, 0);
+  console.log(`📋 Discovered ${totalSubs} subcommands across ${Object.keys(subcommands).length} commands`);
 
   return subcommands;
 }

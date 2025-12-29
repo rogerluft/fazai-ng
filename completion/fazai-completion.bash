@@ -44,42 +44,37 @@ _fazai_completion() {
     # Handle specific commands with subcommands
     case "${COMP_WORDS[1]}" in
         qdrant)
-            local subcmds="status metrics backup restore import export container collections help"
-            COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
-            return 0
-            ;;
-        vector)
-            local subcmds="validate recreate reset"
+            local subcmds="backup container export import logs metrics recommend recommendations restart restore start status stop"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         alias)
-            local subcmds="list ls show remove rm delete"
+            local subcmds="delete list ls remove rm show"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         cloudflare)
-            local subcmds="zones dns workers purge analytics"
+            local subcmds="cache dns ssl worker workers zone zones"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         cf)
-            local subcmds="zones dns workers purge analytics"
+            local subcmds="cache dns ssl worker workers zone zones"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         github)
-            local subcmds="auth user repos issues fork star pr help"
+            local subcmds="auth fork help issue issues pr repo repos star starred user"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         inference)
-            local subcmds="add import list search remove clear help"
+            local subcmds="add clear import list remove search"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         agent)
-            local subcmds="loop run reflect status scripts help"
+            local subcmds="help loop native reflect run scripts status --help -h"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
@@ -89,12 +84,17 @@ _fazai_completion() {
             return 0
             ;;
         dashboard)
-            local subcmds="start stop status help"
+            local subcmds="start status stop --host --no-cors --no-logs --no-rate-limit --port"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
         samba)
-            local subcmds="list add del criauser criadir criagroup completion help"
+            local subcmds="add completion criadir criagroup criauser del list"
+            COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
+            return 0
+            ;;
+        completion)
+            local subcmds="bash zsh install list help"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;
