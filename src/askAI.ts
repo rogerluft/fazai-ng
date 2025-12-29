@@ -387,32 +387,46 @@ export async function* askAI(
         yield cachedResponse;
         return;
       }
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`Cache lookup failed: ${err.message}`);
-      // Continue with provider call on cache error
+    } catch (error: any) {
+      logger.debug(`Cache lookup failed: ${error.message}`);
     }
   }
 
-  // RAG enrichment: Get context from Qdrant
-  let ragContext = "";
-  if (semanticSearchEnabled) {
+  // NEW: Comprehensive context enrichment
+  let systemMessage: string;
+
+  if (isGeneralQuestion) {
     try {
-      ragContext = await enrichWithRAG(question);
-      if (ragContext) {
-        logger.debug(`RAG context enriched (${ragContext.length} chars)`);
-      }
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`RAG enrichment failed: ${err.message}`);
-      // Continue without RAG context
-    }
-  }
+        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
+        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
 
-  // Build system message with personality (fileContent) and RAG context
-  const systemMessage = isGeneralQuestion
-    ? SYSTEM_MESSAGES.general(fileContent, ragContext)
-    : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+        // Parallelize context fetching
+        const [personality, memories, ragResult] = await Promise.all([
+            loadPersonalityFromQdrant(),
+            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
+            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
+        ]);
+
+        const personalityContext = buildPersonalitySystemPrompt(personality);
+        const memoriesContext = summarizeMemories(memories);
+
+        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
+
+        // Combine memory and RAG context
+        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
+
+        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
+
+    } catch (error: any) {
+        logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
+        const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+        systemMessage = SYSTEM_MESSAGES.general(fileContent, ragContext); // Fallback to original behavior
+    }
+  } else {
+      // For code analysis, keep it simple but include RAG
+      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+  }
 
   let currentProvider: ProviderName = provider as ProviderName;
   let currentModel = model;
