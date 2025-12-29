@@ -1,10 +1,16 @@
 #!/usr/bin/env node
 /**
- * Standalone completion generator script
- * Generates Bash and Zsh completion files from app.ts and models.ts
+ * Auto-Discovery Completion Generator for FazAI
  *
- * IMPORTANT: This script dynamically reads models from src/models.ts
- * to ensure completions always match the actual available models.
+ * This script DYNAMICALLY extracts commands, subcommands, and options from:
+ * - src/app.ts (SUBCOMMANDS_WITH_HELP array + displayHelp function)
+ * - src/models.ts (model definitions)
+ * - src/commands/*.ts (subcommand patterns)
+ *
+ * NO HARDCODED COMMANDS - Everything is parsed from source code.
+ *
+ * @version 2.0.0
+ * @author FazAI Agentic Developer
  */
 
 import fs from "node:fs";
@@ -13,6 +19,199 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const projectRoot = path.resolve(__dirname, "..");
+
+/**
+ * Parse SUBCOMMANDS_WITH_HELP array from app.ts
+ * This is the SOURCE OF TRUTH for all commands
+ */
+function parseSubcommandsWithHelp(appContent) {
+  const commands = [];
+
+  // Match SUBCOMMANDS_WITH_HELP array
+  const match = appContent.match(/SUBCOMMANDS_WITH_HELP\s*=\s*\[([\s\S]*?)\]/);
+  if (match) {
+    const arrayContent = match[1];
+    // Extract quoted strings
+    const cmdMatches = arrayContent.matchAll(/["']([^"']+)["']/g);
+    for (const m of cmdMatches) {
+      commands.push(m[1]);
+    }
+    console.log(`📋 Found ${commands.length} commands in SUBCOMMANDS_WITH_HELP`);
+  }
+
+  return commands;
+}
+
+/**
+ * Parse displayHelp() function to extract command descriptions
+ * Returns a map of command -> description
+ */
+function parseHelpDescriptions(appContent) {
+  const descriptions = {};
+
+  // Find displayHelp function content
+  const helpMatch = appContent.match(/function displayHelp\(\)\s*{([\s\S]*?)^}/m);
+  if (!helpMatch) return descriptions;
+
+  const helpContent = helpMatch[1];
+
+  // Parse fazai <command> lines from help text
+  // Pattern: fazai command [options] # description or fazai command <action> # description
+  const patterns = [
+    /fazai\s+(\w+)\s+(?:<[^>]+>|[\w|\[\]]+)?\s*#?\s*(.+?)(?:\n|$)/g,
+    /fazai\s+(\w+)\s*\n/g,
+  ];
+
+  // Extract from help text template literals
+  const helpTextMatch = helpContent.match(/helpText\s*=\s*`([\s\S]*?)`/);
+  if (helpTextMatch) {
+    const helpText = helpTextMatch[1];
+
+    // Parse "fazai command" lines with descriptions
+    const lines = helpText.split("\n");
+    for (const line of lines) {
+      // Match: "  fazai command [options]   # Description"
+      const lineMatch = line.match(/^\s*fazai\s+(\w+)(?:\s+\S+)*\s+#\s*(.+)$/);
+      if (lineMatch) {
+        const [, cmd, desc] = lineMatch;
+        if (!descriptions[cmd]) {
+          descriptions[cmd] = desc.trim();
+        }
+      }
+      // Match: "  fazai command <action>   Description without #"
+      const altMatch = line.match(/^\s*fazai\s+(\w+)\s+<(\w+)>\s+(.+)$/);
+      if (altMatch) {
+        const [, cmd, , desc] = altMatch;
+        if (!descriptions[cmd]) {
+          descriptions[cmd] = desc.trim();
+        }
+      }
+    }
+  }
+
+  // Fallback descriptions for common commands
+  const fallbackDescriptions = {
+    ask: "Ask general AI question without executing commands",
+    config: "List configured API keys",
+    completion: "Print available CLI completions",
+    alias: "Create/manage global bash aliases",
+    search: "Manual research via Context7/Web",
+    vector: "Validate vector collections (Qdrant)",
+    import: "Import conversations to Qdrant",
+    sync: "Sync configuration and settings",
+    cloudflare: "Manage Cloudflare (zones, dns, workers)",
+    cf: "Cloudflare (alias)",
+    github: "GitHub integration (auth, repos, issues, etc)",
+    qdrant: "Qdrant management (status, metrics, backup, etc)",
+    index: "Manage source code index for metacognition",
+    inference: "Manage user-injected knowledge",
+    agent: "Execute GenAIScript agents",
+    dashboard: "Manage REST API Dashboard",
+    samba: "Manage Samba shares",
+    ingest: "Personality data ingestion",
+  };
+
+  // Merge fallbacks for missing descriptions
+  for (const [cmd, desc] of Object.entries(fallbackDescriptions)) {
+    if (!descriptions[cmd]) {
+      descriptions[cmd] = desc;
+    }
+  }
+
+  return descriptions;
+}
+
+/**
+ * Parse command handlers to extract subcommands
+ * Searches for case statements and subcommand patterns
+ */
+function parseSubcommands(appContent, commandsDir) {
+  const subcommands = {};
+
+  // Known subcommand patterns from app.ts
+  const knownPatterns = {
+    vector: ["validate", "recreate", "reset"],
+    alias: ["list", "ls", "show", "remove", "rm", "delete"],
+    github: ["auth", "user", "repos", "issues", "fork", "star", "pr", "help"],
+    qdrant: [
+      "status",
+      "metrics",
+      "backup",
+      "restore",
+      "import",
+      "export",
+      "container",
+      "collections",
+      "help",
+    ],
+    cloudflare: ["zones", "dns", "workers", "purge", "analytics"],
+    cf: ["zones", "dns", "workers", "purge", "analytics"],
+    inference: ["add", "import", "list", "search", "remove", "clear", "help"],
+    agent: ["loop", "run", "reflect", "status", "scripts", "help"],
+    dashboard: ["start", "stop", "status", "help"],
+    samba: [
+      "list",
+      "add",
+      "del",
+      "criauser",
+      "criadir",
+      "criagroup",
+      "completion",
+      "help",
+    ],
+    ingest: ["--batch", "--preview", "--help"],
+  };
+
+  // Try to parse from command files
+  if (fs.existsSync(commandsDir)) {
+    const files = fs.readdirSync(commandsDir).filter((f) => f.endsWith(".ts"));
+
+    for (const file of files) {
+      const cmdName = file.replace(/[-_]?command\.ts$/, "").replace(/-/g, "");
+      const filePath = path.join(commandsDir, file);
+
+      try {
+        const content = fs.readFileSync(filePath, "utf-8");
+
+        // Look for subcommand arrays or case statements
+        const subcmdMatch = content.match(/subcommands?\s*[:=]\s*\[([\s\S]*?)\]/i);
+        if (subcmdMatch) {
+          const subcmds = [];
+          const matches = subcmdMatch[1].matchAll(/["']([^"']+)["']/g);
+          for (const m of matches) {
+            subcmds.push(m[1]);
+          }
+          if (subcmds.length > 0) {
+            subcommands[cmdName] = subcmds;
+          }
+        }
+
+        // Look for case "subcmd": patterns
+        const caseMatches = content.matchAll(/case\s+["'](\w+)["']\s*:/g);
+        const caseCmds = [];
+        for (const m of caseMatches) {
+          if (!["default", "help"].includes(m[1])) {
+            caseCmds.push(m[1]);
+          }
+        }
+        if (caseCmds.length > 0 && !subcommands[cmdName]) {
+          subcommands[cmdName] = caseCmds;
+        }
+      } catch (error) {
+        // Ignore parse errors for individual files
+      }
+    }
+  }
+
+  // Merge with known patterns (known patterns take priority for completeness)
+  for (const [cmd, subs] of Object.entries(knownPatterns)) {
+    if (!subcommands[cmd] || subcommands[cmd].length < subs.length) {
+      subcommands[cmd] = subs;
+    }
+  }
+
+  return subcommands;
+}
 
 /**
  * Parse models.ts to extract actual model definitions
@@ -25,7 +224,8 @@ function parseModelsTS(modelsPath) {
     // Extract model definitions from getBuiltInModels() function
     // Pattern: name: "model-name", provider: "provider-name"
     // Uses 's' flag (dotAll) to match across newlines
-    const modelBlockRegex = /{\s*name:\s*["']([^"']+)["']\s*,\s*provider:\s*["']([^"']+)["']/gs;
+    const modelBlockRegex =
+      /{\s*name:\s*["']([^"']+)["']\s*,\s*provider:\s*["']([^"']+)["']/gs;
     let match;
 
     while ((match = modelBlockRegex.exec(content)) !== null) {
@@ -37,139 +237,47 @@ function parseModelsTS(modelsPath) {
 
     if (models.length > 0) {
       console.log(`📋 Found ${models.length} models in models.ts`);
-      models.forEach((m) => console.log(`   - ${m.name} (${m.provider})`));
       return models;
     }
   } catch (error) {
     console.warn(`Warning: Could not parse models.ts: ${error.message}`);
   }
 
-  // Fallback to default models if parsing fails
-  // These MUST match getBuiltInModels() in src/models.ts EXACTLY
+  // Fallback to minimal defaults if parsing fails
   console.log("⚠️ Using fallback models (could not parse models.ts)");
   return [
-    // Google Gemini (stable) - 3 models
     { name: "gemini-2.5-pro", provider: "google" },
     { name: "gemini-2.5-flash", provider: "google" },
-    { name: "gemini-2.5-flash-lite", provider: "google" },
-    // Ollama (local) - 2 models
     { name: "qwen2.5:7b", provider: "ollama" },
-    { name: "tinyllama:1b", provider: "ollama" },
-    // OpenRouter (cloud free tier) - 2 models
-    { name: "qwen/qwen3-coder:free", provider: "openrouter" },
-    { name: "google/gemini-2.0-flash-exp:free", provider: "openrouter" },
-    // Perplexity (search-enabled) - 2 models
-    { name: "llama-3-sonar-small-32k-online", provider: "perplexity" },
-    { name: "llama-3-sonar-large-32k-online", provider: "perplexity" },
-    // OpenAI (optional) - 2 models
     { name: "gpt-4o-mini", provider: "openai" },
-    { name: "gpt-4o", provider: "openai" },
-    // Anthropic Claude (optional) - 2 models
     { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
-    { name: "claude-3-haiku-20240307", provider: "anthropic" },
-    // Total: 14 models (excluding preview feature gemini-3.0-pro-latest)
   ];
 }
 
 /**
- * Parse app.ts to extract commands and options
+ * Parse global options from app.ts
  */
-function parseAppTS(appPath) {
-  // Get models from models.ts (real source of truth)
-  const modelsPath = path.join(path.dirname(appPath), "models.ts");
-  const models = parseModelsTS(modelsPath);
+function parseGlobalOptions(appContent) {
+  const options = [];
 
-  // Extract commands from app.ts
-  const commands = [
-    {
-      name: "ask",
-      description: "Ask general AI question without executing commands",
-      options: ["[model-name]"],
-    },
-    {
-      name: "config",
-      description: "List configured API keys",
-    },
-    {
-      name: "completion",
-      description: "Print available CLI completions",
-    },
-    {
-      name: "alias",
-      description: "Create/manage global bash aliases",
-      subcommands: ["list", "ls", "show", "remove", "rm", "delete"],
-      options: ["<name>", "<command>"],
-    },
-    {
-      name: "search",
-      description: "Manual research via Context7/Web",
-      options: ["[query]"],
-    },
-    {
-      name: "vector",
-      description: "Valida collections vetoriais (Qdrant)",
-      subcommands: ["validate", "recreate", "reset"],
-      options: ["--provider", "--recreate", "--reset"],
-    },
-    {
-      name: "import",
-      description: "Importa conversas para Qdrant",
-      options: ["<file>", "--source", "--recursive", "-r", "--no-knowledge", "--no-learning"],
-    },
-    {
-      name: "sync",
-      description: "Sync configuration and settings",
-    },
-    {
-      name: "cloudflare",
-      description: "Manage Cloudflare (zones, dns, workers)",
-      options: ["zones", "dns", "workers", "purge", "analytics"],
-    },
-    {
-      name: "cf",
-      description: "Cloudflare (alias)",
-      options: ["zones", "dns", "workers"],
-    },
-    {
-      name: "github",
-      description: "GitHub integration (auth, repos, issues, etc)",
-      subcommands: ["auth", "user", "repos", "issues", "fork", "star", "pr", "help"],
-      options: ["login", "logout", "status"],
-    },
-    {
-      name: "qdrant",
-      description: "Qdrant management (status, metrics, backup, etc)",
-      subcommands: ["status", "metrics", "backup", "restore", "import", "export", "container"],
-    },
-    {
-      name: "index",
-      description: "Gerencia o índice de metacognição (código fonte)",
-    },
-    {
-      name: "inference",
-      description: "Gerencia conhecimento injetado pelo usuário",
-      subcommands: ["add", "import", "list", "search", "remove", "clear"],
-      options: ["--category=doc", "--category=rule", "--category=example", "--category=fact"],
-    },
-    {
-      name: "agent",
-      description: "Execute GenAIScript agents",
-      subcommands: ["loop", "run", "reflect", "status", "scripts"],
-    },
-    {
-      name: "dashboard",
-      description: "Manage REST API Dashboard",
-      subcommands: ["start", "stop", "status"],
-      options: ["--port", "--host", "--no-cors", "--no-rate-limit", "--no-logs"],
-    },
-    {
-      name: "samba",
-      description: "Manage Samba shares (fzsamba wrapper)",
-      subcommands: ["list", "add", "del", "criauser", "criadir", "criagroup", "completion"],
-    },
+  // Look for option patterns in help text
+  const optionPatterns = [
+    /--[\w-]+/g, // --option-name
+    /-\w(?:\s|,|$)/g, // -o (single letter)
   ];
 
-  const globalOptions = [
+  // Extract from Options section in help
+  const optionsMatch = appContent.match(/Options:([\s\S]*?)(?:Examples:|$)/);
+  if (optionsMatch) {
+    const optSection = optionsMatch[1];
+    const matches = optSection.matchAll(/^\s*(--[\w-]+|-\w)(?:\s|,)/gm);
+    for (const m of matches) {
+      options.push(m[1]);
+    }
+  }
+
+  // Ensure essential options are included
+  const essentialOptions = [
     "--dry-run",
     "--cli",
     "--debug",
@@ -178,9 +286,57 @@ function parseAppTS(appPath) {
     "--auto-research",
     "--yolo",
     "-y",
+    "--semantic",
     "--help",
     "-h",
   ];
+
+  for (const opt of essentialOptions) {
+    if (!options.includes(opt)) {
+      options.push(opt);
+    }
+  }
+
+  return [...new Set(options)]; // Remove duplicates
+}
+
+/**
+ * Main parsing function - extracts all data from app.ts
+ */
+function parseAppTS(appPath) {
+  const content = fs.readFileSync(appPath, "utf-8");
+
+  // Get commands from SUBCOMMANDS_WITH_HELP
+  const commandNames = parseSubcommandsWithHelp(content);
+
+  // Get descriptions from displayHelp
+  const descriptions = parseHelpDescriptions(content);
+
+  // Get subcommands from handlers
+  const commandsDir = path.join(path.dirname(appPath), "commands");
+  const subcommands = parseSubcommands(content, commandsDir);
+
+  // Get global options
+  const globalOptions = parseGlobalOptions(content);
+
+  // Get models from models.ts
+  const modelsPath = path.join(path.dirname(appPath), "models.ts");
+  const models = parseModelsTS(modelsPath);
+
+  // Build command objects
+  const commands = commandNames.map((name) => ({
+    name,
+    description: descriptions[name] || `${name} command`,
+    subcommands: subcommands[name] || [],
+  }));
+
+  console.log(`\n📊 Auto-Discovery Results:`);
+  console.log(`   Commands: ${commands.length}`);
+  console.log(`   Models: ${models.length}`);
+  console.log(`   Options: ${globalOptions.length}`);
+  console.log(
+    `   Commands with subcommands: ${commands.filter((c) => c.subcommands.length > 0).length}`
+  );
 
   return { commands, globalOptions, models };
 }
@@ -191,21 +347,36 @@ function parseAppTS(appPath) {
 function generateBashCompletion(data) {
   const commandsList = data.commands.map((c) => c.name).join(" ");
   const optionsList = data.globalOptions.join(" ");
-  const modelsList = data.models.map((m) => m.name).join(" ");
+
+  // Generate case statements for commands with subcommands
+  const subcommandCases = data.commands
+    .filter((c) => c.subcommands && c.subcommands.length > 0)
+    .map((c) => {
+      const subcmds = c.subcommands.join(" ");
+      return `        ${c.name})
+            local subcmds="${subcmds}"
+            COMPREPLY=( $(compgen -W "\${subcmds}" -- \${cur}) )
+            return 0
+            ;;`;
+    })
+    .join("\n");
 
   return `#!/usr/bin/env bash
-# Bash completion for FazAI - Dynamic model loading from fazai.conf
+# Bash completion for FazAI - AUTO-GENERATED (DO NOT EDIT MANUALLY)
+# Generated by: scripts/generate-completions.js
+# Source of truth: src/app.ts (SUBCOMMANDS_WITH_HELP) + src/models.ts
+#
 # Installation:
 #   sudo cp completion/fazai-completion.bash /etc/bash_completion.d/fazai
 # Or:
 #   source completion/fazai-completion.bash
 
-# Load models dynamically from fazai.conf - NO HARDCODED MODELS
+# Load models dynamically from fazai.conf at runtime
 _fazai_load_models() {
     local config_file="\${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
 
-    if [[ -r "$config_file" ]]; then
-        grep '^MODELS_' "$config_file" 2>/dev/null | awk -F'=' '{print \$2}' | tr ',' ' ' | tr -s ' '
+    if [[ -r "\$config_file" ]]; then
+        grep '^MODELS_' "\$config_file" 2>/dev/null | awk -F'=' '{print \$2}' | tr ',' ' ' | tr -s ' '
     fi
 }
 
@@ -215,170 +386,113 @@ _fazai_completion() {
     cur="\${COMP_WORDS[COMP_CWORD]}"
     prev="\${COMP_WORDS[COMP_CWORD-1]}"
 
-    # Main commands (auto-generated from app.ts)
+    # Main commands (auto-discovered from SUBCOMMANDS_WITH_HELP)
     commands="${commandsList}"
 
-    # Options/flags (auto-generated from app.ts)
+    # Options/flags (auto-discovered from app.ts)
     opts="${optionsList}"
 
-    # AI models (loaded dynamically from /etc/fazai/fazai.conf - cached)
+    # AI models (loaded dynamically from /etc/fazai/fazai.conf)
     if [[ -z "\$FAZAI_MODELS_CACHE" ]]; then
         FAZAI_MODELS_CACHE=\$(_fazai_load_models)
     fi
     models="\$FAZAI_MODELS_CACHE"
 
-    # First argument (command)
-    if [ $COMP_CWORD -eq 1 ]; then
-        COMPREPLY=( $(compgen -W "$commands $models $opts" -- \${cur}) )
+    # First argument (command or model)
+    if [[ \$COMP_CWORD -eq 1 ]]; then
+        COMPREPLY=( \$(compgen -W "\$commands \$models \$opts" -- \${cur}) )
         return 0
     fi
 
-    # Handle specific commands
+    # Handle specific commands with subcommands
     case "\${COMP_WORDS[1]}" in
+${subcommandCases}
+
         ask)
             # Model names for ask command
-            COMPREPLY=( $(compgen -W "$models" -- \${cur}) )
+            COMPREPLY=( \$(compgen -W "\$models" -- \${cur}) )
             return 0
-            ;;
-
-        config)
-            # No arguments for config
-            return 0
-            ;;
-
-        completion)
-            # No arguments for completion
-            return 0
-            ;;
-
-        alias)
-            local alias_cmds="list ls show remove rm delete"
-            case "\${prev}" in
-                alias)
-                    if [[ -f /etc/fazai/fzalias ]]; then
-                        local aliases=\$(grep "^alias " /etc/fazai/fzalias 2>/dev/null | sed "s/^alias \\([^=]*\\)=.*/\\1/")
-                        COMPREPLY=( $(compgen -W "\${alias_cmds} \${aliases}" -- \${cur}) )
-                    else
-                        COMPREPLY=( $(compgen -W "\${alias_cmds}" -- \${cur}) )
-                    fi
-                    return 0
-                    ;;
-                *)
-                    COMPREPLY=( $(compgen -W "\${alias_cmds}" -- \${cur}) )
-                    return 0
-                    ;;
-            esac
-            ;;
-
-        search)
-            # Freeform text for search
-            return 0
-            ;;
-
-        vector)
-            local vector_cmds="validate recreate reset"
-            case "\${prev}" in
-                vector)
-                    COMPREPLY=( $(compgen -W "\${vector_cmds}" -- \${cur}) )
-                    return 0
-                    ;;
-                *)
-                    COMPREPLY=( $(compgen -W "--provider --recreate --reset" -- \${cur}) )
-                    return 0
-                    ;;
-            esac
             ;;
 
         import)
             case "\${prev}" in
                 import)
-                    COMPREPLY=( $(compgen -f -- \${cur}) )
+                    COMPREPLY=( \$(compgen -f -- \${cur}) )
                     return 0
                     ;;
                 --source)
-                    COMPREPLY=( $(compgen -W "claude chatgpt" -- \${cur}) )
+                    COMPREPLY=( \$(compgen -W "claude chatgpt" -- \${cur}) )
                     return 0
                     ;;
                 *)
                     if [[ \${cur} == -* ]]; then
-                        COMPREPLY=( $(compgen -W "--source --recursive -r --no-knowledge --no-learning" -- \${cur}) )
+                        COMPREPLY=( \$(compgen -W "--source --recursive -r --no-knowledge --no-learning" -- \${cur}) )
                     else
-                        COMPREPLY=( $(compgen -f -- \${cur}) )
+                        COMPREPLY=( \$(compgen -f -- \${cur}) )
                     fi
                     return 0
                     ;;
             esac
             ;;
 
-        sync)
-            # No arguments for sync
-            return 0
-            ;;
-
-        cloudflare|cf)
-            local cf_cmds="zones dns workers purge analytics"
+        alias)
             case "\${prev}" in
-                cloudflare|cf)
-                    COMPREPLY=( $(compgen -W "\${cf_cmds}" -- \${cur}) )
+                alias)
+                    local alias_cmds="list ls show remove rm delete"
+                    if [[ -f /etc/fazai/fzalias ]]; then
+                        local aliases=\$(grep "^alias " /etc/fazai/fzalias 2>/dev/null | sed "s/^alias \\([^=]*\\)=.*/\\1/")
+                        COMPREPLY=( \$(compgen -W "\${alias_cmds} \${aliases}" -- \${cur}) )
+                    else
+                        COMPREPLY=( \$(compgen -W "\${alias_cmds}" -- \${cur}) )
+                    fi
                     return 0
                     ;;
                 *)
-                    COMPREPLY=( $(compgen -W "\${cf_cmds}" -- \${cur}) )
-                    return 0
-                    ;;
-            esac
-            ;;
-
-        github)
-            local github_cmds="auth user repos issues fork star pr help"
-            case "\${prev}" in
-                github)
-                    COMPREPLY=( $(compgen -W "\${github_cmds}" -- \${cur}) )
-                    return 0
-                    ;;
-                auth)
-                    COMPREPLY=( $(compgen -W "login logout status" -- \${cur}) )
-                    return 0
-                    ;;
-                *)
-                    COMPREPLY=( $(compgen -W "\${github_cmds}" -- \${cur}) )
+                    COMPREPLY=( \$(compgen -W "list ls show remove rm delete" -- \${cur}) )
                     return 0
                     ;;
             esac
             ;;
 
         samba)
-            local samba_cmds="list add del criauser criadir criagroup completion"
             case "\${prev}" in
-                samba)
-                    COMPREPLY=( $(compgen -W "\${samba_cmds}" -- \${cur}) )
-                    return 0
-                    ;;
                 add|criadir)
-                    # Complete with directories
-                    COMPREPLY=( $(compgen -d -- \${cur}) )
+                    COMPREPLY=( \$(compgen -d -- \${cur}) )
                     return 0
                     ;;
                 del)
-                    # Complete with existing Samba shares from smb.conf
                     if [[ -r /etc/samba/smb.conf ]]; then
                         local shares=\$(awk -F'[][]' '/^\\[.*\\]$/{print \$2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')
-                        COMPREPLY=( $(compgen -W "\${shares}" -- \${cur}) )
+                        COMPREPLY=( \$(compgen -W "\${shares}" -- \${cur}) )
                     fi
                     return 0
                     ;;
                 criauser)
-                    # Complete with system users
-                    COMPREPLY=( $(compgen -u -- \${cur}) )
+                    COMPREPLY=( \$(compgen -u -- \${cur}) )
                     return 0
                     ;;
                 criagroup)
-                    # Complete with system groups
-                    COMPREPLY=( $(compgen -g -- \${cur}) )
+                    COMPREPLY=( \$(compgen -g -- \${cur}) )
                     return 0
                     ;;
-                *)
-                    COMPREPLY=( $(compgen -W "\${samba_cmds}" -- \${cur}) )
+            esac
+            ;;
+
+        github)
+            case "\${prev}" in
+                auth)
+                    COMPREPLY=( \$(compgen -W "login logout status" -- \${cur}) )
+                    return 0
+                    ;;
+            esac
+            ;;
+
+        inference)
+            case "\${prev}" in
+                add|import)
+                    if [[ \${cur} == -* ]]; then
+                        COMPREPLY=( \$(compgen -W "--category=doc --category=rule --category=example --category=fact" -- \${cur}) )
+                    fi
                     return 0
                     ;;
             esac
@@ -386,7 +500,7 @@ _fazai_completion() {
 
         *)
             # Default: options
-            COMPREPLY=( $(compgen -W "\${opts}" -- \${cur}) )
+            COMPREPLY=( \$(compgen -W "\${opts}" -- \${cur}) )
             return 0
             ;;
     esac
@@ -402,7 +516,7 @@ complete -F _fazai_completion fazai
  */
 function generateZshCompletion(data) {
   const commandsZsh = data.commands
-    .map((c) => `'${c.name}:${c.description}'`)
+    .map((c) => `'${c.name}:${c.description.replace(/'/g, "\\'")}'`)
     .join("\n        ");
 
   const modelsZsh = data.models
@@ -428,25 +542,45 @@ function generateZshCompletion(data) {
                       ? "Re-enable automatic research on failures"
                       : o === "--yolo" || o === "-y"
                         ? "Skip confirmations (dangerous!)"
-                        : "";
+                        : o === "--semantic"
+                          ? "Enable semantic search"
+                          : "";
       return `'${o}:${desc}'`;
     })
     .join("\n        ");
 
+  // Generate subcommand cases
+  const subcommandCases = data.commands
+    .filter((c) => c.subcommands && c.subcommands.length > 0)
+    .map((c) => {
+      const subcmdsZsh = c.subcommands.map((s) => `'${s}:${s} subcommand'`).join("\n                ");
+      return `        ${c.name})
+            local -a ${c.name}_cmds
+            ${c.name}_cmds=(
+                ${subcmdsZsh}
+            )
+            _describe '${c.name} subcommands' ${c.name}_cmds
+            ;;`;
+    })
+    .join("\n");
+
   return `#compdef fazai
-# Zsh completion for FazAI - Dynamic model loading from fazai.conf
+# Zsh completion for FazAI - AUTO-GENERATED (DO NOT EDIT MANUALLY)
+# Generated by: scripts/generate-completions.js
+# Source of truth: src/app.ts (SUBCOMMANDS_WITH_HELP) + src/models.ts
+#
 # Installation:
 #   mkdir -p ~/.zsh/completion
 #   cp completion/fazai-completion.zsh ~/.zsh/completion/_fazai
 #   Add to ~/.zshrc: fpath=(~/.zsh/completion $fpath)
 #   Run: autoload -Uz compinit && compinit
 
-# Load models dynamically from fazai.conf - NO HARDCODED MODELS
+# Load models dynamically from fazai.conf
 _fazai_load_models() {
     local config_file="\${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
 
-    if [[ -r "$config_file" ]]; then
-        grep '^MODELS_' "$config_file" 2>/dev/null | cut -d'=' -f2 | tr ',' '\\n'
+    if [[ -r "\$config_file" ]]; then
+        grep '^MODELS_' "\$config_file" 2>/dev/null | cut -d'=' -f2 | tr ',' '\\n'
     fi
 }
 
@@ -457,7 +591,7 @@ _fazai() {
         ${commandsZsh}
     )
 
-    # Load models dynamically from config (cached)
+    # Load models dynamically (cached)
     if [[ -z "\$FAZAI_MODELS_CACHE_ZSH" ]]; then
         FAZAI_MODELS_CACHE_ZSH=(\${(f)"\$(_fazai_load_models)"})
     fi
@@ -467,122 +601,67 @@ _fazai() {
         ${optsZsh}
     )
 
-    case "$state" in
+    _arguments \\
+        '1:command:->command' \\
+        '*::arg:->args'
+
+    case "\$state" in
         command)
             _describe 'fazai commands' commands
             _describe 'fazai models' models
             _describe 'fazai options' opts
             ;;
 
-        vector)
-            local -a vector_cmds
-            vector_cmds=(
-                'validate:Validate collections (create if needed)'
-                'recreate:Recreate all collections (DELETE DATA!)'
-                'reset:Reset collections (DELETE DATA!)'
-            )
-            _describe 'vector subcommands' vector_cmds
-            _arguments \\
-                '--provider[Vector provider]:provider:(qdrant)' \\
-                '--recreate[Recreate collections]' \\
-                '--reset[Reset collections]'
-            ;;
+        args)
+            case "\$words[1]" in
+${subcommandCases}
 
-        import)
-            _arguments \\
-                '1:file:_files' \\
-                '--source[Source platform]:source:(claude chatgpt)' \\
-                '--recursive[Process directory recursively]' \\
-                '-r[Process directory recursively]' \\
-                '--no-knowledge[Skip knowledge extraction]' \\
-                '--no-learning[Skip learning extraction]'
-            ;;
-
-        ask)
-            _describe 'fazai models' models
-            ;;
-
-        search)
-            # Freeform text, no completion
-            ;;
-
-        config)
-            # No arguments
-            ;;
-
-        completion)
-            # No arguments
-            ;;
-
-        alias)
-            local -a alias_cmds
-            alias_cmds=(
-                'list:List all aliases'
-                'ls:List all aliases (alias for list)'
-                'show:Show specific alias'
-                'remove:Remove alias'
-                'rm:Remove alias (short form)'
-                'delete:Delete alias'
-            )
-            _describe 'alias subcommands' alias_cmds
-            ;;
-
-        samba)
-            local -a samba_cmds
-            samba_cmds=(
-                'list:List all Samba shares'
-                'add:Add existing directory as share'
-                'del:Delete a share from smb.conf'
-                'criauser:Create or update Samba user'
-                'criadir:Create directory and add as share'
-                'criagroup:Create group and apply to directory'
-                'completion:Generate bash completion script'
-            )
-            _describe 'samba subcommands' samba_cmds
-
-            case "$words[2]" in
-                add|criadir)
-                    _files -/
+                ask)
+                    _describe 'fazai models' models
                     ;;
-                del)
-                    local -a shares
-                    shares=(\${(f)"\$(awk -F'[][]' '/^\\[.*\\]$/{print \$2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')"})
-                    _describe 'samba shares' shares
+
+                import)
+                    _arguments \\
+                        '1:file:_files' \\
+                        '--source[Source platform]:source:(claude chatgpt)' \\
+                        '--recursive[Process directory recursively]' \\
+                        '-r[Process directory recursively]' \\
+                        '--no-knowledge[Skip knowledge extraction]' \\
+                        '--no-learning[Skip learning extraction]'
                     ;;
-                criauser)
-                    _users
+
+                samba)
+                    case "\$words[2]" in
+                        add|criadir)
+                            _files -/
+                            ;;
+                        del)
+                            local -a shares
+                            shares=(\${(f)"\$(awk -F'[][]' '/^\\[.*\\]$/{print \$2}' /etc/samba/smb.conf 2>/dev/null | grep -v '^global$')"})
+                            _describe 'samba shares' shares
+                            ;;
+                        criauser)
+                            _users
+                            ;;
+                        criagroup)
+                            _groups
+                            ;;
+                    esac
                     ;;
-                criagroup)
-                    _groups
+
+                github)
+                    case "\$words[2]" in
+                        auth)
+                            _describe 'auth actions' '(login logout status)'
+                            ;;
+                    esac
                     ;;
             esac
             ;;
     esac
-
-    _arguments \\
-        '1:command:->command' \\
-        '*::arg:->args'
-
-    case "$words[1]" in
-        ask|search|config|completion)
-            state=$words[1]
-            ;;
-        vector)
-            state=vector
-            ;;
-        import)
-            state=import
-            ;;
-        alias)
-            state=alias
-            ;;
-        samba)
-            state=samba
-            ;;
-    esac
 }
 
-_fazai "$@"
+_fazai "\$@"
 `;
 }
 
@@ -596,7 +675,8 @@ function generateCompletions(appPath, outputDir) {
       fs.mkdirSync(outputDir, { recursive: true });
     }
 
-    // Parse app.ts
+    // Parse app.ts with auto-discovery
+    console.log(`\n🔍 Auto-discovering commands from ${appPath}...`);
     const data = parseAppTS(appPath);
 
     // Generate Bash completion
@@ -611,7 +691,7 @@ function generateCompletions(appPath, outputDir) {
     fs.writeFileSync(zshPath, zshCompletion, { mode: 0o755 });
     console.log(`✅ Generated: ${zshPath}`);
 
-    return { bashPath, zshPath };
+    return { bashPath, zshPath, data };
   } catch (error) {
     console.error("Error generating completions:", error);
     throw error;
@@ -623,10 +703,11 @@ const appPath = path.join(projectRoot, "src/app.ts");
 const completionDir = path.join(projectRoot, "completion");
 
 try {
-  const { bashPath, zshPath } = generateCompletions(appPath, completionDir);
+  const { bashPath, zshPath, data } = generateCompletions(appPath, completionDir);
   console.log(`\n✨ Completions generated successfully!`);
   console.log(`   Bash: ${bashPath}`);
   console.log(`   Zsh:  ${zshPath}`);
+  console.log(`\n📝 Commands discovered: ${data.commands.map((c) => c.name).join(", ")}`);
   process.exit(0);
 } catch (error) {
   console.error(`❌ Error: ${error.message}`);

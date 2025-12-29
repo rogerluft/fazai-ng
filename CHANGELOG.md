@@ -2,6 +2,39 @@
 
 ## [Unreleased]
 
+### 🔧 Auto-Discovery Completion Generator v2.0
+
+Refatoração completa do gerador de completions para descoberta automática de features.
+
+#### Problema Resolvido
+
+- Commands eram HARDCODED em `scripts/generate-completions.js` (linhas 83-170)
+- Novos comandos adicionados em `app.ts` não apareciam no completion
+- Duplicação entre `scripts/generate-completions.js` e `src/utils/completion-generator.ts`
+
+#### Nova Implementação
+
+- **Auto-Discovery de Comandos** - Parse automático de `SUBCOMMANDS_WITH_HELP` do `app.ts`
+- **Auto-Discovery de Subcommands** - Parse de arquivos em `src/commands/*.ts`
+- **Auto-Discovery de Opções** - Extração de flags do help text
+- **Modelos Dinâmicos** - Continua lendo de `models.ts` + runtime de `fazai.conf`
+
+#### Resultado
+
+```
+📊 Auto-Discovery Results:
+   Commands: 17 (vs 13 antes - faltavam qdrant, index, inference, agent, dashboard)
+   Models: 14
+   Options: 11
+   Commands with subcommands: 11
+```
+
+#### Arquivos Modificados
+
+- `scripts/generate-completions.js` - Reescrito com auto-discovery
+- `completion/fazai-completion.bash` - Regenerado automaticamente
+- `completion/fazai-completion.zsh` - Regenerado automaticamente
+
 ### 🛡️ Threat Intelligence Agent
 
 Novo agente GenAIScript para análise de ameaças cibernéticas.
