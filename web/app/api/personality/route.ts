@@ -39,8 +39,9 @@ export async function GET() {
     return NextResponse.json(personality);
   } catch (error: any) {
     console.error("Failed to fetch personality:", error);
+    // @todo: Consider exposing error details only in dev/debug mode.
     return NextResponse.json(
-      { error: "Failed to fetch personality", details: error.message },
+      { error: "Failed to fetch personality" },
       { status: 500 }
     );
   }
@@ -55,8 +56,10 @@ export async function PUT(request: Request) {
 
     return NextResponse.json({ success: true });
   } catch (error: any) {
+    console.error("Failed to update personality:", error);
+    // @todo: Consider exposing error details only in dev/debug mode.
     return NextResponse.json(
-      { error: "Failed to update personality", details: error.message },
+      { error: "Failed to update personality" },
       { status: 500 }
     );
   }
