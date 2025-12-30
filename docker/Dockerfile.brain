@@ -1,0 +1,63 @@
+# =============================================================================
+# FazAI Brain - Dockerfile
+# =============================================================================
+# Imagem contendo FazAI Core pronto para rodar
+# Conecta a Qdrant e Ollama via docker-compose
+# =============================================================================
+
+FROM node:20-slim
+
+LABEL maintainer="Roger Luft <roger@fazai.io>"
+LABEL description="FazAI Brain - AI-powered Linux administration"
+LABEL version="3.6.x"
+
+# Variáveis de ambiente
+ENV NODE_ENV=production
+ENV FAZAI_CONFIG_PATH=/etc/fazai/fazai.conf
+ENV QDRANT_HOST=qdrant
+ENV QDRANT_PORT=6333
+ENV OLLAMA_HOST=ollama
+ENV OLLAMA_PORT=11434
+ENV AGENT_SOCKET=/run/fazai/agent.sock
+
+# Dependências do sistema
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    jq \
+    socat \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Diretórios
+WORKDIR /opt/fazai
+RUN mkdir -p /etc/fazai /data /run/fazai
+
+# Copia package files primeiro (cache de dependências)
+COPY package*.json ./
+
+# Instala dependências Node
+RUN npm ci --only=production
+
+# Copia código compilado
+COPY dist/ ./dist/
+COPY bin/ ./bin/
+
+# Copia configuração padrão
+COPY docker/brain/fazai.conf.default /etc/fazai/fazai.conf.default
+
+# Copia entrypoint
+COPY docker/brain/entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Porta do dashboard
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Entrypoint
+ENTRYPOINT ["/entrypoint.sh"]
+
+# Comando padrão
+CMD ["node", "dist/app.js", "dashboard", "start"]

@@ -5,15 +5,16 @@ GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[0;33m'
 BLUE='\033[0;34m'
+CYAN='\033[0;36m'
 NC='\033[0m'
 
 LOG_FILE="tests/real-world-output.log"
 FAZAI_BIN="./bin/fazai"
-# -y (yolo mode) skips confirmation prompts for batch/automated testing
 
-# Limpa log anterior
-echo "=== SUÍTE DE TESTES REAIS FAZAI NG (V2.1) ===" > $LOG_FILE
+# Limpa log anterior e prepara cabecalho
+echo "=== SUITE DE TESTES REAIS FAZAI NG (V2.2 - MAESTRO) ===" > $LOG_FILE
 echo "Data: $(date)" >> $LOG_FILE
+echo "Ambiente: $(uname -a)" >> $LOG_FILE
 echo "------------------------------------------------" >> $LOG_FILE
 
 run_test() {
@@ -25,86 +26,67 @@ run_test() {
     
     START=$(date +%s%N)
     
-    # Execução (eval para processar pipes e redirecionamentos)
+    # Execucao (eval para processar pipes e redirecionamentos)
     eval "$cmd" >> $LOG_FILE 2>&1
     EXIT_CODE=$?
     
     END=$(date +%s%N)
-    DURATION=$(( ($END - $START) / 1000000 ))
+    DURATION=$(($(( ($END - $START) / 1000000 )))))
 
     if [ $EXIT_CODE -eq 0 ]; then
-        echo -e "${GREEN}✅ SUCESSO (${DURATION}ms)${NC}"
+        echo -e "${GREEN} OK (${DURATION}ms)${NC}"
         echo "RESULT: SUCCESS" >> $LOG_FILE
     else
-        echo -e "${RED}❌ ERRO (Exit Code: $EXIT_CODE)${NC}"
+        echo -e "${RED} ERRO (Exit Code: $EXIT_CODE)${NC}"
         echo "RESULT: ERROR (Code $EXIT_CODE)" >> $LOG_FILE
     fi
     echo "------------------------------------------------" >> $LOG_FILE
 }
 
-# === GRUPO 1: CONHECIMENTO & RAG (ASK) ===
-echo -e "\n${YELLOW}=== GRUPO 1: CONHECIMENTO & RAG ===${NC}"
-run_test "Ask: Função Bash" "$FAZAI_BIN ask 'como se faz uma funcao em bash?'"
-run_test "Ask: Definição Kernel" "$FAZAI_BIN ask 'o que eh kernel?'"
-# Novos Testes
-run_test "Ask: Diferença TCP/UDP" "$FAZAI_BIN ask 'qual a diferença tecnica entre tcp e udp em uma frase?'"
-run_test "Ask: Inode Concept" "$FAZAI_BIN ask 'explique o conceito de inode para um leigo'"
-run_test "Ask: Sort Files" "$FAZAI_BIN ask 'comando para listar arquivos por tamanho decrescente'"
+# === GRUPO 1: CONHECIMENTO E RAG (ASK) ===
+echo -e "\n${YELLOW}=== GRUPO 1: CONHECIMENTO E RAG ===${NC}"
+run_test "Ask: Funcao Bash" "$FAZAI_BIN ask 'como se faz uma funcao em bash?'"
+run_test "Ask: Definicao Kernel" "$FAZAI_BIN ask 'o que eh kernel?'"
+run_test "Ask: Brute Force Protection" "$FAZAI_BIN ask 'Como proteger um servidor contra ataques de forca bruta?'"
+run_test "Ask: Command lsof" "$FAZAI_BIN ask 'O que eh o comando lsof e como usa-lo para ver portas?'"
+run_test "Ask: RAID Comparison" "$FAZAI_BIN ask 'Explique a diferenca tecnica fundamental entre RAID 1 e RAID 5'"
 
-# === GRUPO 2: EXECUÇÃO & ARQUIVOS (EXEC) ===
-echo -e "\n${YELLOW}=== GRUPO 2: EXECUÇÃO & ARQUIVOS ===${NC}"
+# === GRUPO 2: EXECUCAO E ARQUIVOS (EXEC) ===
+echo -e "\n${YELLOW}=== GRUPO 2: EXECUCAO E ARQUIVOS ===${NC}"
 run_test "Exec: Script Contagem" "$FAZAI_BIN -y 'gere um script em bash que conte ate 10 e salve em /tmp/cont10.sh'"
-# Validação
-if [ -f /tmp/cont10.sh ]; then echo "   🔎 Arquivo criado com sucesso."; else echo "   ❌ Falha na criação do arquivo."; fi
 
-run_test "Exec: Contagem Tela" "$FAZAI_BIN -y 'conte ate 10 exibindo os numeros na tela'"
+# Dependencia Implicita: Gnuplot (Instalar -> Gerar Dados -> Plotar)
+run_test "Dep: CPU Graph (Gnuplot)" "sudo $FAZAI_BIN -y 'instale a ferramenta gnuplot, colete o uso de cpu atual via mpstat ou top e use o gnuplot para gerar um grafico simples em /tmp/cpu_usage.png'"
+if [ -f /tmp/cpu_usage.png ]; then echo -e "${CYAN}   [VERIFICACAO] Grafico gerado com sucesso.${NC}" | tee -a $LOG_FILE; else echo -e "${RED}   [VERIFICACAO] Falha ao gerar grafico.${NC}" | tee -a $LOG_FILE; fi
 
-# Dependência Implícita 1: Instalar -> Rodar -> Salvar
-run_test "Dep: Tree Package" "sudo $FAZAI_BIN -y 'instale o pacote tree se nao existir e gere a arvore do diretorio /etc/default salvando em /tmp/etc_tree.txt'"
-if [ -f /tmp/etc_tree.txt ]; then echo "   🔎 Árvore gerada com sucesso."; else echo "   ❌ Falha na dependência tree."; fi
+# Logica Condicional: Espaco em Disco
+run_test "Exec: Disk Alert Logic" "$FAZAI_BIN -y 'verifique o espaco em disco e se algum disco estiver acima de 80% gere um log em /tmp/disk_alert.txt com a lista de culpados'"
 
-# Dependência Implícita 2: Criar Dir -> Compactar -> Listar
-run_test "Dep: Backup Tar" "$FAZAI_BIN -y 'crie um diretorio /tmp/backup_test, compacte a pasta /var/log/apt (use sudo se precisar) para dentro dele como apt_logs.tar.gz e liste o conteudo do tar'"
+# Analise de Logs do Sistema
+run_test "Exec: Login Report" "sudo $FAZAI_BIN -y 'analise as sessoes de login recentes e gere um relatorio em /tmp/login_report.txt filtrando por IPs externos'"
 
-# Dependência Implícita 3: Script Python -> Executar -> Validar
-run_test "Dep: Fibonacci Python" "$FAZAI_BIN -y 'crie um script python /tmp/fibo.py que imprima a sequencia fibonacci ate 50, execute ele para testar'"
+# === GRUPO 3: ADMINISTRACAO (SUDO) ===
+echo -e "\n${YELLOW}=== GRUPO 3: ADMINISTRACAO ===${NC}"
+run_test "Admin: Samba Management" "sudo $FAZAI_BIN -y 'mostre os compartilhamentos do samba e verifique se o servico smbd esta ativo'"
 
-# === GRUPO 3: ADMINISTRAÇÃO (SUDO REQUIRED) ===
-echo -e "\n${YELLOW}=== GRUPO 3: ADMINISTRAÇÃO (SUDO) ===${NC}"
-run_test "Admin: Samba Shares" "sudo $FAZAI_BIN -y 'mostre os compartilhamentos do samba'"
-run_test "Admin: Listar Processos" "$FAZAI_BIN -y 'liste os processos em execucao ordenados por memoria'"
-run_test "Admin: Criar Usuário+Email" "sudo $FAZAI_BIN -y 'crie o usuario faz001 com a senha andarilho e mande um email ficticio para log'"
-
-# === GRUPO 4: MONITORAMENTO & LONGA DURAÇÃO ===
+# === GRUPO 4: MONITORAMENTO ===
 echo -e "\n${YELLOW}=== GRUPO 4: MONITORAMENTO ===${NC}"
-echo -e "\n[TESTE] Monitor Logs SSH (10s timeout)" | tee -a $LOG_FILE
-# Timeout espera sucesso (124)
-timeout 10s sudo $FAZAI_BIN -y "monitore os logs deste servidor e envie um alerta 'SSH EVENT' para todos usuarios logados a cada evento ssh" >> $LOG_FILE 2>&1
-if [ $? -eq 124 ]; then echo -e "${GREEN}✅ SUCESSO (Rodou e manteve vivo)${NC}"; else echo -e "${RED}❌ ERRO (Crashou)${NC}"; fi
+timeout 15s sudo $FAZAI_BIN -y "monitore os logs deste servidor e envie um alerta 'SSH ACCESS' para todos os terminais via wall cada vez que houver um login ssh" >> $LOG_FILE 2>&1
+if [ $? -eq 124 ]; then echo -e "${GREEN} OK (Monitoramento iniciado)${NC}"; else echo -e "${RED} ERRO (Monitoramento falhou em 15s)${NC}"; fi
 
-# === GRUPO 5: CRAWLER & SEARCH ===
-echo -e "\n${YELLOW}=== GRUPO 5: CRAWLER & SEARCH ===${NC}"
-run_test "Search: Latest Kernel" "$FAZAI_BIN search 'latest linux kernel stable version'"
-run_test "Search: Best Practices SSH" "$FAZAI_BIN search 'best practices ssh hardening ubuntu 24.04'"
+# === GRUPO 5: CRAWLER E SEARCH ===
+echo -e "\n${YELLOW}=== GRUPO 5: CRAWLER E SEARCH ===${NC}"
+run_test "Search: CVE Ubuntu" "$FAZAI_BIN search 'current critical security vulnerabilities for ubuntu 24.04'"
+run_test "Search: Docker Release" "$FAZAI_BIN search 'latest stable docker engine release notes and features'"
 
 # === GRUPO 6: INTERATIVO (--CLI) ===
 echo -e "\n${YELLOW}=== GRUPO 6: MODO INTERATIVO ===${NC}"
-# Injeta comandos no stdin do modo interativo
-INPUT_CLI="/help\n/ask qual a capital da frança?\n/search nodejs lts version\n/exec ls -la /tmp | head -n 5\n/exit\n"
+INPUT_CLI="/help\n/ask como funciona o bit swapping?\n/search linux kernel 6.12 features\n/exec free -h\n/exit\n"
 echo -e "$INPUT_CLI" | $FAZAI_BIN --cli >> $LOG_FILE 2>&1
-if [ $? -eq 0 ]; then echo -e "${GREEN}✅ SUCESSO (CLI Interativo)${NC}"; else echo -e "${RED}❌ ERRO (CLI Crashou)${NC}"; fi
+if [ $? -eq 0 ]; then echo -e "${GREEN} OK (Interacao CLI Completa)${NC}"; else echo -e "${RED} ERRO (CLI crashou durante interacao)${NC}"; fi
 
-echo -e "\n${GREEN}=== EXECUÇÃO CONCLUÍDA ===${NC}"
+echo -e "\n${GREEN}=== EXECUCAO CONCLUIDA ===${NC}"
+echo -e "${YELLOW}Iniciando Auditoria Agentica Automatica...${NC}"
 
-# Resumo
-TOTAL=$(grep -c "RESULT:" $LOG_FILE 2>/dev/null || echo 0)
-SUCCESS=$(grep -c "RESULT: SUCCESS" $LOG_FILE 2>/dev/null || echo 0)
-FAILED=$((TOTAL - SUCCESS))
-echo -e "\n${BLUE}📊 RESUMO: ${SUCCESS}/${TOTAL} testes passaram (${FAILED} falhas)${NC}"
-echo -e "Log completo: ${LOG_FILE}"
-
-# Opcional: Auditoria com GenAIScript (se disponível)
-if command -v npx &> /dev/null && [ -f "genaisrc/test-auditor.genai.mjs" ]; then
-    echo "Iniciando Auditoria Automática (GenAIScript)..."
-    npx genaiscript run test-auditor --vars "logfile=$LOG_FILE" 2>/dev/null || true
-fi
+# Automacao da Auditoria
+genaiscript run test-auditor --vars "logfile=$LOG_FILE"

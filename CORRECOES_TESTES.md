@@ -180,3 +180,25 @@ npm test -- tests/integration/vector-store.test.ts
 # Watch mode
 npm test -- --watch
 ```
+
+## Scripts de Teste de Infraestrutura
+
+### 1. Teste Qdrant (`test-qdrant.sh`)
+Verifica conectividade e lista as collections existentes.
+
+```bash
+#!/bin/bash
+TARGET=${1:-"localhost:6333"}
+echo "🔍 Conectando em Qdrant: $TARGET..."
+curl -s "http://$TARGET/collections" | jq -r '.result.collections[].name'
+```
+
+### 2. Teste Ollama (`test-ollama.sh`)
+Verifica conectividade e lista os pesos (modelos) instalados.
+
+```bash
+#!/bin/bash
+TARGET=${1:-"localhost:11434"}
+echo "🔍 Conectando em Ollama (Llama): $TARGET..."
+curl -s "http://$TARGET/api/tags" | jq -r '.models[].name'
+```
