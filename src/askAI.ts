@@ -387,8 +387,25 @@ export async function* askAI(
         yield cachedResponse;
         return;
       }
-    } catch (error: any) {
-      logger.debug(`Cache lookup failed: ${error.message}`);
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`Cache lookup failed: ${err.message}`);
+      // Continue with provider call on cache error
+    }
+  }
+
+  // RAG enrichment: Get context from Qdrant
+  let ragContext = "";
+  if (semanticSearchEnabled) {
+    try {
+      ragContext = await enrichWithRAG(question);
+      if (ragContext) {
+        logger.debug(`RAG context enriched (${ragContext.length} chars)`);
+      }
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`RAG enrichment failed: ${err.message}`);
+      // Continue without RAG context
     }
   }
 
