@@ -24,7 +24,7 @@ describe('ResilienceOrchestrator', () => {
 
   it('deve ter sucesso no nível 1 (IA primária)', async () => {
     // askAI é um async generator, precisa retornar um generator, não uma Promise
-    const mockAskAI = vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+    const mockAskAI = vi.mocked(askAIModule.askAI).mockImplementationOnce(async function* () {
       yield 'Resposta da IA Primária';
     });
 
@@ -38,17 +38,14 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve fazer fallback para o nível 2 (IA secundária) se a primária falhar', async () => {
-    // Primeiro: falha 3x no primário (MAX_RETRIES=3), depois sucesso no fallback
-    let callCount = 0;
-    const mockAskAI = vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
-      callCount++;
-      if (callCount <= 3) {
-        // Primeiras 3 chamadas falham (retries do modelo primário)
-        throw new Error('Falha na IA Primária');
-      }
-      // A partir da 4ª chamada (modelo fallback), sucesso
-      yield 'Resposta da IA Secundária';
-    });
+    // Simula 3 falhas para o primário e sucesso para o fallback
+    const mockAskAI = vi.mocked(askAIModule.askAI)
+      .mockImplementationOnce(() => { throw new Error('Falha na IA Primária 1'); })
+      .mockImplementationOnce(() => { throw new Error('Falha na IA Primária 2'); })
+      .mockImplementationOnce(() => { throw new Error('Falha na IA Primária 3'); })
+      .mockImplementationOnce(async function* () {
+        yield 'Resposta da IA Secundária';
+      });
 
     const orchestrator = new ResilienceOrchestrator();
     const result = await orchestrator.executeTaskWithResilience('teste');
