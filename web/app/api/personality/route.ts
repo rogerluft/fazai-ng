@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { qdrant } from "@/lib/qdrant";
 import type { Personality } from "@/types/fazai";
+import type { Personality as JarvisPersonality } from "@/types/jarvis";
 
 export async function GET() {
   try {
