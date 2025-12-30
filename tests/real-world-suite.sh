@@ -8,7 +8,7 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 LOG_FILE="tests/real-world-output.log"
-FAZAI_BIN="./bin/fazai"
+FAZAI_BIN="node ./dist/app.cjs"
 # -y (yolo mode) skips confirmation prompts for batch/automated testing
 
 # Limpa log anterior

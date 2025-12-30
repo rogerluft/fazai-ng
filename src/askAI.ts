@@ -409,10 +409,48 @@ export async function* askAI(
     }
   }
 
-  // Build system message with personality (fileContent) and RAG context
-  const systemMessage = isGeneralQuestion
-    ? SYSTEM_MESSAGES.general(fileContent, ragContext)
-    : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+  // NEW: Comprehensive context enrichment
+  let systemMessage: string;
+
+  if (isGeneralQuestion) {
+    try {
+        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
+        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
+
+        // Parallelize context fetching
+        const [personality, memories, ragResult] = await Promise.all([
+            loadPersonalityFromQdrant(),
+            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
+            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
+        ]);
+
+        const personalityContext = buildPersonalitySystemPrompt(personality);
+        const memoriesContext = summarizeMemories(memories);
+
+        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
+
+        // Combine memory and RAG context
+        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
+
+        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
+
+    } catch (error: unknown) {
+        const err = error instanceof Error ? error : new Error(String(error));
+        // Se for um erro de conexão, loga como debug. Senão, como aviso.
+        if (err.message.includes('fetch failed')) {
+            logger.debug(`Could not connect to Qdrant for context enrichment: ${err.message}`);
+        } else {
+            logger.warn(`Context enrichment failed unexpectedly: ${err.message}. Continuing without personality/memory context.`);
+        }
+        // Fallback seguro em caso de qualquer erro: usa um prompt geral sem personalidade
+        const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+        systemMessage = SYSTEM_MESSAGES.general("", ragContext);
+    }
+  } else {
+      // For code analysis, keep it simple but include RAG
+      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+  }
 
   let currentProvider: ProviderName = provider as ProviderName;
   let currentModel = model;

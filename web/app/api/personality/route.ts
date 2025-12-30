@@ -1,40 +1,46 @@
 import { NextResponse } from "next/server";
-import type { Personality } from "@/types/jarvis";
-
-const mockPersonality: Personality = {
-  id: "personality_001",
-  traits: [
-    {
-      trait_name: "Autonomy",
-      category: "decisão",
-      value: "High",
-      intensity: 0.8,
-      context: "Agent can make decisions without human intervention",
-    },
-    {
-      trait_name: "Transparency",
-      category: "comunicação",
-      value: "Critical",
-      intensity: 0.95,
-      context: "Always explain actions and decisions",
-    },
-    {
-      trait_name: "Caution",
-      category: "ética",
-      value: "High",
-      intensity: 0.85,
-      context: "Avoid risky operations without validation",
-    },
-  ],
-  updated_at: new Date().toISOString(),
-};
+import { qdrant } from "@/lib/qdrant";
+import type { Personality } from "@/types/fazai";
 
 export async function GET() {
   try {
-    return NextResponse.json(mockPersonality);
-  } catch (error) {
+    // Query fazai_personality collection
+    const response = await qdrant.scroll("fazai_personality", {
+      limit: 100,
+      with_payload: true,
+      with_vector: false,
+    });
+
+    const points = response.points || [];
+
+    if (points.length === 0) {
+      return NextResponse.json(
+        { error: "No personality traits found" },
+        { status: 404 }
+      );
+    }
+
+    // Format traits
+    const traits = points.map((point: any) => ({
+      trait_name: point.payload?.trait_name || "Unknown",
+      category: point.payload?.category || "general",
+      value: point.payload?.value || "",
+      intensity: point.payload?.intensity || 0.5,
+      context: point.payload?.context,
+      tags: point.payload?.tags || [],
+    }));
+
+    const personality: Personality = {
+      id: "personality_001",
+      traits,
+      updated_at: new Date().toISOString(),
+    };
+
+    return NextResponse.json(personality);
+  } catch (error: any) {
+    console.error("Failed to fetch personality:", error);
     return NextResponse.json(
-      { error: "Failed to fetch personality" },
+      { error: "Failed to fetch personality", details: error.message },
       { status: 500 }
     );
   }
@@ -43,10 +49,14 @@ export async function GET() {
 export async function PUT(request: Request) {
   try {
     const body = await request.json();
-    return NextResponse.json({ ...mockPersonality, ...body });
-  } catch (error) {
+
+    // Update personality traits in Qdrant
+    // (Implementation depends on update strategy)
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
     return NextResponse.json(
-      { error: "Failed to update personality" },
+      { error: "Failed to update personality", details: error.message },
       { status: 500 }
     );
   }

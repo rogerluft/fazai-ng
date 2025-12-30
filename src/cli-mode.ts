@@ -240,16 +240,15 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   }
   logger.info(chalk.green(`✅ API key configurada (${defaultModel.provider})`));
 
-  // Load personality from Qdrant (or fallback)
+  // Load personality from Qdrant
   let personality: PersonalityTraits | null = null;
   try {
-    logger.debug("Loading personality traits...");
+    logger.info(chalk.cyan("🧠 Loading personality from Qdrant..."));
     personality = await loadPersonalityFromQdrant();
-    logger.info(chalk.cyan(`🧠 Personalidade carregada (${personality.loadedFrom}): ` +
-      `${personality.expertise.length} expertise, ${personality.behavior.length} behavior traits`));
+    logger.info(chalk.green(`✅ Personality loaded: ${personality.traits.length} traits, ${personality.expertise.length} expertise areas`));
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));
-    logger.debug(`Personality loading failed (continuing without): ${err.message}`);
+    logger.warn(`⚠️  Could not load personality, proceeding with default behavior. Error: ${err.message}`);
   }
 
   // Generate session ID for memory grouping
