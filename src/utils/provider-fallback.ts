@@ -40,30 +40,35 @@ export interface FallbackError extends Error {
   code?: string | number;
   status?: number;
   message: string;
+  cause?: FallbackError;
 }
 
 /**
  * Check if error should trigger provider fallback
  */
 export function shouldFallbackToNextProvider(error: FallbackError): boolean {
-  // Network/connection errors
-  if (
-    error.code === "ECONNREFUSED" ||
-    error.code === "ETIMEDOUT" ||
-    error.code === "ENOTFOUND" ||
-    error.code === "ECONNRESET"
-  ) {
-    return true;
+  // Recursively check the cause chain for network errors
+  let currentError: FallbackError | undefined = error;
+  while (currentError) {
+    if (
+      currentError.code === "ECONNREFUSED" ||
+      currentError.code === "ETIMEDOUT" ||
+      currentError.code === "ENOTFOUND" ||
+      currentError.code === "ECONNRESET"
+    ) {
+      return true;
+    }
+    currentError = currentError.cause;
   }
 
-  // Check error message patterns
+  // Check error message patterns from the top-level error
   const message = error.message?.toLowerCase() || "";
 
   // Ollama-specific: server offline
   if (
     message.includes("econnrefused") ||
     message.includes("connection refused") ||
-    message.includes("ollama") && message.includes("not") && message.includes("running")
+    (message.includes("ollama") && message.includes("not") && message.includes("running"))
   ) {
     return true;
   }

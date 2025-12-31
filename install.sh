@@ -245,9 +245,11 @@ setup_log_directory() {
         success "Diretório $LOG_DIR criado"
     fi
 
-    # Permissões 777 recursivo
-    sudo chmod -R 777 "$LOG_DIR"
-    success "Permissões de $LOG_DIR configuradas (777 -R)"
+    # Mudar o proprietário para o usuário atual e definir permissões seguras
+    CURRENT_USER=$(whoami)
+    sudo chown -R "$CURRENT_USER":"$(id -gn "$CURRENT_USER")" "$LOG_DIR"
+    sudo chmod -R 755 "$LOG_DIR"
+    success "Permissões de $LOG_DIR configuradas para o usuário $CURRENT_USER (755)"
 }
 
 # Main
@@ -255,10 +257,10 @@ main() {
   print_banner
   check_dependencies
   setup_installation
+  setup_log_directory
   install_deps_build
   create_bin_link
   setup_config_file
-  setup_log_directory
 
   echo ""
   success "Instalação concluída!"

@@ -394,6 +394,7 @@ export async function* askAI(
 
   // NEW: Comprehensive context enrichment
   let systemMessage: string;
+  let ragContext: string = "";
 
   if (isGeneralQuestion) {
     try {
