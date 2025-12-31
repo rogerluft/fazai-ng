@@ -53,7 +53,7 @@ export class LlamaProvider extends BaseProvider {
     this.temperature = parseFloat(getConfigValue("LLAMA_TEMPERATURE") || "0.7");
     this.maxTokens = parseInt(getConfigValue("LLAMA_MAX_TOKENS") || "2048", 10);
 
-    logger.debug(`LlamaProvider initialized: ${this.baseUrl}`);
+    logger.debug(`LlamaProvider initialized: ${this.baseUrl}, timeout=${this.timeout}ms`);
   }
 
   /**

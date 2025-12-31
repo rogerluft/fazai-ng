@@ -16,9 +16,24 @@ LLAMA_SERVER_URL=http://localhost:11430
 LLAMA_TIMEOUT=180000  # 3 minutos (Phi-3 local pode ser lento)
 ```
 
+### 🔐 Fix: Permissões de Log (/var/log/fazai)
+
+**Problema:** Erro `EACCES: permission denied` ao escrever logs porque usuário não estava no grupo `fazai`.
+
+**Solução:**
+- `install.sh`: Nova função `setup_log_directory()` que:
+  - Cria `/var/log/fazai` se não existir
+  - Aplica `chmod -R 777` no diretório
+
+**Correção manual (se necessário):**
+```bash
+sudo chmod -R 777 /var/log/fazai/
+```
+
 **Arquivos modificados:**
 - `tests/real-world-suite.sh` - timeout hardcoded aumentado para testes
 - `/etc/fazai/fazai.conf` - LLAMA_TIMEOUT adicionado
+- `install.sh` - função setup_log_directory()
 
 ---
 

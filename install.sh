@@ -235,6 +235,21 @@ setup_config_file() {
     fi
 }
 
+setup_log_directory() {
+    info "Configurando diretório de logs..."
+    local LOG_DIR="/var/log/fazai"
+
+    # Criar diretório se não existir
+    if [ ! -d "$LOG_DIR" ]; then
+        sudo mkdir -p "$LOG_DIR"
+        success "Diretório $LOG_DIR criado"
+    fi
+
+    # Permissões 777 recursivo
+    sudo chmod -R 777 "$LOG_DIR"
+    success "Permissões de $LOG_DIR configuradas (777 -R)"
+}
+
 # Main
 main() {
   print_banner
@@ -243,6 +258,7 @@ main() {
   install_deps_build
   create_bin_link
   setup_config_file
+  setup_log_directory
 
   echo ""
   success "Instalação concluída!"
