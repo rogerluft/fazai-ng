@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { input } from "@inquirer/prompts";
 import chalk from "chalk";
 import { models } from "./models";
 import { checkAPIKey, getAndSetAPIKey, listConfiguredKeys } from "./apiKeyUtils-fazai";
@@ -429,10 +428,14 @@ async function main() {
   }
 
   // Get task (either from direct command or prompt)
-  const task = directCommand || await input({
-    message: "O que você precisa fazer? ",
-    validate: (input: string) => input.trim() !== "" || "Tarefa não pode estar vazia",
-  });
+  let task = directCommand;
+  if (!task) {
+    const { input } = await import("@inquirer/prompts");
+    task = await input({
+      message: "O que você precisa fazer? ",
+      validate: (input: string) => input.trim() !== "" || "Tarefa não pode estar vazia",
+    });
+  }
 
   // Normalize task to avoid comma ambiguity (NLP fix)
   const normalizedTask = normalizeTask(task);
