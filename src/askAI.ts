@@ -512,26 +512,13 @@ export async function* askAI(
     logger.info(`✨ Context enriched: personality=${!!enrichedContext.personalityContext}, memory=${!!enrichedContext.memoryContext}, rag=${!!enrichedContext.ragContext}`);
   } else {
     // For code analysis, keep it simple but include RAG with safe execution
-    const ragContext = await safeExecute(
-      'RAG enrichment for code analysis',
-      async () => semanticSearchEnabled ? await enrichWithRAG(question) : "",
-      ''
-    );
-    systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
-  }
-
-  // Helper function for safe execution (reused from safeEnrichContext pattern)
-  async function safeExecute<T>(
-    name: string,
-    fn: () => Promise<T>,
-    defaultValue: T
-  ): Promise<T> {
     try {
-      return await fn();
+      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`${name} failed: ${err.message}`);
-      return defaultValue;
+      logger.debug(`RAG enrichment for code analysis failed: ${err.message}`);
+      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", "");
     }
   }
 

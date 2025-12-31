@@ -112,8 +112,11 @@ export async function PUT(request: Request) {
         const semanticText = `${trait.trait_name}: ${trait.value}. ${trait.context || ''}`.trim();
         const vector = await generateEmbedding(semanticText);
         
+        // Use crypto for unique IDs to avoid collisions
+        const uniqueId = `${Date.now()}_${Math.random().toString(36).substring(2, 15)}_${index}`;
+        
         return {
-          id: `${Date.now()}_${index}`, // Use timestamp-based ID for uniqueness
+          id: uniqueId,
           vector,
           payload: {
             ...trait,
