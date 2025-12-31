@@ -61,6 +61,102 @@ const SYSTEM_MESSAGES = {
 };
 
 /**
+ * Resilient Context Enrichment - Always continues, never crashes
+ * Principle: "Degrade gracefully, never fail completely"
+ * Execution: LINEAR (sequential) - designed for CPU-bound environments
+ * 
+ * Note: Parallel execution (Promise.all) will be considered for future iterations.
+ * Currently using linear execution for simplicity and CPU-bound workloads.
+ */
+async function safeEnrichContext(question: string, options: {
+  enablePersonality?: boolean;
+  enableMemory?: boolean;
+  enableRAG?: boolean;
+}): Promise<{
+  personalityContext: string;
+  memoryContext: string;
+  ragContext: string;
+  errors: string[];
+}> {
+  const result = {
+    personalityContext: '',
+    memoryContext: '',
+    ragContext: '',
+    errors: [] as string[],
+  };
+
+  // Helper: wraps any async operation to never throw
+  const safeExecute = async <T>(
+    name: string,
+    fn: () => Promise<T>,
+    defaultValue: T
+  ): Promise<T> => {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      const errorMsg = `${name} failed: ${err.message}`;
+      
+      // Log appropriately based on error type
+      if (err.message.includes('fetch failed') || err.message.includes('ECONNREFUSED')) {
+        logger.debug(errorMsg);
+      } else {
+        logger.warn(errorMsg);
+      }
+      
+      result.errors.push(errorMsg);
+      return defaultValue;
+    }
+  };
+
+  // LINEAR EXECUTION (sequential)
+  // Each step is independent and failures don't cascade
+  
+  // Step 1: Load personality
+  if (options.enablePersonality) {
+    const personality = await safeExecute(
+      'Personality loading',
+      async () => {
+        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
+        const traits = await loadPersonalityFromQdrant();
+        return buildPersonalitySystemPrompt(traits);
+      },
+      ''
+    );
+    result.personalityContext = personality;
+  }
+
+  // Step 2: Load memories
+  if (options.enableMemory) {
+    const memoryContext = await safeExecute(
+      'Memory loading',
+      async () => {
+        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
+        const memories = await loadRelevantMemories(question, { limit: 5, minScore: 0.5 });
+        return summarizeMemories(memories);
+      },
+      ''
+    );
+    result.memoryContext = memoryContext;
+  }
+
+  // Step 3: RAG enrichment
+  if (options.enableRAG) {
+    const ragContext = await safeExecute(
+      'RAG enrichment',
+      async () => {
+        const enriched = await enrichWithRAG(question);
+        return enriched || '';
+      },
+      ''
+    );
+    result.ragContext = ragContext;
+  }
+
+  return result;
+}
+
+/**
  * ECOA: Executa ferramentas solicitadas pela IA via tags [[TOOL: query]]
  *
  * WEB: Uses Perplexity for fast, contextual web search
@@ -394,62 +490,49 @@ export async function* askAI(
     }
   }
 
-  // RAG enrichment: Get context from Qdrant
-  let ragContext = "";
-  if (semanticSearchEnabled) {
-    try {
-      ragContext = await enrichWithRAG(question);
-      if (ragContext) {
-        logger.debug(`RAG context enriched (${ragContext.length} chars)`);
-      }
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`RAG enrichment failed: ${err.message}`);
-      // Continue without RAG context
-    }
-  }
-
-  // NEW: Comprehensive context enrichment
+  // NEW: Resilient context enrichment - Never crash, always continue
   let systemMessage: string;
 
   if (isGeneralQuestion) {
-    try {
-        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
-        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
+    const enrichedContext = await safeEnrichContext(question, {
+      enablePersonality: true,
+      enableMemory: true,
+      enableRAG: semanticSearchEnabled,
+    });
 
-        // Parallelize context fetching
-        const [personality, memories, ragResult] = await Promise.all([
-            loadPersonalityFromQdrant(),
-            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
-            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
-        ]);
-
-        const personalityContext = buildPersonalitySystemPrompt(personality);
-        const memoriesContext = summarizeMemories(memories);
-
-        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
-
-        // Combine memory and RAG context
-        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
-
-        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
-
-    } catch (error: unknown) {
-        const err = error instanceof Error ? error : new Error(String(error));
-        // Se for um erro de conexão, loga como debug. Senão, como aviso.
-        if (err.message.includes('fetch failed')) {
-            logger.debug(`Could not connect to Qdrant for context enrichment: ${err.message}`);
-        } else {
-            logger.warn(`Context enrichment failed unexpectedly: ${err.message}. Continuing without personality/memory context.`);
-        }
-        // Fallback seguro em caso de qualquer erro: usa um prompt geral sem personalidade
-        const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
-        systemMessage = SYSTEM_MESSAGES.general("", ragContext);
+    // Log any errors that occurred during enrichment
+    if (enrichedContext.errors.length > 0) {
+      logger.debug(`Context enrichment encountered ${enrichedContext.errors.length} errors: ${enrichedContext.errors.join('; ')}`);
     }
+
+    // Build system message with whatever context we successfully obtained
+    const combinedContext = [enrichedContext.memoryContext, enrichedContext.ragContext].filter(Boolean).join("\n\n");
+    systemMessage = SYSTEM_MESSAGES.general(enrichedContext.personalityContext, combinedContext);
+
+    logger.info(`✨ Context enriched: personality=${!!enrichedContext.personalityContext}, memory=${!!enrichedContext.memoryContext}, rag=${!!enrichedContext.ragContext}`);
   } else {
-      // For code analysis, keep it simple but include RAG
-      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
-      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+    // For code analysis, keep it simple but include RAG with safe execution
+    const ragContext = await safeExecute(
+      'RAG enrichment for code analysis',
+      async () => semanticSearchEnabled ? await enrichWithRAG(question) : "",
+      ''
+    );
+    systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+  }
+
+  // Helper function for safe execution (reused from safeEnrichContext pattern)
+  async function safeExecute<T>(
+    name: string,
+    fn: () => Promise<T>,
+    defaultValue: T
+  ): Promise<T> {
+    try {
+      return await fn();
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`${name} failed: ${err.message}`);
+      return defaultValue;
+    }
   }
 
   let currentProvider: ProviderName = provider as ProviderName;
@@ -542,8 +625,8 @@ export async function* askAI(
       const followUpPrompt = `${prompt}\n\n--- RESULTADO DA FERRAMENTA ---\n${toolResult}\n--- FIM ---\n\nAgora responda a pergunta original usando este resultado:`;
 
       const followUpSystemMessage = isGeneralQuestion
-        ? SYSTEM_MESSAGES.general(fileContent, ragContext)
-        : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+        ? SYSTEM_MESSAGES.general(fileContent, "")
+        : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", "");
 
       // Make follow-up call (non-streaming for simplicity)
       yield "\n\n"; // Clear line after tag

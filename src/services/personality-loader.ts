@@ -8,6 +8,7 @@
 import { getQdrantClient } from "../database/qdrant-pool";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
+import { getConfigValue } from "../config";
 
 export interface PersonalityTrait {
   trait_name: string;
@@ -30,6 +31,53 @@ let cachedPersonality: PersonalityTraits | null = null;
 let cacheTimestamp: Date | null = null;
 const CACHE_TTL = 3600000; // 1 hour
 
+// Cache for allowed expertise tags (to avoid re-parsing config)
+let allowedExpertiseTagsCache: Set<string> | null | undefined = undefined;
+
+/**
+ * Get allowed expertise tags from config or environment
+ * If not configured, returns null (meaning: accept ALL tags)
+ * 
+ * Priority:
+ * 1. Config file: FAZAI_EXPERTISE_TAGS (comma-separated)
+ * 2. Environment: FAZAI_EXPERTISE_TAGS (comma-separated)
+ * 3. Default: null (accept all tags)
+ */
+function getAllowedExpertiseTags(): Set<string> | null {
+  // Return cached result if available
+  if (allowedExpertiseTagsCache !== undefined) {
+    return allowedExpertiseTagsCache;
+  }
+
+  // Try config first, then environment variable
+  const configTags = getConfigValue('FAZAI_EXPERTISE_TAGS');
+  const envTags = process.env.FAZAI_EXPERTISE_TAGS;
+  
+  const tagsString = configTags || envTags;
+  
+  if (!tagsString || tagsString.trim().length === 0) {
+    // No filter configured = accept ALL tags
+    logger.debug("No expertise tag filter configured, accepting all tags");
+    allowedExpertiseTagsCache = null;
+    return null;
+  }
+  
+  // Parse comma-separated tags
+  const tags = tagsString
+    .split(',')
+    .map(t => t.trim().toLowerCase())
+    .filter(t => t.length > 0);
+  
+  if (tags.length === 0) {
+    allowedExpertiseTagsCache = null;
+    return null;
+  }
+  
+  allowedExpertiseTagsCache = new Set(tags);
+  logger.debug(`Expertise tag filter: ${Array.from(allowedExpertiseTagsCache).join(', ')}`);
+  return allowedExpertiseTagsCache;
+}
+
 /**
  * Load personality traits from Qdrant
  *
@@ -37,6 +85,13 @@ const CACHE_TTL = 3600000; // 1 hour
  * Call clearPersonalityCache() to force refresh.
  */
 export async function loadPersonalityFromQdrant(): Promise<PersonalityTraits> {
+  // Check for cache invalidation flag (set by web API)
+  if (process.env.FAZAI_PERSONALITY_CACHE_INVALIDATE) {
+    logger.debug("🔄 Cache invalidation flag detected, clearing cache");
+    clearPersonalityCache();
+    delete process.env.FAZAI_PERSONALITY_CACHE_INVALIDATE;
+  }
+
   // Check cache
   if (cachedPersonality && cacheTimestamp) {
     const age = Date.now() - cacheTimestamp.getTime();
@@ -104,18 +159,24 @@ export async function loadPersonalityFromQdrant(): Promise<PersonalityTraits> {
 
 /**
  * Extract expertise areas from traits
+ * Uses configurable tag filtering via FAZAI_EXPERTISE_TAGS
  */
 function extractExpertise(traits: PersonalityTrait[]): string[] {
   const expertise = new Set<string>();
+  const allowedTags = getAllowedExpertiseTags(); // null = accept all
 
   for (const trait of traits) {
     if (trait.category === "expertise" || trait.category === "domain") {
       expertise.add(trait.value.toLowerCase());
     }
+    
     if (trait.tags) {
       for (const tag of trait.tags) {
-        if (["linux", "networking", "docker", "security", "monitoring"].includes(tag.toLowerCase())) {
-          expertise.add(tag.toLowerCase());
+        const lowerTag = tag.toLowerCase(); // Cache toLowerCase result
+        // If allowedTags is null, accept ALL tags
+        // If allowedTags is defined, only accept matching tags
+        if (!allowedTags || allowedTags.has(lowerTag)) {
+          expertise.add(lowerTag);
         }
       }
     }
@@ -181,11 +242,13 @@ CRITICAL: Embody this persona completely. Your responses must originate from the
 
 /**
  * Clear personality cache (force reload)
+ * Also clears expertise tags cache to pick up config changes
  */
 export function clearPersonalityCache(): void {
   cachedPersonality = null;
   cacheTimestamp = null;
-  logger.debug("✓ Personality cache cleared");
+  allowedExpertiseTagsCache = undefined; // Reset to undefined to force re-read
+  logger.debug("✓ Personality cache cleared (including expertise tags filter)");
 }
 
 /**
