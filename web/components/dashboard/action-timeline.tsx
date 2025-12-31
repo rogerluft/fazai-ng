@@ -4,12 +4,12 @@ import React, { useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import * as api from "@/lib/api";
 import { Clock, CheckCircle, AlertCircle, Loader } from "lucide-react";
 
 export function ActionTimeline() {
-  const { recentActions, setRecentActions, setLoading } = useJarvisStore();
+  const { recentActions, setRecentActions, setLoading } = useFazaiStore();
 
   const { data, isLoading } = useQuery({
     queryKey: ["recent-actions"],

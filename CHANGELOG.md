@@ -1,5 +1,83 @@
 # FazAI Changelog
 
+## [3.14.1] - 2025-12-31
+
+### 🛡️ Fix: Validação de Comandos Desconhecidos
+
+**Problema:** `fazai --lixo` ou `fazai --punheta` era enviado para a IA, gastando tokens desnecessariamente.
+
+**Solução:** Adicionada validação de opções antes do Admin Mode:
+```bash
+$ fazai --punheta
+❌ Opção desconhecida: --punheta
+💡 Use 'fazai --help' para ver opções disponíveis
+```
+
+**Também detecta typos em comandos:**
+```bash
+$ fazai confg
+❌ Comando desconhecido: confg
+💡 Você quis dizer: config?
+```
+
+---
+
+### ✨ Feature: FazAI Maestro Cleaner (Faxineiro Semântico)
+
+**Autor:** GeGe (Gemini 3 Pro) + Claudio (Claude Opus 4.5)
+
+**Objetivo:** Identificar e arquivar arquivos desnecessários, órfãos ou com tecnologias deprecadas.
+
+**Arquivo:** `genaisrc/cleaner.genai.mjs`
+
+**Uso:**
+```bash
+# Modo análise (gera relatório)
+genaiscript run cleaner
+
+# Modo execução (move arquivos para archive/)
+genaiscript run cleaner --vars "mode=exec"
+```
+
+**Tools disponíveis:**
+| Tool | Descrição |
+|------|-----------|
+| `list_source_files` | Lista arquivos .ts/.js do projeto |
+| `analyze_imports` | Verifica dependências de um arquivo |
+| `find_deprecated_tech` | Busca Milvus, Jarvis legado, etc |
+| `find_orphan_files` | Identifica arquivos sem importadores |
+| `generate_report` | Gera JSON com candidatos a arquivamento |
+| `archive_files` | Move arquivos para archive/ (modo exec) |
+
+**Segurança:**
+- ❌ NUNCA deleta arquivos (apenas move para archive/)
+- ❌ NUNCA mexe em genaisrc/ ou src/agentic/
+- ✅ Requer aprovação humana antes de mover
+
+---
+
+## [3.14.0] - 2025-12-31
+
+### 🔄 Refactor: Complete Jarvis→FazAI Migration (web/)
+
+**Breaking Change:** Removed all Jarvis references from web interface.
+
+| Change | Files Affected |
+|--------|----------------|
+| `JarvisStore` → `FazaiStore` | `lib/store.ts` |
+| `useJarvisStore` → `useFazaiStore` | 9 pages/components |
+| `types/jarvis.ts` → `types/fazai.ts` | 4 imports |
+| Deleted `types/jarvis.ts` | - |
+| Added 8 types to `fazai.ts` | AgentStatus, Action, Memory, Learning, KnowledgeBase, InferenceRule, Trait, Personality |
+
+**UI Text Updates:**
+- "Terminal Jarvis" → "FazAI autonomous Linux agent"
+- "Jarvis agent" → "FazAI agent"
+
+**Version Sync:** All packages now at 3.14.0
+
+---
+
 ## [Unreleased]
 
 ### 🛠️ Fix: YOLO Mode (-y) Now Works Correctly

@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import { Trash2, Plus } from "lucide-react";
-import type { Trait } from "@/types/jarvis";
+import type { Trait } from "@/types/fazai";
 
 interface TraitEditorProps {
   traits: Trait[];

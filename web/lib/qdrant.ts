@@ -9,7 +9,7 @@ export const qdrant = new QdrantClient({
 });
 
 /**
- * Collection names (corrected from jarvis_* to fazai_*)
+ * FazAI Qdrant collection names
  */
 export const COLLECTIONS = [
   "fazai_personality",

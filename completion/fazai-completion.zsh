@@ -40,6 +40,7 @@ _fazai() {
         'dashboard:Gerencia REST API Dashboard (start, stop, status)'
         'samba:Gerencia compartilhamentos Samba (list, add, del, etc)'
         'completion:Print available CLI completions'
+        'cleaner:Semantic file cleaner (archive orphan/deprecated files)'
     )
 
     # Load models dynamically (cached)
@@ -222,6 +223,15 @@ _fazai() {
                 'help:help subcommand'
             )
             _describe 'completion subcommands' completion_cmds
+            ;;
+        cleaner)
+            local -a cleaner_cmds
+            cleaner_cmds=(
+                '--exec:--exec subcommand'
+                '--dry-run:--dry-run subcommand'
+                '--help:--help subcommand'
+            )
+            _describe 'cleaner subcommands' cleaner_cmds
             ;;
 
                 ask)

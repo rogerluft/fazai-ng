@@ -174,7 +174,7 @@ async function main() {
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
     "config", "search", "inference", "agent", "ingest",
-    "dashboard", "samba", "completion"
+    "dashboard", "samba", "completion", "cleaner"
   ];
 
   const firstArg = inputs[0];
@@ -284,6 +284,13 @@ async function main() {
     process.exit(0);
   }
 
+  // Cleaner command - Faxineiro Semântico
+  if (inputs[0] === "cleaner") {
+    const { handleCleanerCommand } = await import("./commands/cleaner");
+    await handleCleanerCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "vector") {
     await handleVectorCommand(inputs.slice(1));
     process.exit(0);
@@ -350,6 +357,52 @@ async function main() {
   if (inputs[0] === "ask") {
     await handleAskCommand(inputs.slice(1));
     process.exit(0);
+  }
+
+  // ============================================================================
+  // VALIDATION: Unknown commands/options
+  // Prevents garbage like "fazai --punheta" from being sent to AI
+  // ============================================================================
+  const KNOWN_OPTIONS = [
+    "--dry-run", "--yolo", "-y", "--debug", "--verbose",
+    "--log-file", "--auto-research", "--help", "-h", "--version", "-v",
+    "--cli", "--exec"
+  ];
+
+  // Check for unknown options (args starting with --)
+  if (inputs.length > 0) {
+    const unknownOptions = inputs.filter(arg =>
+      arg.startsWith("--") && !KNOWN_OPTIONS.includes(arg) && !arg.startsWith("--log-file=")
+    );
+
+    if (unknownOptions.length > 0) {
+      logger.error(chalk.red(`❌ Opção desconhecida: ${unknownOptions.join(", ")}`));
+      logger.info(chalk.yellow("💡 Use 'fazai --help' para ver opções disponíveis"));
+      process.exit(1);
+    }
+
+    // Check if first arg looks like a command but isn't known
+    const firstArg = inputs[0];
+    if (firstArg && !firstArg.startsWith("-") && !firstArg.startsWith("--")) {
+      const isKnownCommand = SUBCOMMANDS_WITH_HELP.includes(firstArg);
+      const isModelName = models.some(m => m.name === firstArg);
+      const looksLikeTask = firstArg.includes(" ") || /^[a-z]+\s/i.test(inputs.join(" "));
+
+      // If it's a single word that's not a command or model, it might be a typo
+      if (!isKnownCommand && !isModelName && inputs.length === 1 && !looksLikeTask) {
+        // Check for common typos
+        const similarCommands = SUBCOMMANDS_WITH_HELP.filter(cmd =>
+          cmd.startsWith(firstArg.slice(0, 2)) || firstArg.startsWith(cmd.slice(0, 2))
+        );
+
+        if (similarCommands.length > 0) {
+          logger.error(chalk.red(`❌ Comando desconhecido: ${firstArg}`));
+          logger.info(chalk.yellow(`💡 Você quis dizer: ${similarCommands.join(", ")}?`));
+          logger.info(chalk.gray("   Use 'fazai --help' para ver todos os comandos"));
+          process.exit(1);
+        }
+      }
+    }
   }
 
   // Admin Mode (DEFAULT!)

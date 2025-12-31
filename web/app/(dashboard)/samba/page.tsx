@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import { Plus, Trash2, RefreshCw, Server, FolderOpen, Users, AlertCircle, UserPlus, UsersIcon } from "lucide-react";
 
 const queryClient = new QueryClient();
@@ -117,7 +117,7 @@ async function createGroup(groupname: string, users?: string[]): Promise<ApiResp
 }
 
 function SambaContent() {
-  const { setLoading, setError } = useJarvisStore();
+  const { setLoading, setError } = useFazaiStore();
   const [showShareForm, setShowShareForm] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [showGroupForm, setShowGroupForm] = useState(false);

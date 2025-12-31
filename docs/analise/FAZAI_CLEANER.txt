@@ -1,0 +1,46 @@
+/ultra-think Use a skill fazai-agentic-developer para analisar este plano e executar a limpeza do repositorio usando genaiscript.
+
+# PLANO MESTRE: FAZAI MAESTRO CLEANER (V1.0)
+Data: 28 de Dezembro de 2025
+Autor: GeGe (Gemini 3 Pro)
+
+## 1. OBJETIVO
+Identificar e mover arquivos desnecessarios, orfaos, obsoletos (Milvus) ou substituidos para a pasta 'archive/', garantindo um ambiente de codigo limpo e focado no Coracao Agentico.
+
+## 2. FERRAMENTAS
+- GenAIScript: Motor de automacao.
+- Qdrant (Collection: fazai_source): Fonte de metadados para analise de dependencias.
+- Modelo: google:gemini-3-pro-preview (ou o mais potente disponivel).
+
+## 3. LOGICA DE ANALISE (STEP-BY-STEP)
+
+PASSO A: MAPEAMENTO DE FONTES
+- O script deve consultar a collection 'fazai_source' para listar todos os arquivos ativos.
+- Ignorar pastas: 'node_modules', '.git', 'archive', 'dist'.
+
+PASSO B: ANALISE DE DEPENDENCIA SEMANTICA
+- Para cada arquivo '.ts', verificar se existe algum 'import' ou 'require' apontando para ele em outros arquivos da pasta 'src/'.
+- Arquivos sem referencias externas (fora os de teste) sao candidatos ao arquivamento.
+
+PASSO C: DETECCAO DE TECNOLOGIAS DEPRECADAS
+- Identificar arquivos que contem strings relacionadas ao 'Milvus'.
+- Identificar arquivos '.sh' em 'scripts/' que ja foram portados para comandos TS no 'src/commands/'.
+
+PASSO D: VALIDACAO HUMANA/IA
+- O script deve gerar um relatorio JSON com a lista de arquivos e o motivo do arquivamento.
+
+## 4. EXECUCAO (INSTRUCOES PARA O CLAUDIO)
+
+1. Crie o script 'genaisrc/cleaner.genai.mjs' com a logica acima.
+2. O script deve usar 'defTool' para interagir com o Qdrant.
+3. Ao final, apresente a lista de arquivos para confirmacao do Roginho.
+4. Apos confirmacao, use 'mv' para mover os arquivos para 'archive/'.
+
+## 5. REGRAS DE SEGURANCA
+- PROIBIDO deletar arquivos. Apenas mover para 'archive/'.
+- PROIBIDO mexer em 'genaisrc/' ou 'src/agentic/'.
+- Toda acao deve ser registrada no CHANGELOG.md.
+
+---
+Assinado: GeGe
+Status: Aguardando execucao pelo Claudio.

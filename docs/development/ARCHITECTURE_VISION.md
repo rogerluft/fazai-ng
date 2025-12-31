@@ -1,4 +1,4 @@
-# 🏗️ Arquitetura FazAI v4.0 - Terminal Jarvis + AutoGPT + Genkit
+# 🏗️ Arquitetura FazAI v4.0 - Terminal + AutoGPT + Genkit
 
 **Visão:** Mega Framework Terminal com IA Autônoma  
 **Data:** 15/11/2024  
@@ -51,11 +51,11 @@ models = [
 
 ### 🎯 Visão Futura (v4.0)
 
-**Mega Framework Terminal Jarvis + AutoGPT + Genkit:**
+**Mega Framework FazAI Terminal + AutoGPT + Genkit:**
 ```
 User/AutoGPT Agent
         ↓
-Terminal Jarvis (CLI Robusta)
+FazAI Terminal (CLI Robusta)
         ↓
 Genkit Orchestrator (Plugin-based)
         ├─→ genkitx-openai (GPT-4o/Mini/Turbo)
@@ -85,7 +85,7 @@ Linux Kernel (Wrappers seguros)
 
 ## 🧩 Componentes do Mega Framework
 
-### 1. Terminal Jarvis (CLI Interface)
+### 1. FazAI Terminal (CLI Interface)
 **Função:** Interface Humano-Agente e Autonomia
 
 **Recursos:**
@@ -97,8 +97,8 @@ Linux Kernel (Wrappers seguros)
 
 **Melhorias Necessárias:**
 ```typescript
-// src/jarvis-terminal.ts (NOVO)
-interface JarvisAgent {
+// src/fazai-terminal.ts (NOVO)
+interface FazaiAgent {
   plan(goal: string): Task[];
   execute(task: Task): Promise<Result>;
   reflect(result: Result): Correction[];

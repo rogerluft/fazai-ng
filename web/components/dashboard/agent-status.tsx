@@ -5,12 +5,12 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import * as api from "@/lib/api";
 import { Play, Pause, Square } from "lucide-react";
 
 export function AgentStatus() {
-  const { agentStatus, setAgentStatus, setLoading, setError } = useJarvisStore();
+  const { agentStatus, setAgentStatus, setLoading, setError } = useFazaiStore();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["agent-status"],
@@ -109,7 +109,7 @@ export function AgentStatus() {
         <div className="flex items-center justify-between">
           <div>
             <CardTitle>Agent Status</CardTitle>
-            <CardDescription>Terminal Jarvis autonomous agent</CardDescription>
+            <CardDescription>FazAI autonomous Linux agent</CardDescription>
           </div>
           <Badge variant={statusColor[status.status as keyof typeof statusColor]}>
             {status.status.toUpperCase()}

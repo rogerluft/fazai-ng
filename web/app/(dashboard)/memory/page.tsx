@@ -8,13 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import { Search } from "lucide-react";
 
 const queryClient = new QueryClient();
 
 function MemoryContent() {
-  const { setLoading } = useJarvisStore();
+  const { setLoading } = useFazaiStore();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedRole, setSelectedRole] = useState<string | null>(null);
 

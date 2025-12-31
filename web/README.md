@@ -102,7 +102,7 @@ web/
 │   ├── store.ts            # Zustand store
 │   └── utils.ts            # Utility functions
 ├── types/
-│   └── jarvis.ts           # Type definitions
+│   └── fazai.ts            # Type definitions
 └── package.json
 ```
 
@@ -129,7 +129,7 @@ Create a `.env.local` file:
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=your_api_key_optional
 
-# Jarvis CLI configuration
+# FazAI CLI configuration
 NEXT_PUBLIC_API_URL=http://localhost:3000
 
 # WebSocket configuration

@@ -109,6 +109,7 @@ function parseHelpDescriptions(appContent) {
     dashboard: "Manage REST API Dashboard",
     samba: "Manage Samba shares",
     ingest: "Personality data ingestion",
+    cleaner: "Semantic file cleaner (archive orphan/deprecated files)",
   };
 
   // Merge fallbacks for missing descriptions
@@ -186,6 +187,9 @@ function parseSubcommands(appContent, commandsDir) {
 
   // Ensure completion has its own subcommands
   subcommands["completion"] = ["bash", "zsh", "install", "list", "help"];
+
+  // Manual additions for cleaner (uses flags, not subcommands)
+  subcommands["cleaner"] = ["--exec", "--dry-run", "--help"];
 
   // Log discovery results
   const totalSubs = Object.values(subcommands).reduce((acc, subs) => acc + subs.length, 0);

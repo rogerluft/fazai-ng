@@ -1,11 +1,11 @@
-# 🖥️ FazAI v3.13.0 - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.14.0 - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
 **Administrador de Sistemas Linux Senior + Redes**
 *GenAIScript · llama.cpp · RAG Multi-Collection · Vector Store Qdrant · ECOA Architecture*
 
-[![Version](https://img.shields.io/badge/version-3.13.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.14.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-CC%20BY%204.0-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://typescriptlang.org)

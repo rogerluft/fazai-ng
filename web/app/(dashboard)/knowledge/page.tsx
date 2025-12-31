@@ -8,14 +8,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import * as api from "@/lib/api";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import { Plus, Trash2, Check } from "lucide-react";
-import type { KnowledgeBase } from "@/types/jarvis";
+import type { KnowledgeBase } from "@/types/fazai";
 
 const queryClient = new QueryClient();
 
 function KnowledgeContent() {
-  const { setLoading, setError } = useJarvisStore();
+  const { setLoading, setError } = useFazaiStore();
   const [showForm, setShowForm] = useState(false);
   const [newKb, setNewKb] = useState<Partial<KnowledgeBase>>({
     category: "networking",

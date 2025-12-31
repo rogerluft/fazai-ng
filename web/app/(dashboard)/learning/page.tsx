@@ -18,13 +18,13 @@ import {
   Cell,
 } from "recharts";
 import * as api from "@/lib/api";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import { TrendingUp, AlertCircle, CheckCircle, Zap } from "lucide-react";
 
 const queryClient = new QueryClient();
 
 function LearningContent() {
-  const { setLoading } = useJarvisStore();
+  const { setLoading } = useFazaiStore();
 
   const { data: learnings = [], isLoading } = useQuery({
     queryKey: ["learning"],

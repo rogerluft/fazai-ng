@@ -7,14 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import * as api from "@/lib/api";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import { Code, Search, FileText, Calendar } from "lucide-react";
 import type { SourceCode } from "@/types/fazai";
 
 const queryClient = new QueryClient();
 
 function SourceContent() {
-  const { setLoading } = useJarvisStore();
+  const { setLoading } = useFazaiStore();
   const [searchTerm, setSearchTerm] = useState("");
 
   const { data: sourceItems = [], isLoading } = useQuery({
