@@ -98,10 +98,6 @@ setup_installation() {
       if [ "$IS_DEV_MODE" -eq 1 ]; then
         if [ ! -L "$INSTALL_DIR" ]; then
             warning "Diretório $INSTALL_DIR existe. Preparando para linkar..."
-            # Backup se necessário? Por enquanto, assumimos que o usuário sabe o que faz em dev.
-            # Vamos limpar o diretório alvo para criar a estrutura correta de links
-            # Mas cuidado para não apagar dados importantes.
-            # A solicitação pede uma estrutura específica.
 
             # Vamos criar o diretório pai se não existir
             if [ ! -d "$INSTALL_DIR" ]; then
@@ -235,6 +231,64 @@ setup_config_file() {
     fi
 }
 
+# =============================================================================
+# FUNCIONALIDADES DO MODO PRODUÇÃO
+# (Mantidas do install.sh original para compatibilidade completa)
+# =============================================================================
+
+# Instalar Qdrant (Lógica simplificada para Prod)
+install_qdrant() {
+  if [ -d ".git" ]; then return 0; fi # Skip in dev mode unless explicitly requested
+
+  info "Verificando Qdrant..."
+  if curl -sf "http://localhost:6333/collections" > /dev/null 2>&1; then
+    success "Qdrant já está rodando"
+    return 0
+  fi
+
+  if ! command -v docker &> /dev/null; then
+    warning "Docker não encontrado. Pulando instalação automática do Qdrant."
+    return 0
+  fi
+
+  info "Instalando Qdrant via Docker..."
+  docker run -d \
+      --name qdrant \
+      --restart unless-stopped \
+      -p 6333:6333 \
+      -p 6334:6334 \
+      -v /opt/fazai/qdrant_storage:/qdrant/storage:z \
+      qdrant/qdrant:latest || warning "Falha ao iniciar Qdrant docker"
+}
+
+# Instalar Llama.cpp (Lógica simplificada para Prod)
+install_llama_cpp() {
+  if [ -d ".git" ]; then return 0; fi # Skip in dev mode unless explicitly requested
+
+  info "Verificando llama.cpp..."
+  if command -v llama-server &> /dev/null; then
+    success "llama-server já instalado"
+    return 0
+  fi
+
+  warning "Instalação automática do llama.cpp requer compilação manual em produção por enquanto."
+}
+
+# Instalar Web Interface
+install_web_interface() {
+  if [ -d ".git" ]; then return 0; fi # Skip in dev mode
+
+  info "Instalando interface web..."
+  if [ -d "$INSTALL_DIR/web" ]; then
+    cd "$INSTALL_DIR/web"
+    if [ -f "package.json" ]; then
+        npm install --silent || warning "Falha npm install web"
+        npm run build || warning "Falha build web"
+        success "Web interface instalada"
+    fi
+  fi
+}
+
 # Main
 main() {
   print_banner
@@ -243,6 +297,13 @@ main() {
   install_deps_build
   create_bin_link
   setup_config_file
+
+  # Executar passos adicionais apenas se NÃO for dev mode ou se for solicitado
+  if [ ! -d ".git" ]; then
+      install_qdrant
+      install_llama_cpp
+      install_web_interface
+  fi
 
   echo ""
   success "Instalação concluída!"

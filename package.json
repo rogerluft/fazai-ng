@@ -75,7 +75,7 @@
   },
   "main": "./dist/app.js",
   "bin": {
-    "fazai": "bin/fazai.js"
+    "fazai": "bin/fazai.mjs"
   },
   "engineStrict": true,
   "devDependencies": {

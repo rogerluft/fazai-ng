@@ -31,7 +31,7 @@ run_test() {
     eval "$cmd" >> $LOG_FILE 2>&1
     EXIT_CODE=$?
     END=$(date +%s%N)
-    DURATION=$(($(( ($END - $START) / 1000000 ))))
+    DURATION=$(( ($END - $START) / 1000000 ))
 
     if [ $EXIT_CODE -eq 0 ]; then
         echo -e "${GREEN} OK (${DURATION}ms)${NC}"
