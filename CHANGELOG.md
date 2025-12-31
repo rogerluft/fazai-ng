@@ -1,5 +1,47 @@
 # FazAI Changelog
 
+## [3.14.3] - 2025-12-31
+
+### 📚 Docs: Guia para Remover Pastas do Histórico Git
+
+**Problema:** Necessidade de remover permanentemente arquivos/pastas do histórico Git (ex: `claudio15-11-25`).
+
+**Solução:**
+- Novo guia completo: `docs/guides/REMOVE_FROM_GIT_HISTORY.md`
+- Script automatizado: `scripts/git-purge-folder.sh`
+- Seção adicionada ao README com referência às ferramentas
+
+**Guia inclui:**
+- 3 métodos: `git-filter-repo` (recomendado), `git-filter-branch`, BFG Repo-Cleaner
+- Instruções passo a passo com exemplos práticos
+- Avisos de segurança e boas práticas
+- Seção de troubleshooting
+
+**Script `git-purge-folder.sh`:**
+```bash
+# Uso básico
+./scripts/git-purge-folder.sh claudio15-11-25
+
+# Com dry-run (simulação)
+./scripts/git-purge-folder.sh "claudio*" --glob --dry-run
+```
+
+**Recursos:**
+- ✅ Modo dry-run para simulação segura
+- ✅ Backup automático antes da execução
+- ✅ Suporte a padrões glob (ex: `claudio*`)
+- ✅ Validações pré-execução
+- ✅ Instruções pós-execução
+
+**Arquivos criados:**
+- `docs/guides/REMOVE_FROM_GIT_HISTORY.md` - Guia completo
+- `scripts/git-purge-folder.sh` - Script automatizado
+- `README.md` - Nova seção "Manutenção e Ferramentas"
+
+**Nota:** O `.gitignore` já possui regras para excluir `claudio*` e `Claudio*` (linhas 188-189).
+
+---
+
 ## [3.14.2] - 2025-12-31
 
 ### ⏱️ Fix: LLAMA_TIMEOUT Configurável
