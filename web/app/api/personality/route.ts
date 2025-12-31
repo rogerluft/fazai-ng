@@ -109,7 +109,8 @@ export async function PUT(request: Request) {
     const points = await Promise.all(
       validatedTraits.map(async (trait, index) => {
         // Create semantic text for embedding
-        const semanticText = `${trait.trait_name}: ${trait.value}. ${trait.context || ''}`.trim();
+        const contextPart = trait.context ? `. ${trait.context}` : "";
+        const semanticText = `${trait.trait_name}: ${trait.value}${contextPart}`.trim();
         const vector = await generateEmbedding(semanticText);
         
         // Use crypto for unique IDs to avoid collisions
