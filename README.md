@@ -451,6 +451,26 @@ fazai github issue create owner/repo
 
 ---
 
+## 🛠️ Manutenção e Ferramentas
+
+### Remover Pasta do Histórico Git
+
+Para remover permanentemente uma pasta ou arquivo do histórico completo do Git:
+
+```bash
+# Usando script automatizado
+./scripts/git-purge-folder.sh claudio15-11-25
+
+# Com dry-run (simulação)
+./scripts/git-purge-folder.sh "claudio*" --glob --dry-run
+```
+
+**Documentação completa**: [docs/guides/REMOVE_FROM_GIT_HISTORY.md](docs/guides/REMOVE_FROM_GIT_HISTORY.md)
+
+**⚠️ Aviso**: Esta é uma operação destrutiva que requer `git push --force` e pode afetar colaboradores.
+
+---
+
 ## 🤝 Contribuindo
 
 Contribuições são muito bem-vindas! Consulte o [Guia de Contribuição](CONTRIBUTING.md).
