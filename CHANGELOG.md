@@ -2,6 +2,15 @@
 
 ## [3.14.1] - 2025-12-31
 
+### 📖 Docs: README atualizado para v3.14
+
+- Seção "O que há de novo" atualizada com features v3.14:
+  - 🧹 Maestro Cleaner (Faxineiro Semântico)
+  - 🛡️ Validação de comandos desconhecidos
+  - 🔄 Migração Jarvis→FazAI + ESM build
+
+---
+
 ### 🛡️ Fix: Validação de Comandos Desconhecidos
 
 **Problema:** `fazai --lixo` ou `fazai --punheta` era enviado para a IA, gastando tokens desnecessariamente.
