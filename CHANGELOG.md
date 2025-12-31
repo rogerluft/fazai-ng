@@ -1,5 +1,27 @@
 # FazAI Changelog
 
+## [3.14.2] - 2025-12-31
+
+### ⏱️ Fix: LLAMA_TIMEOUT Configurável
+
+**Problema:** Testes e operações com AI local (Phi-3/llama.cpp) falhavam por timeout insuficiente.
+
+**Solução:**
+- `tests/real-world-suite.sh`: Timeout aumentado de 10s para 120s (2 minutos)
+- `LLAMA_TIMEOUT=180000` adicionado ao fazai.conf (3 minutos)
+
+**Configuração em fazai.conf:**
+```bash
+LLAMA_SERVER_URL=http://localhost:11430
+LLAMA_TIMEOUT=180000  # 3 minutos (Phi-3 local pode ser lento)
+```
+
+**Arquivos modificados:**
+- `tests/real-world-suite.sh` - timeout hardcoded aumentado para testes
+- `/etc/fazai/fazai.conf` - LLAMA_TIMEOUT adicionado
+
+---
+
 ## [3.14.1] - 2025-12-31
 
 ### 📖 Docs: README atualizado para v3.14

@@ -64,7 +64,7 @@ run_test "Version Command" "$FAZAI_BIN --version"
 # 3. Testes de Conhecimento (RAG/LLM - Pode falhar sem rede/serviços)
 echo -e "\n${YELLOW}=== 3. LLM/RAG (Pode depender de serviços externos) ===${NC}"
 # Usamos timeout para não travar se o serviço estiver fora
-run_test "Ask Simple (Timeout 10s)" "timeout 10s $FAZAI_BIN ask 'Quem é voce?' || echo 'Timeout ou Falha no LLM'"
+run_test "Ask Simple (Timeout 120s)" "timeout 120s $FAZAI_BIN ask 'Quem é voce?' || echo 'Timeout ou Falha no LLM'"
 
 # 4. Testes de Execução (Simulação)
 echo -e "\n${YELLOW}=== 4. EXECUCAO DE COMANDOS ===${NC}"
