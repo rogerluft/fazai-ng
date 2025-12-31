@@ -612,8 +612,8 @@ export async function* askAI(
       const followUpPrompt = `${prompt}\n\n--- RESULTADO DA FERRAMENTA ---\n${toolResult}\n--- FIM ---\n\nAgora responda a pergunta original usando este resultado:`;
 
       const followUpSystemMessage = isGeneralQuestion
-        ? SYSTEM_MESSAGES.general(fileContent, "")
-        : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", "");
+        ? SYSTEM_MESSAGES.general(fileContent, ragContext)
+        : SYSTEM_MESSAGES.codeAnalysis(fileContent, ragContext, "");
 
       // Make follow-up call (non-streaming for simplicity)
       yield "\n\n"; // Clear line after tag
