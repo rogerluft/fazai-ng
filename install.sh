@@ -255,10 +255,10 @@ main() {
   print_banner
   check_dependencies
   setup_installation
+  setup_log_directory
   install_deps_build
   create_bin_link
   setup_config_file
-  setup_log_directory
 
   echo ""
   success "Instalação concluída!"
