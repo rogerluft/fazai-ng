@@ -1,11 +1,11 @@
-# 🖥️ FazAI v3.14.0 - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI v3.14.1 - Terminal Admin Linux com IA Autônoma
 
 <div align="center">
 
 **Administrador de Sistemas Linux Senior + Redes**
 *GenAIScript · llama.cpp · RAG Multi-Collection · Vector Store Qdrant · ECOA Architecture*
 
-[![Version](https://img.shields.io/badge/version-3.14.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.14.1-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-CC%20BY%204.0-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://typescriptlang.org)
@@ -16,23 +16,25 @@
 
 ---
 
-## 🌟 O que há de novo na v3.13
+## 🌟 O que há de novo na v3.14
 
-### 🦙 llama.cpp + Phi-3-mini (Local LLM)
-- **Zero custo, privacidade total, funciona offline**
-- Modelo Phi-3-mini da Microsoft (~2.4GB)
-- API OpenAI-compatible na porta 11430
-- Primeira prioridade no fallback chain
+### 🧹 Maestro Cleaner (v3.14.1)
+- **Faxineiro Semântico** - detecta e arquiva código obsoleto
+- Análise de imports órfãos e tecnologias deprecadas
+- Modo seguro: nunca deleta, apenas move para `archive/`
+- GenAIScript agent com 6 tools especializados
+- `fazai cleaner [--exec] [--dry-run]`
 
-### 🧠 ECOA Architecture
-- **Emotional-Cognitive Orchestration Architecture**
-- Campos semânticos unificados em todas as collections
-- Resonance scoring, temporal decay, legitimacy contexts
+### 🛡️ Validação de Comandos (v3.14.1)
+- **Bloqueia opções desconhecidas** antes de enviar à IA
+- Evita desperdício de tokens com comandos inválidos
+- Mensagem clara: "Use 'fazai --help' para ver opções"
 
-### 🗂️ Samba Integration
-- Gerenciamento completo de shares via CLI
-- Criação de usuários, diretórios e grupos
-- Bash completion inteligente
+### 🔄 Migração Jarvis→FazAI (v3.14.0)
+- **Jarvis completamente deprecado**
+- Referências legadas removidas do código
+- Documentação unificada sob marca FazAI
+- Build migrado para ESM (ECMAScript Modules)
 
 ---
 
@@ -261,7 +263,7 @@ fazai completion
 
 ```bash
 # ============================================
-# FAZAI v3.13.0 - Configuração
+# FAZAI v3.14.1 - Configuração
 # ============================================
 
 # --- Local LLM (llama.cpp + Phi-3-mini) ---
