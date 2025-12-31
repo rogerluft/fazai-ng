@@ -8,6 +8,7 @@
 import { getQdrantClient } from "../database/qdrant-pool";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
+import { getConfigValue } from "../config";
 
 export interface PersonalityTrait {
   trait_name: string;
@@ -103,19 +104,53 @@ export async function loadPersonalityFromQdrant(): Promise<PersonalityTraits> {
 }
 
 /**
+ * Get allowed expertise tags from config or environment.
+ * If not configured, returns null (meaning: accept ALL tags).
+ */
+function getAllowedExpertiseTags(): Set<string> | null {
+  // Try config first, then environment variable
+  const configTags = getConfigValue<string[]>('personality.expertiseTags');
+  const envTagsStr = process.env.FAZAI_EXPERTISE_TAGS;
+
+  let tags: string[] | undefined;
+
+  if (configTags && Array.isArray(configTags)) {
+      tags = configTags;
+  } else if (envTagsStr) {
+      tags = envTagsStr.split(',').map(t => t.trim());
+  }
+
+  if (!tags || tags.length === 0) {
+    // No filter configured = accept ALL tags
+    logger.debug("No expertise tag filter configured, accepting all tags.");
+    return null;
+  }
+
+  const tagSet = new Set(tags.map(t => t.toLowerCase()));
+  logger.debug(`Filtering expertise with ${tagSet.size} allowed tags.`);
+  return tagSet;
+}
+
+
+/**
  * Extract expertise areas from traits
  */
 function extractExpertise(traits: PersonalityTrait[]): string[] {
   const expertise = new Set<string>();
+  const allowedTags = getAllowedExpertiseTags(); // null = accept all
 
   for (const trait of traits) {
     if (trait.category === "expertise" || trait.category === "domain") {
       expertise.add(trait.value.toLowerCase());
     }
+
     if (trait.tags) {
       for (const tag of trait.tags) {
-        if (["linux", "networking", "docker", "security", "monitoring"].includes(tag.toLowerCase())) {
-          expertise.add(tag.toLowerCase());
+        const lowerTag = tag.toLowerCase();
+        // If allowedTags is null, accept ALL tags.
+        // If allowedTags is defined, only accept matching tags.
+        if (!allowedTags || allowedTags.has(lowerTag)) {
+          expertise.add(lowerTag);
         }
       }
     }

@@ -1,15 +1,16 @@
 import { NextResponse } from "next/server";
-import { getQdrantClient } from "../../../database/qdrant-pool";
-import { withRetry } from "../../../utils/retry";
-import { clearPersonalityCache } from "../../../services/personality-loader";
-import { logger } from "../../../logger";
-import { generateEmbedding } from "../../../services/embeddings";
-import type { Personality as FazaiPersonality, PersonalityTrait } from "../../../services/personality-loader";
-import type { Personality as JarvisPersonality } from "@/types/jarvis";
+import { getQdrantClient } from "../../../../src/database/qdrant-pool";
+import { withRetry } from "../../../../src/utils/retry";
+import { clearPersonalityCache } from "../../../../src/services/personality-loader";
+import { logger } from "../../../../src/logger";
+import { createEmbeddingService } from "../../../../src/services/embeddings";
+import type { Personality as FazaiPersonality, PersonalityTrait } from "../../../../src/services/personality-loader";
 import crypto from 'crypto';
 
 
 export async function GET() {
+  // @todo: In the future, this endpoint could support fetching different personalities
+  // to allow for a team of specialized agents (e.g., Windows expert, call center assistant).
   try {
     const client = await getQdrantClient();
     // Query fazai_personality collection
@@ -86,11 +87,13 @@ export async function PUT(request: Request) {
 
     const client = await getQdrantClient();
 
+    const embeddingService = await createEmbeddingService();
+
     const points = await Promise.all(
       validatedTraits.map(async (trait, index) => {
         // Create semantic text for embedding
         const semanticText = `${trait.trait_name}: ${trait.value}. ${trait.context || ''}`.trim();
-        const vector = await generateEmbedding(semanticText);
+        const vector = await embeddingService.generate(semanticText);
 
         return {
           id: crypto.randomUUID(),
