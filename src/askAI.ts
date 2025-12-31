@@ -408,26 +408,24 @@ export async function* askAI(
             semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
         ]);
 
-        ragContext = ragResult;
-
         const personalityContext = buildPersonalitySystemPrompt(personality);
         const memoriesContext = summarizeMemories(memories);
 
-        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragContext ? (ragContext.match(/\n/g) || []).length + 1 : 0} RAG items`);
+        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
 
         // Combine memory and RAG context
-        const combinedContext = [memoriesContext, ragContext].filter(Boolean).join("\n\n");
+        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
 
         systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
 
     } catch (error: any) {
         logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
-        ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+        const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
         systemMessage = SYSTEM_MESSAGES.general(fileContent, ragContext); // Fallback to original behavior
     }
   } else {
       // For code analysis, keep it simple but include RAG
-      ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
       systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
   }
 
