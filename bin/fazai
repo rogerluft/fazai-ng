@@ -20,7 +20,7 @@ fi
 
 # Detecta o diretório de instalação
 INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
-APP_JS="${INSTALL_DIR}/dist/app.cjs"
+APP_JS="${INSTALL_DIR}/dist/app.js"
 
 # Verifica se a aplicação existe
 if [[ ! -f "$APP_JS" ]]; then

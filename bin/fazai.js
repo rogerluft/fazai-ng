@@ -11,7 +11,7 @@ import { dirname, resolve, join } from "node:path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-const entrypoint = resolve(__dirname, "../dist/app.cjs");
+const entrypoint = resolve(__dirname, "../dist/app.js");
 
 const run = async () => {
   ensureFreshBuild();
