@@ -138,7 +138,7 @@ async function main() {
   
   if (debugFlag) {
     console.log("DEBUG: Raw Args:", rawArgs);
-    console.log("DEBUG: Loaded Models Nicknames:", models.map(m => m.nickName));
+    console.log("DEBUG: Loaded Models:", models.map(m => `${m.name} (${m.provider})`));
   }
   const verboseFlag = rawArgs.includes("--verbose");
 
