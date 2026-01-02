@@ -2,6 +2,10 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
 
 const QDRANT_URL = process.env.QDRANT_URL;
+
+// Note: It is expected that some collections may have 0 points.
+// The purpose of this check is to ensure all collections are created
+// and that at least some data has been persisted overall.
 const COLLECTIONS = [
   "fazai_personality",
   "fazai_memory",
@@ -37,6 +41,8 @@ async function verifyQdrant() {
         console.log(`❌ Collection '${collectionName}' does not exist.`);
       } else {
         console.error(`❌ Error checking collection '${collectionName}':`, error.message);
+        // Exit immediately on unexpected errors (e.g., connection issues)
+        process.exit(1);
       }
     }
   }
