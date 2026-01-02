@@ -68,7 +68,7 @@ run_test "Ask Simple (Timeout 120s)" "timeout 120s $FAZAI_BIN ask 'Quem é voce?
 
 # 4. Testes de Execução (Simulação)
 echo -e "\n${YELLOW}=== 4. EXECUCAO DE COMANDOS ===${NC}"
-run_test "Dry Run Command" "$FAZAI_BIN -y 'echo Hello World' --dry-run"
+run_test "Dry Run Command" "$FAZAI_BIN -y 'echo Hello World' --dry-run qwen3:8b"
 
 # 5. Validação de endpoints
 echo -e "\n${YELLOW}=== 5. VALIDACAO DE ENDPOINTS (Config) ===${NC}"
@@ -79,6 +79,27 @@ if curl --connect-timeout 2 -s "$OLLAMA_URL" > /dev/null; then
 else
     echo -e "${RED}✗ Ollama inacessível (Esperado no Sandbox)${NC}"
 fi
+
+# 6. Validação de Persistência (Qdrant)
+echo -e "\n${YELLOW}=== 6. VALIDACAO DE PERSISTENCIA (QDRANT) ===${NC}"
+# Prioritize environment variable, fallback to config file
+if [ -z "$QDRANT_URL" ]; then
+    echo "QDRANT_URL not set, reading from $FAZAI_CONFIG_PATH..."
+    export QDRANT_URL=$(grep "QDRANT_URL" $FAZAI_CONFIG_PATH | cut -d= -f2)
+fi
+
+if [ -z "$QDRANT_URL" ]; then
+    echo -e "${RED}✗ QDRANT_URL não definido como variável de ambiente nem encontrado em $FAZAI_CONFIG_PATH${NC}"
+else
+    echo "Qdrant URL para verificação: $QDRANT_URL"
+    # Ensure local dependency for the script is installed
+    if [ ! -d "node_modules/@qdrant" ]; then
+        echo "Instalando dependência local para verificação..."
+        npm install --silent @qdrant/js-client-rest
+    fi
+    node tests/verify-qdrant-persistence.js
+fi
+
 
 echo -e "\n${GREEN}=== EXECUCAO CONCLUIDA ===${NC}"
 echo "Logs completos em $LOG_FILE"
