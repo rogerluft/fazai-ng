@@ -27,8 +27,8 @@ ${chalk.yellow("Uso:")}
   fazai cleaner --help       Mostra esta ajuda
 
 ${chalk.yellow("O que o Cleaner faz:")}
-  • Detecta tecnologias deprecadas (Milvus, Jarvis legado)
   • Identifica arquivos órfãos (não importados por ninguém)
+  • Análise semântica de dependências e uso
   • Gera relatório JSON em archive/cleaner-report.json
   • Move arquivos para archive/ (modo --exec)
 
