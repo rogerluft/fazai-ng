@@ -68,7 +68,9 @@ run_test "Ask Simple (Timeout 120s)" "timeout 120s $FAZAI_BIN ask 'Quem é voce?
 
 # 4. Testes de Execução (Simulação)
 echo -e "\n${YELLOW}=== 4. EXECUCAO DE COMANDOS ===${NC}"
-run_test "Dry Run Command" "$FAZAI_BIN -y 'echo Hello World' --dry-run qwen3:8b"
+run_test "Dry Run Command" "$FAZAI_BIN -y 'liste as portas que estou ouvindo em tcp e udp' --dry-run qwen3:8b"
+
+
 
 # 5. Validação de endpoints
 echo -e "\n${YELLOW}=== 5. VALIDACAO DE ENDPOINTS (Config) ===${NC}"
