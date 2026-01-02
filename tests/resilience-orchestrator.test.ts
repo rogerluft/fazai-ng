@@ -61,7 +61,9 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve fazer fallback para o nível 3 (Context7) se as IAs falharem', async () => {
-    vi.mocked(askAIModule.askAI).mockRejectedValue(new Error('Falha na IA'));
+    vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      throw new Error('Falha na IA');
+    });
     vi.mocked(configModule.getConfigValue).mockReturnValue('http://fake-context7.com');
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -77,7 +79,9 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve fazer fallback para o nível 4 (Web Search) se os níveis anteriores falharem', async () => {
-    vi.mocked(askAIModule.askAI).mockRejectedValue(new Error('Falha na IA'));
+    vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      throw new Error('Falha na IA');
+    });
     vi.mocked(configModule.getConfigValue).mockReturnValue(null); // Desativa Context7
     const mockSearch = vi.mocked(AgenticWebCrawler.prototype.searchMultiSource).mockResolvedValue([
       { title: 'Resultado da Web', link: 'http://web.com', snippet: 'Snippet', source: 'DuckDuckGo', category: 'web' }
@@ -101,7 +105,9 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve retornar falha crítica se todos os níveis falharem', async () => {
-    vi.mocked(askAIModule.askAI).mockRejectedValue(new Error('Falha na IA'));
+    vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      throw new Error('Falha na IA');
+    });
     vi.mocked(configModule.getConfigValue).mockReturnValue(null);
     vi.mocked(AgenticWebCrawler.prototype.searchMultiSource).mockResolvedValue([]);
 

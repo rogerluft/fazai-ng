@@ -1,5 +1,47 @@
 # FazAI Changelog
 
+## [3.14.4] - 2026-01-02
+
+### 🐛 Fix: Correções Críticas de TypeScript e Testes
+
+**Problema:** CLI apresentando erros após mudanças do Gemini. Testes falhando com "stream is not async iterable".
+
+**Correções Aplicadas:**
+
+1. **`src/services/api-status-checker.ts`** (NOVO)
+   - Módulo estava faltando, causando erro de import em `cli-mode.ts`
+   - Implementação completa com `checkAllAPIs()` e `formatResponseTime()`
+
+2. **`src/ui/spinner.ts`**
+   - `start()` não retornava `this`, quebrando encadeamento em `spamexperts-ui.ts`
+   - Corrigido para retornar `this` permitindo `.start().stop()` pattern
+
+3. **`src/commands/inference.ts`**
+   - Usava `.embed()` que não existe; corrigido para `.generate()`
+   - Faltava `await` em `createEmbeddingService()` (função async)
+
+4. **`src/app.ts`**
+   - Tipo `Model` não estava importado; adicionado ao import
+
+5. **`tests/resilience-orchestrator.test.ts`** (CRÍTICO)
+   - **Root cause:** `mockRejectedValue` usado em AsyncGenerator
+   - `askAI` é `async function*`, não Promise - `mockRejectedValue` retorna Promise que não é async iterable
+   - Corrigido para usar `mockImplementation` com `async function* () { throw new Error(...) }`
+
+**Impacto:**
+- ✅ 471 testes passando
+- ✅ Build TypeScript sem erros críticos
+- ✅ CLI funcionando corretamente
+
+**Arquivos Modificados:**
+- `src/services/api-status-checker.ts` (novo)
+- `src/ui/spinner.ts`
+- `src/commands/inference.ts`
+- `src/app.ts`
+- `tests/resilience-orchestrator.test.ts`
+
+---
+
 ## [3.14.3] - 2025-12-31
 
 ### 📚 Docs: Guia para Remover Pastas do Histórico Git

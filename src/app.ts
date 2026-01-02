@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import chalk from "chalk";
-import { models } from "./models";
+import { models, type Model } from "./models";
 import { checkAPIKey, getAndSetAPIKey, listConfiguredKeys } from "./apiKeyUtils-fazai";
 import { getLinuxCommandsFromAI } from "./linux-admin";
 import { collectSystemInfo } from "./system-info";

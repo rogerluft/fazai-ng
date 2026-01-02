@@ -84,8 +84,8 @@ async function handleAdd(args: string[]): Promise<void> {
 
   try {
     const client = await getQdrantClient();
-    const embedService = createEmbeddingService();
-    const embedding = await embedService.embed(content);
+    const embedService = await createEmbeddingService();
+    const embedding = await embedService.generate(content);
 
     const entry: InferenceEntry = {
       id: randomUUID(),
@@ -144,14 +144,14 @@ async function handleImportFile(args: string[]): Promise<void> {
     }
 
     const client = await getQdrantClient();
-    const embedService = createEmbeddingService();
+    const embedService = await createEmbeddingService();
     let count = 0;
 
     for (const entry of entries) {
       const trimmed = entry.trim();
       if (trimmed.length < 10) continue;
 
-      const embedding = await embedService.embed(trimmed);
+      const embedding = await embedService.generate(trimmed);
       const id = randomUUID();
 
       await client.upsert(INFERENCE_COLLECTION, {
@@ -222,8 +222,8 @@ async function handleSearch(args: string[]): Promise<void> {
 
   try {
     const client = await getQdrantClient();
-    const embedService = createEmbeddingService();
-    const embedding = await embedService.embed(query);
+    const embedService = await createEmbeddingService();
+    const embedding = await embedService.generate(query);
 
     const results = await client.search(INFERENCE_COLLECTION, {
       vector: embedding,
