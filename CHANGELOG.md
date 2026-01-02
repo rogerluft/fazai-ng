@@ -1,5 +1,48 @@
 # FazAI Changelog
 
+## [3.14.6] - 2026-01-02
+
+### 🔧 Fix: Correções Web Dashboard e Debug Log
+
+**Commits:** 1bbe90d, 20e756a, 5fc93e9
+
+#### 1. Web API Mock Functions (Gemini Patch)
+- **Problema:** `web/lib/api.ts` tinha apenas `getSourceCode`, faltavam funções para dashboard
+- **Correção:** Adicionadas 18 funções mock para compilação do dashboard:
+  - Agent: `getAgentStatus`, `pauseAgent`, `resumeAgent`, `stopAgent`, `getRecentActions`
+  - Rules: `getRules`, `createRule`, `updateRule`, `deleteRule`, `testRule`
+  - Knowledge: `getKnowledge`, `createKnowledge`, `deleteKnowledge`
+  - Learning: `getLearning`
+  - Memory: `searchMemory`, `getMemoryByRole`
+  - Personality: `getPersonality`, `addTrait`, `removeTrait`
+- **Tipo corrigido:** `Personality` em `web/types/fazai.ts` - adicionados campos `id?` e `updated_at?`
+
+#### 2. Debug Log nickName Fix
+- **Problema:** `DEBUG: Loaded Models: undefined` porque acessava `m.nickName` que não existe
+- **Correção:** Alterado para `m.name (m.provider)` em `src/app.ts`
+- **Resultado:** `DEBUG: Loaded Models: ['Phi-3-mini-4k-instruct-q4.gguf (llama)', ...]`
+
+#### 3. Cleaner Help Text
+- **Problema:** Help text do `fazai cleaner` focava em detecção de tecnologias depreciadas
+- **Correção:** Atualizado para refletir propósito real:
+  - Identificar arquivos órfãos (não importados por ninguém)
+  - Análise semântica de dependências e uso
+  - Mover arquivos não utilizados para `archive/`
+
+**Arquivos Modificados:**
+- `web/lib/api.ts` - 18 novas funções mock
+- `web/types/fazai.ts` - Personality type corrigido
+- `src/app.ts` - Debug log fix
+- `src/commands/cleaner.ts` - Help text atualizado
+
+**Validação:**
+- ✅ npm run build passou
+- ✅ Web build passou
+- ✅ Testes real-world passando
+- ✅ Busca Qdrant confirmou migração Jarvis→FazAI completa
+
+---
+
 ## [3.14.5] - 2026-01-02
 
 ### 🔧 Fix: Infraestrutura de Serviço e Permissões
