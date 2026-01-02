@@ -101,7 +101,9 @@ export type Trait = {
 };
 
 export type Personality = {
+  id?: string;
   traits: Trait[];
+  updated_at?: string;
 };
 
 export type SourceCode = {
