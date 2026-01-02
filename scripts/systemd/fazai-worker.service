@@ -24,12 +24,18 @@ After=network-online.target qdrant.service
 Wants=network-online.target
 # Dependencias opcionais - inicia mesmo se nao existirem
 Wants=qdrant.service ollama.service
+# Limite de reinicializacao (maximo 5 em 60 segundos)
+StartLimitIntervalSec=60
+StartLimitBurst=5
 
 [Service]
 # -------------------------------------------------------------------------
 # Identidade do Processo
 # -------------------------------------------------------------------------
-# Usuario e grupo dedicado para isolamento de seguranca
+# Usuario dedicado de servico (fazai) - requer que:
+# 1. Usuario fazai esteja no grupo do dono do repo (ex: rluft)
+# 2. Home do dono tenha permissao 710 (grupo pode atravessar)
+# Isso é configurado automaticamente pelo install.sh
 User=fazai
 Group=fazai
 
@@ -42,11 +48,13 @@ WorkingDirectory=/opt/fazai
 # -------------------------------------------------------------------------
 # Comando de Execucao
 # -------------------------------------------------------------------------
-# Executa o worker compilado (TypeScript -> JavaScript)
-ExecStart=/usr/bin/node /opt/fazai/dist/worker.js
+# Executa o Dashboard/API Server do FazAI
+# O dashboard fornece endpoints REST para integração com outros sistemas
+# NOTA: O CLI principal é interativo; o dashboard é o modo servidor
+ExecStart=/usr/bin/node /opt/fazai/dist/app.js dashboard start --host 0.0.0.0
 
 # Comando opcional para verificar configuracao antes de iniciar
-ExecStartPre=/usr/bin/test -f /opt/fazai/dist/worker.js
+ExecStartPre=/usr/bin/test -f /opt/fazai/dist/app.js
 
 # -------------------------------------------------------------------------
 # Politica de Reinicio
@@ -55,9 +63,6 @@ ExecStartPre=/usr/bin/test -f /opt/fazai/dist/worker.js
 Restart=always
 # Aguarda 5 segundos antes de reiniciar
 RestartSec=5
-# Maximo de 5 reinicializacoes em 60 segundos
-StartLimitIntervalSec=60
-StartLimitBurst=5
 
 # -------------------------------------------------------------------------
 # Variaveis de Ambiente
@@ -81,16 +86,10 @@ Environment=FAZAI_LOG_DIR=/var/log/fazai
 Environment=LOG_LEVEL=info
 
 # -------------------------------------------------------------------------
-# Arquivos de Ambiente Adicionais (secrets, API keys)
-# -------------------------------------------------------------------------
-# Carrega variaveis adicionais de arquivo seguro (opcional)
-EnvironmentFile=-/etc/fazai/fazai.env
-
-# -------------------------------------------------------------------------
 # Recursos e Limites
 # -------------------------------------------------------------------------
-# Limite de memoria (ajustar conforme necessidade)
-MemoryLimit=2G
+# Limite de memoria (sistema tem 300GB disponivel)
+MemoryMax=64G
 
 # Limite de arquivos abertos
 LimitNOFILE=65535

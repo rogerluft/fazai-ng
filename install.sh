@@ -252,19 +252,131 @@ setup_log_directory() {
     success "Permissões de $LOG_DIR configuradas para o usuário $CURRENT_USER (755)"
 }
 
+setup_fazai_service_user() {
+    info "Configurando usuário de serviço fazai..."
+    local CURRENT_USER=$(whoami)
+    local CURRENT_GROUP=$(id -gn "$CURRENT_USER")
+    local HOME_DIR=$(eval echo ~$CURRENT_USER)
+
+    # Criar grupo fazai se não existir
+    if ! getent group fazai > /dev/null 2>&1; then
+        sudo groupadd -r fazai
+        success "Grupo 'fazai' criado"
+    else
+        info "Grupo 'fazai' já existe"
+    fi
+
+    # Criar usuário fazai se não existir
+    if ! id fazai > /dev/null 2>&1; then
+        sudo useradd -r -g fazai -s /sbin/nologin -d /opt/fazai -c "FazAI Service Account" fazai
+        success "Usuário 'fazai' criado"
+    else
+        info "Usuário 'fazai' já existe"
+    fi
+
+    # Adicionar fazai ao grupo do usuário atual para acessar symlinks
+    if ! groups fazai | grep -q "$CURRENT_GROUP"; then
+        sudo usermod -aG "$CURRENT_GROUP" fazai
+        success "Usuário 'fazai' adicionado ao grupo '$CURRENT_GROUP'"
+    fi
+
+    # Garantir que o home do usuário seja acessível (755 = rwxr-xr-x)
+    # Permissivo para evitar problemas com symlinks
+    local HOME_PERMS=$(stat -c "%a" "$HOME_DIR" 2>/dev/null || echo "700")
+    if [ "$HOME_PERMS" -lt 755 ] 2>/dev/null; then
+        sudo chmod 755 "$HOME_DIR"
+        success "Permissão de $HOME_DIR alterada para 755"
+    else
+        info "Permissão de $HOME_DIR OK ($HOME_PERMS)"
+    fi
+
+    # Garantir que o diretório do projeto seja acessível
+    if [ -d "$HOME_DIR/fazai-ng" ]; then
+        # Definir permissões recursivamente para leitura pelo grupo
+        chmod -R g+rX "$HOME_DIR/fazai-ng"
+        success "Permissões de $HOME_DIR/fazai-ng ajustadas para acesso do grupo"
+    fi
+
+    # Criar diretório de dados com permissões corretas
+    if [ -d "$INSTALL_DIR/data" ]; then
+        sudo chown -R fazai:fazai "$INSTALL_DIR/data" 2>/dev/null || true
+        sudo chmod -R 775 "$INSTALL_DIR/data"
+    fi
+}
+
+verify_service_permissions() {
+    info "Verificando permissões para o serviço fazai-worker..."
+    local CURRENT_USER=$(whoami)
+    local CURRENT_GROUP=$(id -gn "$CURRENT_USER")
+    local HOME_DIR=$(eval echo ~$CURRENT_USER)
+    local ISSUES_FOUND=0
+
+    # 1. Verificar se usuário fazai existe
+    if ! id fazai > /dev/null 2>&1; then
+        warning "Usuário 'fazai' não existe."
+        ISSUES_FOUND=1
+    else
+        # 2. Verificar se fazai está no grupo do usuário atual
+        if ! groups fazai 2>/dev/null | grep -q "$CURRENT_GROUP"; then
+            warning "Usuário 'fazai' não está no grupo '$CURRENT_GROUP'."
+            info "Corrigindo: adicionando fazai ao grupo $CURRENT_GROUP..."
+            sudo usermod -aG "$CURRENT_GROUP" fazai 2>/dev/null && \
+                success "fazai adicionado ao grupo $CURRENT_GROUP" || \
+                warning "Falha ao adicionar fazai ao grupo (requer sudo)"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # 3. Verificar permissão do home directory (precisa ser 755 ou mais)
+    if [ -d "$HOME_DIR" ]; then
+        local HOME_PERMS=$(stat -c "%a" "$HOME_DIR" 2>/dev/null || echo "000")
+        if [ "$HOME_PERMS" -lt 755 ] 2>/dev/null; then
+            warning "Home directory $HOME_DIR com permissão restritiva ($HOME_PERMS)"
+            info "Corrigindo: alterando para 755..."
+            sudo chmod 755 "$HOME_DIR" 2>/dev/null && \
+                success "$HOME_DIR agora tem permissão 755" || \
+                warning "Falha ao alterar permissão (requer sudo)"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # 4. Verificar se o diretório do projeto é acessível pelo grupo
+    if [ -d "$INSTALL_DIR" ]; then
+        if ! sudo -u fazai test -r "$INSTALL_DIR/dist/app.js" 2>/dev/null; then
+            warning "Diretório $INSTALL_DIR não acessível pelo usuário fazai"
+            info "Corrigindo: ajustando permissões do grupo..."
+            chmod -R g+rX "$(readlink -f $INSTALL_DIR/dist 2>/dev/null || echo $INSTALL_DIR)" 2>/dev/null && \
+                success "Permissões ajustadas" || \
+                warning "Falha ao ajustar permissões"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # Resultado
+    if [ "$ISSUES_FOUND" -eq 0 ]; then
+        success "Todas as permissões do serviço estão corretas!"
+    else
+        warning "Alguns problemas de permissão foram corrigidos."
+        info "Execute 'sudo systemctl restart fazai-worker' se necessário."
+    fi
+}
+
 # Main
 main() {
   print_banner
   check_dependencies
   setup_installation
   setup_log_directory
+  setup_fazai_service_user
   install_deps_build
   create_bin_link
   setup_config_file
+  verify_service_permissions
 
   echo ""
   success "Instalação concluída!"
   echo -e "Execute 'fazai' para começar."
+  echo -e "Para iniciar o serviço: ${CYAN}sudo systemctl start fazai-worker${NC}"
 }
 
 main "$@"

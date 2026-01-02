@@ -1,5 +1,51 @@
 # FazAI Changelog
 
+## [3.14.5] - 2026-01-02
+
+### 🔧 Fix: Infraestrutura de Serviço e Permissões
+
+**Problema 1:** Hookify plugin falhava com "No module named 'hookify'" porque `${CLAUDE_PLUGIN_ROOT}` não era expandido pelo Claude Code.
+
+**Correção Hookify:**
+- Adicionado fallback em todos os scripts Python (`pretooluse.py`, `posttooluse.py`, `stop.py`, `userpromptsubmit.py`)
+- Derivação de path a partir de `__file__` quando variável de ambiente não disponível
+- `hooks.json` alterado para usar caminhos absolutos em vez de `${CLAUDE_PLUGIN_ROOT}`
+
+**Problema 2:** fazai-worker.service falhava com exit code 1 procurando `worker.js` inexistente.
+
+**Correção Service:**
+- ExecStart corrigido: `/opt/fazai/dist/worker.js` → `/opt/fazai/dist/app.js dashboard start --host 0.0.0.0`
+- Adicionado ExecStartPre para verificar existência do app.js
+- MemoryMax ajustado para 64G (sistema tem 300GB disponíveis)
+- StartLimitIntervalSec/StartLimitBurst configurados para controle de reinicializações
+
+**Problema 3:** Usuário `fazai` não conseguia acessar symlinks em `/opt/fazai/` que apontam para `/home/rluft/fazai-ng/`.
+
+**Correção Permissões:**
+- Nova função `setup_fazai_service_user()` em `install.sh`:
+  - Cria usuário/grupo `fazai` se não existir
+  - Adiciona `fazai` ao grupo do usuário dono do repositório
+  - Altera permissão do home directory para 755 (acesso total)
+  - Configura permissões do diretório do projeto para acesso do grupo
+
+- Nova função `verify_service_permissions()` em `install.sh` e `scripts/setup-env.sh`:
+  - Verifica e corrige automaticamente todas as permissões necessárias
+  - Executada em toda instalação e durante setup-env
+  - Auto-corrige problemas encontrados sem intervenção manual
+
+**Arquivos Modificados:**
+- `install.sh` - Novas funções setup_fazai_service_user() e verify_service_permissions()
+- `scripts/setup-env.sh` - Nova função verify_service_permissions()
+- `scripts/systemd/fazai-worker.service` - Correções de ExecStart e configurações
+
+**Impacto:**
+- ✅ Hookify funcionando corretamente
+- ✅ fazai-worker.service iniciando com usuário dedicado `fazai`
+- ✅ Dashboard acessível em http://localhost:3000/health
+- ✅ Permissões verificadas e corrigidas automaticamente em cada instalação
+
+---
+
 ## [3.14.4] - 2026-01-02
 
 ### 🐛 Fix: Correções Críticas de TypeScript e Testes
