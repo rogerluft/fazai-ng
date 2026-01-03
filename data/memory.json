@@ -353,5 +353,15 @@
     "role": "user",
     "content": "test query",
     "timestamp": "2025-12-29T08:04:35.883Z"
+  },
+  {
+    "role": "user",
+    "content": "ls",
+    "timestamp": "2026-01-02T12:17:23.886Z"
+  },
+  {
+    "role": "user",
+    "content": "o que eh o faz ai?",
+    "timestamp": "2026-01-02T12:20:19.822Z"
   }
 ]

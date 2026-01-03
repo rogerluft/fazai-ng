@@ -22,6 +22,9 @@ node_modules
 .swcrc
 yarn.lock
 *.tmp
+data/*
+data
+memory.json
 *.log
 *.out.js
 *.out.refresh.js
@@ -216,7 +219,10 @@ docs/restricted/
 scripts/restricted/
 etc/fazai/mods/restricted/
 .veu-secrets/
-
+restricted/
+save*.txt
+#GEMINI*
+CLAUDE*
 
 .gemini/
 gha-creds-*.json
