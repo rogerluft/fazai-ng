@@ -1,5 +1,86 @@
 # FazAI Changelog
 
+## [3.14.7] - 2026-01-03
+
+### 🚀 Feat: Separação de Endpoints Chat vs Embedding
+
+**Objetivo:** Otimizar performance de embeddings com servidor local dedicado.
+
+#### Arquitetura Nova
+```
+┌─────────────────┐     ┌──────────────────────────────┐
+│   Chat/LLM      │────▶│ 192.168.0.101:11434 (remoto) │
+│   (phi3:8b)     │     │ OLLAMA_BASE_URL              │
+└─────────────────┘     └──────────────────────────────┘
+
+┌─────────────────┐     ┌──────────────────────────────┐
+│   Embeddings    │────▶│ localhost:11434 (local)      │
+│(nomic-embed)    │     │ OLLAMA_EMBED_URL (NOVO!)     │
+└─────────────────┘     └──────────────────────────────┘
+```
+
+#### Mudanças
+1. **Nova config:** `OLLAMA_EMBED_URL` em `/etc/fazai/fazai.conf`
+   - Permite servidor dedicado para embeddings
+   - Sem latência de rede para operações vetoriais
+   - **SEM FALLBACK** para evitar mistura de dimensões
+
+2. **Nova função:** `getOllamaEmbedUrl()` em `src/config.ts`
+   - Retorna URL do servidor de embeddings
+   - Erro explícito com instruções se não configurado
+   - Protege contra corrupção de vetores
+
+3. **Serviços atualizados:**
+   - `embeddings.ts` - Usa `getOllamaEmbedUrl()`
+   - `embeddings-refactored.ts` - Usa `getOllamaEmbedUrl()`
+   - `embedding-strategies.ts` - Usa `getOllamaEmbedUrl()`
+   - `universal-embedder.ts` - Usa `getOllamaEmbedUrl()`
+
+#### Configuração Requerida
+```bash
+# /etc/fazai/fazai.conf
+OLLAMA_BASE_URL=http://192.168.0.101:11434   # Chat com phi3:8b
+OLLAMA_EMBED_URL=http://localhost:11434       # Embeddings locais
+
+# Instalar modelo de embeddings:
+ollama pull nomic-embed-text
+```
+
+#### Por que sem fallback?
+Misturar servidores de embedding pode causar:
+- Dimensões diferentes (768 vs 1024 vs 1536)
+- Corrupção de busca vetorial no Qdrant
+- Resultados inconsistentes
+
+**Arquivos Modificados:**
+- `/etc/fazai/fazai.conf` - Nova config OLLAMA_EMBED_URL
+- `src/config.ts` - Nova função getOllamaEmbedUrl()
+- `src/services/embeddings.ts`
+- `src/services/embeddings-refactored.ts`
+- `src/services/embedding-strategies.ts`
+- `src/services/universal-embedder.ts`
+
+#### Validação ESTRITA de Dimensões (NOVO!)
+Todos os embedders agora rejeitam dimensões != 768:
+```
+DIMENSION MISMATCH! Expected 768 (nomic-embed-text), got XXX.
+Wrong embedding model detected. FazAI requires nomic-embed-text.
+Fix: ollama pull nomic-embed-text && configure OLLAMA_EMBED_URL
+```
+
+**Arquivos com validação estrita:**
+- `embeddings.ts` - Bloqueia dim != 768
+- `embeddings-refactored.ts` - Bloqueia dim != 768
+- `universal-embedder.ts` - Bloqueia dim != 768
+
+**Validação:**
+- ✅ npm run build passou
+- ✅ nomic-embed-text instalado local (768 dim)
+- ✅ Embedding local testado: 768 dimensões OK
+- ✅ Validação ESTRITA protege contra corrupção de vetores
+
+---
+
 ## [3.14.6] - 2026-01-02
 
 ### 🔧 Fix: Correções Web Dashboard e Debug Log

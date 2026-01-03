@@ -16,7 +16,7 @@
  * @module services/embeddings
  */
 
-import { getConfigValue, getOllamaUrl } from "../config";
+import { getConfigValue, getOllamaEmbedUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -85,7 +85,7 @@ class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private modelCache: Map<CollectionType, EmbeddingModel>;
 
-  constructor(baseUrl: string = getOllamaUrl()) {
+  constructor(baseUrl: string = getOllamaEmbedUrl()) {
     this.baseUrl = baseUrl;
     this.modelCache = new Map();
   }
@@ -230,21 +230,16 @@ class OllamaEmbeddingService implements EmbeddingService {
 
               const rawEmbedding = data.embedding as number[];
 
-              // Validate dimension (should match native dimension)
-              if (rawEmbedding.length !== dimension) {
-                logger.warn(
-                  `Unexpected embedding dimension: ${rawEmbedding.length} (expected ${dimension})`
-                );
+              // VALIDAÇÃO ESTRITA DE DIMENSÃO - Proteção contra corrupção de vetores
+              // FazAI usa exclusivamente nomic-embed-text (768 dim)
+              const EXPECTED_DIM = 768; // nomic-embed-text native dimension
 
-                // Truncate or pad if necessary
-                if (rawEmbedding.length > dimension) {
-                  return rawEmbedding.slice(0, dimension);
-                } else {
-                  return [
-                    ...rawEmbedding,
-                    ...new Array(dimension - rawEmbedding.length).fill(0),
-                  ];
-                }
+              if (rawEmbedding.length !== EXPECTED_DIM) {
+                throw new Error(
+                  `DIMENSION MISMATCH! Expected ${EXPECTED_DIM} (nomic-embed-text), got ${rawEmbedding.length}.\n` +
+                  `Wrong embedding model detected. FazAI requires nomic-embed-text.\n` +
+                  `Fix: ollama pull nomic-embed-text && configure OLLAMA_EMBED_URL in fazai.conf`
+                );
               }
 
               return rawEmbedding;
@@ -505,7 +500,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
   let underlyingService: EmbeddingService;
 
   // Try Ollama first
-  const ollamaBaseUrl = getOllamaUrl();
+  const ollamaBaseUrl = getOllamaEmbedUrl();
 
   try {
     logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);

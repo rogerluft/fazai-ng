@@ -42,6 +42,7 @@ ExecStart=/opt/fazai/scripts/health-check.sh
 Environment=NODE_ENV=production
 Environment=QDRANT_URL=http://localhost:6333
 Environment=OLLAMA_URL=http://localhost:11434
+Environment=OLLAMA_EMBED_URL=http://localhost:11434
 
 # -------------------------------------------------------------------------
 # Arquivos de Ambiente

@@ -178,8 +178,14 @@ create_env_file() {
 # URL do servidor Qdrant (banco de vetores)
 QDRANT_URL=http://localhost:6333
 
-# URL do servidor Ollama (modelos locais)
+# URL do servidor Ollama para CHAT (modelos de inferencia)
+# Use servidor remoto para phi3:8b ou outros modelos de chat
 OLLAMA_URL=http://localhost:11434
+
+# URL do servidor Ollama para EMBEDDINGS (nomic-embed-text)
+# Separar embeddings do chat melhora performance e evita conflitos de dimensao
+# Requer: ollama pull nomic-embed-text
+OLLAMA_EMBED_URL=http://localhost:11434
 
 # -------------------------------------------------------------------------
 # API Keys (preencher conforme necessario)

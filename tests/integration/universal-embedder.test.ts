@@ -2,12 +2,14 @@
  * Integration Tests - Universal Local Embedder
  *
  * Tests real Ollama API integration with nomic-embed-text model.
- * Requires Ollama server running with nomic-embed-text model.
+ * Requires Ollama embedding server running with nomic-embed-text model.
  *
  * Run: npm test -- tests/integration/universal-embedder.test.ts
  *
  * Prerequisites:
- * 1. Ollama server running (http://192.168.0.101:11434)
+ * 1. Ollama embedding server running (http://localhost:11434)
+ *    - Configurado em /etc/fazai/fazai.conf como OLLAMA_EMBED_URL
+ *    - Separado do servidor de chat (OLLAMA_BASE_URL)
  * 2. Model pulled: ollama pull nomic-embed-text
  */
 
@@ -18,10 +20,13 @@ import {
   padVector,
 } from "../../src/services/universal-embedder";
 
-// Check if Ollama is available
+// Embedding server URL (local para melhor performance)
+const OLLAMA_EMBED_URL = "http://localhost:11434";
+
+// Check if Ollama embedding server is available
 async function isOllamaAvailable(): Promise<boolean> {
   try {
-    const response = await fetch("http://192.168.0.101:11434/api/tags", {
+    const response = await fetch(`${OLLAMA_EMBED_URL}/api/tags`, {
       signal: AbortSignal.timeout(3000),
     });
     return response.ok;
@@ -37,7 +42,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     ollamaAvailable = await isOllamaAvailable();
     if (!ollamaAvailable) {
       console.warn(
-        "⚠️  Ollama not available at http://192.168.0.101:11434 - skipping integration tests"
+        `⚠️  Ollama embedding server not available at ${OLLAMA_EMBED_URL} - skipping integration tests`
       );
     }
   });
@@ -170,7 +175,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(1536);
-      expect(info.ollamaUrl).toBe("http://192.168.0.101:11434");
+      // Embeddings usam servidor local (OLLAMA_EMBED_URL)
+      expect(info.ollamaUrl).toBe("http://localhost:11434");
     });
 
     it("should handle special characters", async () => {

@@ -73,8 +73,12 @@ Environment=NODE_ENV=production
 # URL do servidor Qdrant (banco de vetores)
 Environment=QDRANT_URL=http://localhost:6333
 
-# URL do servidor Ollama (modelos locais de IA)
+# URL do servidor Ollama para CHAT (modelos de inferencia)
 Environment=OLLAMA_URL=http://localhost:11434
+
+# URL do servidor Ollama para EMBEDDINGS (nomic-embed-text)
+# Separar embeddings melhora performance e evita conflitos de dimensao
+Environment=OLLAMA_EMBED_URL=http://localhost:11434
 
 # Arquivo de configuracao do FazAI
 Environment=FAZAI_CONFIG=/etc/fazai/fazai.conf

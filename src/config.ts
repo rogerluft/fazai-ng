@@ -202,6 +202,7 @@ export function getLocalInferenceModel(): string {
 /**
  * Get Ollama base URL from config or environment
  * Priority: OLLAMA_BASE_URL from config > env > default (localhost:11434)
+ * Used for: Chat/Inference with LLMs (phi3:8b, qwen3:8b, etc.)
  */
 export function getOllamaUrl(): string {
   return (
@@ -209,6 +210,39 @@ export function getOllamaUrl(): string {
     process.env.OLLAMA_BASE_URL ||
     "http://localhost:11434"
   );
+}
+
+/**
+ * Get Ollama URL specifically for embeddings
+ * Priority: OLLAMA_EMBED_URL from config > env > error
+ * Used for: Generating embeddings with nomic-embed-text
+ *
+ * IMPORTANT: NO FALLBACK to OLLAMA_BASE_URL!
+ * Mixing embedding servers can cause dimension mismatches in vector store.
+ * If not configured, throws error with installation instructions.
+ *
+ * Separating embedding endpoint allows:
+ * - Local embeddings (faster, no network latency)
+ * - Dedicated embedding server with nomic-embed-text
+ * - Consistent vector dimensions across all collections
+ */
+export function getOllamaEmbedUrl(): string {
+  const embedUrl = getConfigValue("OLLAMA_EMBED_URL") || process.env.OLLAMA_EMBED_URL;
+
+  if (!embedUrl) {
+    throw new Error(
+      `OLLAMA_EMBED_URL not configured!\n\n` +
+      `FazAI requires a dedicated embedding server with nomic-embed-text.\n\n` +
+      `Setup instructions:\n` +
+      `1. Install nomic-embed-text: ollama pull nomic-embed-text\n` +
+      `2. Configure in /etc/fazai/fazai.conf:\n` +
+      `   OLLAMA_EMBED_URL=http://localhost:11434\n\n` +
+      `Why no fallback? Mixing embedding servers causes dimension mismatches\n` +
+      `that corrupt vector search. All embeddings must use the same model.`
+    );
+  }
+
+  return embedUrl;
 }
 
 /**

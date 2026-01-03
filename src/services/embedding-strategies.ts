@@ -13,7 +13,7 @@
  * @module services/embedding-strategies
  */
 
-import { getOllamaUrl } from "../config";
+import { getOllamaEmbedUrl } from "../config";
 import { logger } from "../logger";
 
 /**
@@ -382,7 +382,7 @@ export function preprocessText(
  */
 export async function isModelAvailable(
   model: EmbeddingModel,
-  ollamaBaseUrl: string = getOllamaUrl()
+  ollamaBaseUrl: string = getOllamaEmbedUrl()
 ): Promise<boolean> {
   try {
     const controller = new AbortController();
@@ -422,7 +422,7 @@ export async function isModelAvailable(
  */
 export async function getFallbackModel(
   preferredModel: EmbeddingModel,
-  ollamaBaseUrl: string = getOllamaUrl()
+  ollamaBaseUrl: string = getOllamaEmbedUrl()
 ): Promise<EmbeddingModel | null> {
   // Priority order for fallbacks
   const fallbackOrder: EmbeddingModel[] = [

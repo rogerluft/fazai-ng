@@ -91,8 +91,11 @@ Environment=QDRANT_COLLECTION=fazai_kb
 # Modelo de embedding a usar
 Environment=EMBEDDING_MODEL=nomic-embed-text
 
-# URL do Ollama para embeddings locais
+# URL do Ollama para CHAT
 Environment=OLLAMA_URL=http://localhost:11434
+
+# URL do Ollama para EMBEDDINGS (nomic-embed-text)
+Environment=OLLAMA_EMBED_URL=http://localhost:11434
 
 # Nivel de log
 Environment=LOG_LEVEL=info

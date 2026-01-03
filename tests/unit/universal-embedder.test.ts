@@ -71,8 +71,9 @@ describe("Universal Local Embedder (Unit Tests)", () => {
     let embedder: UniversalLocalEmbedder;
 
     beforeEach(() => {
+      // Embeddings usam OLLAMA_EMBED_URL (servidor local)
       embedder = new UniversalLocalEmbedder(
-        "http://192.168.0.101:11434",
+        "http://localhost:11434",
         "nomic-embed-text",
         768,
         1536
@@ -85,7 +86,8 @@ describe("Universal Local Embedder (Unit Tests)", () => {
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(1536);
-      expect(info.ollamaUrl).toBe("http://192.168.0.101:11434");
+      // Embedder usa servidor local (OLLAMA_EMBED_URL)
+      expect(info.ollamaUrl).toBe("http://localhost:11434");
     });
 
     it("should use default values when not provided", () => {
@@ -95,7 +97,8 @@ describe("Universal Local Embedder (Unit Tests)", () => {
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(1536);
-      expect(info.ollamaUrl).toBe("http://192.168.0.101:11434");
+      // Default usa getOllamaEmbedUrl() que retorna localhost:11434
+      expect(info.ollamaUrl).toBe("http://localhost:11434");
     });
 
     it("should handle empty batch", async () => {

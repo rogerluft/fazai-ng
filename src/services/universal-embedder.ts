@@ -19,7 +19,7 @@
  * @module services/universal-embedder
  */
 
-import { getOllamaUrl } from "../config";
+import { getOllamaEmbedUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -89,7 +89,7 @@ export function padVector(vector: number[], targetDim: number = 1536): number[] 
  */
 export async function generateUniversalEmbedding(
   text: string,
-  ollamaUrl: string = getOllamaUrl()
+  ollamaUrl: string = getOllamaEmbedUrl()
 ): Promise<number[]> {
   const embedder = new UniversalLocalEmbedder(ollamaUrl);
   return embedder.embed(text);
@@ -131,7 +131,7 @@ export class UniversalLocalEmbedder {
    * @param useCache Enable embedding cache (default: true)
    */
   constructor(
-    ollamaUrl: string = getOllamaUrl(),
+    ollamaUrl: string = getOllamaEmbedUrl(),
     model: string = "nomic-embed-text",
     nativeDimension: number = 768,
     targetDimension: number = 1536,
@@ -214,10 +214,13 @@ export class UniversalLocalEmbedder {
 
           const embedding = data.embedding;
 
-          // Validate dimension
+          // VALIDAÇÃO ESTRITA DE DIMENSÃO - Proteção contra corrupção de vetores
+          // FazAI usa exclusivamente nomic-embed-text (768 dim) → Zero Pad → 1536 dim
           if (embedding.length !== this.nativeDimension) {
-            logger.warn(
-              `Unexpected embedding dimension: ${embedding.length} (expected: ${this.nativeDimension})`
+            throw new Error(
+              `DIMENSION MISMATCH! Expected ${this.nativeDimension} (nomic-embed-text), got ${embedding.length}.\n` +
+              `Wrong embedding model detected. FazAI requires nomic-embed-text.\n` +
+              `Fix: ollama pull nomic-embed-text && configure OLLAMA_EMBED_URL in fazai.conf`
             );
           }
 

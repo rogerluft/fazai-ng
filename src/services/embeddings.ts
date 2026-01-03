@@ -13,7 +13,7 @@
  * - Progress tracking for large batches
  */
 
-import { getConfigValue, getOllamaUrl } from "../config";
+import { getConfigValue, getOllamaEmbedUrl, getOllamaUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -64,7 +64,7 @@ class OllamaEmbeddingService implements EmbeddingService {
   private readonly MAX_TOKENS = 8192; // nomic-embed-text context limit
 
   constructor(
-    baseUrl: string = getOllamaUrl(),
+    baseUrl: string = getOllamaEmbedUrl(),
     model: string = "nomic-embed-text",
     dimension: number = 768
   ) {
@@ -151,19 +151,23 @@ class OllamaEmbeddingService implements EmbeddingService {
 
               const rawEmbedding = data.embedding as number[];
 
-              // ECOA Logic: Zero Padding para padronização de dimensões
-              // Se o modelo local (CPU) gerar vetor menor (ex: 1024), projeta para 1536
-              const targetDim = 1536; // Padrão ECOA/OpenAI
+              // ECOA Logic: Validação ESTRITA de dimensões
+              // FazAI usa exclusivamente nomic-embed-text (768 dim) → Zero Pad → 1536 dim
+              const EXPECTED_DIM = 768;   // nomic-embed-text native dimension
+              const TARGET_DIM = 1536;    // ECOA/OpenAI standard (padded)
 
-              if (rawEmbedding.length < targetDim) {
-                logger.debug(`Padding vector from ${rawEmbedding.length} to ${targetDim}`);
-                return [...rawEmbedding, ...new Array(targetDim - rawEmbedding.length).fill(0)];
-              } else if (rawEmbedding.length > targetDim) {
-                logger.warn(`Truncating vector from ${rawEmbedding.length} to ${targetDim}`);
-                return rawEmbedding.slice(0, targetDim);
+              // BLOQUEIO DE SEGURANÇA: Rejeitar dimensões inesperadas
+              if (rawEmbedding.length !== EXPECTED_DIM) {
+                throw new Error(
+                  `DIMENSION MISMATCH! Expected ${EXPECTED_DIM} (nomic-embed-text), got ${rawEmbedding.length}.\n` +
+                  `This indicates wrong embedding model. FazAI requires nomic-embed-text.\n` +
+                  `Run: ollama pull nomic-embed-text`
+                );
               }
 
-              return rawEmbedding;
+              // Zero Padding: 768 → 1536
+              logger.debug(`Zero-padding vector from ${EXPECTED_DIM} to ${TARGET_DIM}`);
+              return [...rawEmbedding, ...new Array(TARGET_DIM - EXPECTED_DIM).fill(0)];
             } catch (error: any) {
               clearTimeout(timeoutId);
               // Pass through the zero vector if we caught it above (it's not an error anymore)
@@ -357,18 +361,18 @@ class OpenAIEmbeddingService implements EmbeddingService {
 export async function createEmbeddingService(): Promise<EmbeddingService> {
   // Define provider checks as an array of Promises
   const providerChecks = [
-    // Check 1: Ollama
+    // Check 1: Ollama (using dedicated embed URL for better performance)
     async (): Promise<EmbeddingService | null> => {
       try {
-        const ollamaBaseUrl = getOllamaUrl();
+        const ollamaEmbedUrl = getOllamaEmbedUrl();
         const preferredOllamaModel = "nomic-embed-text"; // 8192 context - preferred!
         const fallbackOllamaModel = "mxbai-embed-large"; // 512 context - fallback only
 
-        logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
+        logger.debug(`Testing Ollama embedding connection at ${ollamaEmbedUrl}...`);
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), 5000);
 
-        const response = await fetch(`${ollamaBaseUrl}/api/tags`, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
+        const response = await fetch(`${ollamaEmbedUrl}/api/tags`, { signal: controller.signal }).finally(() => clearTimeout(timeoutId));
 
         if (response.ok) {
           const data = await response.json();
@@ -377,21 +381,21 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
 
           // Prefer nomic-embed-text (8192 context) over mxbai-embed-large (512 context)
           if (modelNames.some((name: string) => name === preferredOllamaModel || name.startsWith(preferredOllamaModel))) {
-            logger.info(`✓ Using Ollama for embeddings (${preferredOllamaModel}, 1536 dim [padded])`);
-            return new OllamaEmbeddingService(ollamaBaseUrl, preferredOllamaModel, 768);
+            logger.info(`✓ Using Ollama for embeddings at ${ollamaEmbedUrl} (${preferredOllamaModel}, 1536 dim [padded])`);
+            return new OllamaEmbeddingService(ollamaEmbedUrl, preferredOllamaModel, 768);
           }
 
           // Fallback to mxbai-embed-large if nomic not available
           if (modelNames.some((name: string) => name === fallbackOllamaModel || name.startsWith(fallbackOllamaModel))) {
-            logger.info(`✓ Using Ollama for embeddings (${fallbackOllamaModel}, 1536 dim [padded])`);
+            logger.info(`✓ Using Ollama for embeddings at ${ollamaEmbedUrl} (${fallbackOllamaModel}, 1536 dim [padded])`);
             logger.warn(`⚠️  mxbai-embed-large has only 512 token context - consider installing nomic-embed-text`);
-            return new OllamaEmbeddingService(ollamaBaseUrl, fallbackOllamaModel, 1024);
+            return new OllamaEmbeddingService(ollamaEmbedUrl, fallbackOllamaModel, 1024);
           }
 
           logger.debug(`Ollama available but no embedding models found. Available: ${modelNames.join(', ')}`);
         }
       } catch (error: any) {
-        logger.debug(`Ollama not available: ${error.message}`);
+        logger.debug(`Ollama embedding server not available: ${error.message}`);
       }
       return null;
     },
@@ -422,7 +426,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
 
   // No provider available
   throw new Error(
-    "No embedding provider available. Configure OLLAMA_BASE_URL or OPENAI_API_KEY."
+    "No embedding provider available. Configure OLLAMA_EMBED_URL (or OLLAMA_BASE_URL) or OPENAI_API_KEY."
   );
 }
 

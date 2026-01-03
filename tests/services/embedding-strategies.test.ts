@@ -388,8 +388,9 @@ describe("Embedding Strategies", () => {
       const result = await isModelAvailable("mxbai-embed-large");
 
       expect(result).toBe(true);
+      // Embeddings usam OLLAMA_EMBED_URL (servidor local)
       expect(fetch).toHaveBeenCalledWith(
-        "http://192.168.0.101:11434/api/tags",
+        "http://localhost:11434/api/tags",
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
     });

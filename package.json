@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.14.6",
+  "version": "3.14.7",
   "author": "Roger Luft (VeilWalker) <roger@rogerluft.com.br>",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -62,6 +62,8 @@
     "test": "vitest run",
     "test:unit": "vitest run tests/unit",
     "test:integration": "vitest run tests/integration",
+    "test:real": "bash tests/real-world-exec.sh",
+    "test:full": "vitest run && bash tests/real-world-exec.sh",
     "test:watch": "vitest watch",
     "test:ui": "vitest --ui",
     "test:coverage": "vitest run --coverage"
