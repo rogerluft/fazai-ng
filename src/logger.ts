@@ -45,14 +45,28 @@ let hasWarnedAboutLogFile = false;
 const LOG_RATE_LIMIT = {
   count: 0,
   lastReset: Date.now(),
-  maxPerSecond: 100,
+  maxPerSecond: 200, // Aumentado para suportar streaming com amostragem
   killed: false,
+  killedAt: 0,
+  cooldownMs: 5000, // Recuperação automática após 5 segundos sem excesso
 };
 
 function checkRateLimit(): boolean {
-  if (LOG_RATE_LIMIT.killed) return false;
-
   const now = Date.now();
+
+  // Cooldown: recuperar automaticamente após 5 segundos
+  if (LOG_RATE_LIMIT.killed) {
+    if (now - LOG_RATE_LIMIT.killedAt > LOG_RATE_LIMIT.cooldownMs) {
+      LOG_RATE_LIMIT.killed = false;
+      LOG_RATE_LIMIT.count = 0;
+      LOG_RATE_LIMIT.lastReset = now;
+      // Silenciosamente recuperado - não logar para evitar recursão
+    } else {
+      return false;
+    }
+  }
+
+  // Reset contador a cada segundo
   if (now - LOG_RATE_LIMIT.lastReset > 1000) {
     LOG_RATE_LIMIT.count = 0;
     LOG_RATE_LIMIT.lastReset = now;
@@ -62,7 +76,8 @@ function checkRateLimit(): boolean {
 
   if (LOG_RATE_LIMIT.count > LOG_RATE_LIMIT.maxPerSecond) {
     LOG_RATE_LIMIT.killed = true;
-    console.error("\n🛑 LOOP DETECTADO: Logger desativado (>100 logs/seg). Processo continuando sem logs.\n");
+    LOG_RATE_LIMIT.killedAt = now;
+    console.error(`\n🛑 LOOP DETECTADO: Logger pausado (>${LOG_RATE_LIMIT.maxPerSecond} logs/seg). Recuperação automática em ${LOG_RATE_LIMIT.cooldownMs/1000}s.\n`);
     return false;
   }
 
