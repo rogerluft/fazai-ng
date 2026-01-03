@@ -1,5 +1,52 @@
 # FazAI Changelog
 
+## [3.14.8] - 2026-01-03
+
+### 🛡️ Feat: Command Fallback System
+
+**Objetivo:** Garantir comandos válidos quando LLM gera output inválido ou truncado.
+
+#### Problema Identificado
+Análise do `debub.log` revelou falhas em modelos locais (phi3):
+- **Test 2:** `df -h --output=TOTALKB` (opção inválida no df)
+- **Test 3:** JSON truncado sem campo `command`
+
+#### Solução Implementada
+
+1. **Novo módulo:** `src/command-fallbacks.ts`
+   - Intent matching com regex (PT-BR e EN)
+   - 9 intents suportados: disk_usage, system_info, memory_usage, list_files, network_info, process_list, uptime, who_logged, kernel_info
+   - Comandos garantidos para cada intent
+
+2. **Integração em:** `src/linux-admin.ts`
+   - Fallback ativado quando LLM não retorna comandos válidos
+   - Log: `⚡ Usando comando fallback para: [task]...`
+
+3. **Testes TDD:** `tests/unit/command-fallbacks.test.ts` (19 testes)
+
+#### Comandos Fallback
+
+| Intent | Comando |
+|--------|---------|
+| disk_usage | `df -h` |
+| system_info | `uname -a && cat /etc/os-release 2>/dev/null \|\| hostnamectl` |
+| memory_usage | `free -h` |
+| list_files | `ls -la` |
+| network_info | `ip addr show \|\| ifconfig` |
+| process_list | `ps aux --sort=-%mem \| head -20` |
+| uptime | `uptime` |
+| who_logged | `who` |
+| kernel_info | `uname -r` |
+
+#### Arquivos Criados/Modificados
+- `src/command-fallbacks.ts` (novo)
+- `src/linux-admin.ts` (integração)
+- `tests/unit/command-fallbacks.test.ts` (novo)
+- `tests/unit/streaming-parser.test.ts` (novo)
+- `docs/plans/2026-01-03-command-fallbacks-design.md` (plano TDD)
+
+---
+
 ## [3.14.7] - 2026-01-03
 
 ### 🚀 Feat: Separação de Endpoints Chat vs Embedding

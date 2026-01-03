@@ -12,6 +12,7 @@ import { captureLearning } from "./rag/auto-learning";
 import { createEmbeddingService } from "./services/embeddings";
 import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
 import { SemanticCache } from "./services/semantic-cache";
+import { tryGetFallbackForRequest } from "./command-fallbacks";
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google" | "llama";
 
@@ -521,9 +522,18 @@ export async function* getLinuxCommandsFromAI(
         yield result;
       }
 
-      // If we got here without yielding commands, consider it a failure
+      // If we got here without yielding commands, try fallback system
       if (!commandsYielded) {
-        throw new Error(`Provider ${currentProvider} returned no commands`);
+        const fallbackCmd = tryGetFallbackForRequest(task);
+        if (fallbackCmd) {
+          logger.info(chalk.yellow(`⚡ Usando comando fallback para: ${task.substring(0, 50)}...`));
+          yield { type: "command", command: fallbackCmd };
+          yield { type: "allcommands", commands: [fallbackCmd] };
+          commandsYielded = true;
+          collectedCommands.push(fallbackCmd);
+        } else {
+          throw new Error(`Provider ${currentProvider} returned no commands`);
+        }
       }
 
       // 🎯 SEMANTIC CACHE: Armazena comandos bem-sucedidos
