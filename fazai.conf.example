@@ -259,6 +259,7 @@ ENABLE_PREVIEW_FEATURES=false
 # Authentication Method 2: Username/Password (legacy)
 # SPAMEXPERTS_USERNAME=your_username
 # SPAMEXPERTS_PASSWORD=your_password
+
 # ============================================================================
 # OPNsense INTEGRATION
 # ============================================================================

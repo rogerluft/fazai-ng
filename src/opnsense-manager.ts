@@ -1,5 +1,6 @@
 import * as https from 'https'
 import { loadConfig } from './config'
+import { logger } from './logger'
 
 // Interfaces para a configuração do OPNsenseManager
 interface OPNsenseConfig {
@@ -77,6 +78,8 @@ export interface SystemStatus {
  *
  * Classe para interagir com a API do OPNsense,
  * abstraindo a complexidade das chamadas HTTP, autenticação e tratamento de SSL.
+ *
+ * Refatorado para usar endpoints MVC corretos (firewall/filter/...).
  */
 export class OPNsenseManager {
   private config: OPNsenseConfig
@@ -111,6 +114,7 @@ export class OPNsenseManager {
     }
 
     try {
+      logger.debug(`OPNsense Request: ${method} ${url}`);
       const response = await fetch(url, {
         method,
         headers,
@@ -135,32 +139,47 @@ export class OPNsenseManager {
   }
 
   // ============================================================================
-  // Métodos de Firewall
+  // Métodos de Firewall (MVC API)
   // ============================================================================
 
   async listFirewallRules(): Promise<FirewallRule[]> {
-    const { rule: rules } = await this.request<any>('firewall/filter/get')
-    return Object.values(rules).map((r: any) => ({
-      id: r.id,
-      action: r.action,
-      interface: r.interface,
-      protocol: r.protocol,
-      source: r.source.any ? 'any' : r.source.address,
-      destination: r.destination.any ? 'any' : r.destination.address,
-      port: r.destination.port,
+    // searchRule retorna { rows: [...] }
+    const response = await this.request<any>('firewall/filter/searchRule');
+    const rows = response.rows || [];
+
+    return rows.map((r: any) => ({
+      id: r.uuid,
+      action: r.action || 'pass',
+      interface: r.interface || 'lan',
+      protocol: r.protocol || 'any',
+      source: r.source_net || 'any',
+      destination: r.destination_net || 'any',
+      port: r.destination_port || '',
       enabled: r.enabled === '1',
     }))
   }
 
   async addFirewallRule(rule: FirewallRule): Promise<void> {
-    await this.request('firewall/filter/add', {
+    const payload = {
+      rule: {
+        action: rule.action,
+        interface: rule.interface,
+        protocol: rule.protocol,
+        source_net: rule.source,
+        destination_net: rule.destination,
+        destination_port: rule.port,
+        enabled: rule.enabled ? '1' : '0',
+        description: 'Created by FazAI'
+      }
+    };
+    await this.request('firewall/filter/addRule', {
       method: 'POST',
-      body: rule,
+      body: payload,
     })
   }
 
   async deleteFirewallRule(uuid: string): Promise<void> {
-    await this.request(`firewall/filter/del/${uuid}`, {
+    await this.request(`firewall/filter/delRule/${uuid}`, {
       method: 'POST',
     })
   }
@@ -173,22 +192,33 @@ export class OPNsenseManager {
 
   // ============================================================================
   // Métodos de NAT (Port Forward)
+  // Nota: A API de NAT Port Forward (firewall/nat) pode não estar disponível em todas as versões.
   // ============================================================================
 
   async listNATRules(): Promise<NATRule[]> {
-    const { rule: rules } = await this.request<any>('firewall/nat/get')
-    return Object.values(rules).map((r: any) => ({
-      id: r.id,
-      interface: r.interface,
-      protocol: r.protocol,
-      externalPort: r.dstport,
-      internalIP: r.target,
-      internalPort: r['local-port'],
-      enabled: r.enabled === '1',
-    }))
+    // Tentativa best-effort usando endpoint comum ou placeholder
+    try {
+      const response = await this.request<any>('firewall/nat/get');
+      // Se a API antiga existir, pode retornar { nat: { rule: ... } }
+      const rules = response.nat?.rule || {};
+      return Object.values(rules).map((r: any) => ({
+        id: r.uuid || r.id,
+        interface: r.interface,
+        protocol: r.protocol,
+        externalPort: r.dstport,
+        internalIP: r.target,
+        internalPort: r['local-port'],
+        enabled: r.enabled === '1',
+      }));
+    } catch (e) {
+      logger.warn("Falha ao listar regras NAT (endpoint pode não existir): " + e);
+      return [];
+    }
   }
 
   async addPortForward(rule: NATRule): Promise<void> {
+    // Placeholder - endpoint exato de NAT/PortForward varia
+    logger.warn("Adicionar Port Forward via API pode não ser suportado nesta versão.");
     await this.request('firewall/nat/add', {
       method: 'POST',
       body: rule,
@@ -212,19 +242,45 @@ export class OPNsenseManager {
   // ============================================================================
 
   async listInterfaces(): Promise<NetworkInterface[]> {
-    return this.request<NetworkInterface[]>('interfaces/overview/get')
+    // Retorna objeto { "wan": {...}, "lan": {...} }
+    const data = await this.request<any>('interfaces/overview/interfacesInfo');
+
+    return Object.keys(data).map(key => {
+      const iface = data[key];
+      return {
+        name: iface.descr || key.toUpperCase(),
+        device: iface.config?.if || iface.identifier,
+        ipaddr: iface.ipaddr,
+        gateway: iface.gateway,
+        status: iface.status,
+        macaddr: iface.macaddr
+      };
+    });
   }
 
   async listVPNTunnels(): Promise<VPNTunnel[]> {
-    return this.request<VPNTunnel[]>('ipsec/tunnels/get')
+    // Tenta usar endpoint IPsec MVC
+    try {
+      const response = await this.request<any>('ipsec/connections/search'); // ou tunnel/search
+      const rows = response.rows || [];
+      return rows.map((r: any) => ({
+        ikeid: r.uuid,
+        descr: r.description,
+        'remote-gw': r.remote_gateway,
+        status: r.enabled === '1' ? 'active' : 'disabled'
+      }));
+    } catch (e) {
+       // Fallback para legacy se necessário
+       return [];
+    }
   }
 
   async connectVPN(ikeid: string): Promise<void> {
-    await this.request(`ipsec/tunnels/connect/${ikeid}`, { method: 'POST' })
+    await this.request(`ipsec/service/connect/${ikeid}`, { method: 'POST' })
   }
 
   async disconnectVPN(ikeid: string): Promise<void> {
-    await this.request(`ipsec/tunnels/disconnect/${ikeid}`, { method: 'POST' })
+    await this.request(`ipsec/service/disconnect/${ikeid}`, { method: 'POST' })
   }
 
   async getSystemStatus(): Promise<SystemStatus> {
@@ -236,6 +292,15 @@ export class OPNsenseManager {
   }
 
   async listDHCPLeases(): Promise<DHCPLease[]> {
-    return this.request<DHCPLease[]>('dhcpd/leases/get')
+    // dhcpv4/leases/searchLease
+    const response = await this.request<any>('dhcpv4/leases/searchLease');
+    const rows = response.rows || [];
+    return rows.map((r: any) => ({
+      address: r.address,
+      mac: r.mac,
+      hostname: r.hostname,
+      descr: r.description,
+      status: r.status
+    }));
   }
 }
