@@ -8,7 +8,7 @@
  * - Automatic fallback handling
  *
  * Key Changes from Original:
- * - ❌ Removed: Zero padding (1024 → 1536)
+ * - ✅ Updated: Zero padding enforced (768/1024 → 1536) for cross-compatibility
  * - ✅ Added: Collection-specific strategies
  * - ✅ Added: Semantic chunking
  * - ✅ Added: Model availability checking
@@ -78,12 +78,13 @@ export interface EmbeddingService {
 /**
  * Ollama Embedding Service - Refactored
  *
- * Uses native dimensions (1024 or 768) without zero padding.
+ * Uses zero padding to enforce 1536 dimensions for compatibility.
  * Model selection based on collection type.
  */
 class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private modelCache: Map<CollectionType, EmbeddingModel>;
+  private readonly TARGET_DIMENSION = 1536;
 
   constructor(baseUrl: string = getOllamaEmbedUrl()) {
     this.baseUrl = baseUrl;
@@ -231,15 +232,23 @@ class OllamaEmbeddingService implements EmbeddingService {
               const rawEmbedding = data.embedding as number[];
 
               // VALIDAÇÃO ESTRITA DE DIMENSÃO - Proteção contra corrupção de vetores
-              // FazAI usa exclusivamente nomic-embed-text (768 dim)
-              const EXPECTED_DIM = 768; // nomic-embed-text native dimension
+              // FazAI usa exclusivamente nomic-embed-text (768 dim) mas faz padding para 1536
+              const EXPECTED_INPUT_DIM = 768; // nomic-embed-text native dimension
 
-              if (rawEmbedding.length !== EXPECTED_DIM) {
-                throw new Error(
-                  `DIMENSION MISMATCH! Expected ${EXPECTED_DIM} (nomic-embed-text), got ${rawEmbedding.length}.\n` +
-                  `Wrong embedding model detected. FazAI requires nomic-embed-text.\n` +
-                  `Fix: ollama pull nomic-embed-text && configure OLLAMA_EMBED_URL in fazai.conf`
-                );
+              // Validamos se o modelo retornou o que esperamos
+              if (rawEmbedding.length !== EXPECTED_INPUT_DIM && rawEmbedding.length !== 1024) {
+                 // Permitimos 1024 (mxbai) também, mas o ideal é 768
+                 logger.warn(`Unexpected embedding dimension: ${rawEmbedding.length}. Expected 768.`);
+              }
+
+              // PADDING PARA 1536 (OpenAI compatible)
+              if (rawEmbedding.length < this.TARGET_DIMENSION) {
+                  const paddingSize = this.TARGET_DIMENSION - rawEmbedding.length;
+                  const paddedEmbedding = [
+                      ...rawEmbedding,
+                      ...new Array(paddingSize).fill(0)
+                  ];
+                  return paddedEmbedding;
               }
 
               return rawEmbedding;
@@ -266,7 +275,7 @@ class OllamaEmbeddingService implements EmbeddingService {
         logger.error(
           `Failed to generate embedding for text ${i + 1}: ${error.message}`
         );
-        embeddings.push(new Array(dimension).fill(0));
+        embeddings.push(new Array(this.TARGET_DIMENSION).fill(0));
       }
     }
 
@@ -307,8 +316,8 @@ class OllamaEmbeddingService implements EmbeddingService {
     // Return info for default model (will vary by collection at runtime)
     return {
       provider: "ollama" as const,
-      model: "mxbai-embed-large (dynamic)",
-      dimension: 1024, // Most common dimension
+      model: "nomic-embed-text (dynamic + padding)",
+      dimension: 1536, // Standardized dimension
       isLocal: true,
     };
   }
@@ -579,5 +588,6 @@ export async function getEmbeddingDimension(
     return 0;
   }
 
-  return strategy.dimension;
+  // Enforce 1536 for all collections
+  return 1536;
 }
