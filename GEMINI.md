@@ -18,10 +18,11 @@ This document serves as the authoritative guide for the Gemini agent when workin
 
 The FazAI agent operates in a distributed environment. When generating configuration or debugging connectivity, use the following details:
 
-*   **Host:** `home.rogerluft.com.br`
-*   **Ollama Port:** `11434` (Inference & Embeddings)
+*   **Remote unique Host:** `home.rogerluft.com.br`
+*   **Local detail host configuration follow /etc/fazai/fazai.conf***
+*   **Ollama Port:** `11434` (Inference & Embeddings) - host 192.168.0.101
 *   **Llama.cpp Port:** `11430`
-*   **Qdrant Port:** `6333` (Vector Database)
+*   **Qdrant Port:** `6333` (Vector Database) - host container pod "qdrant" localhost 
 
 ### Embedding Configuration
 *   **Model:** `nomic-embed-text` (running on Ollama)
