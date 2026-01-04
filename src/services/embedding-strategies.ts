@@ -187,7 +187,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   personality: {
     collection: "fazai_personality",
     model: "nomic-embed-text",
-    dimension: 768,
+    dimension: 1536, // Padded to 1536
     chunking: CHUNKING_STRATEGIES.personality,
     distanceMetric: "Dot", // Better for sparse trait vectors
     preprocess: PREPROCESSING_FUNCTIONS.personality,
@@ -196,7 +196,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   memory: {
     collection: "fazai_memory",
     model: "mxbai-embed-large",
-    dimension: 1024,
+    dimension: 1536, // Padded to 1536
     chunking: CHUNKING_STRATEGIES.memory,
     distanceMetric: "Cosine", // Good for conversational similarity
     preprocess: PREPROCESSING_FUNCTIONS.memory,
@@ -205,7 +205,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   learning: {
     collection: "fazai_learning",
     model: "mxbai-embed-large",
-    dimension: 1024,
+    dimension: 1536, // Padded to 1536
     chunking: CHUNKING_STRATEGIES.learning,
     distanceMetric: "Dot", // Commands are more literal (magnitude matters)
     preprocess: PREPROCESSING_FUNCTIONS.learning,
@@ -215,7 +215,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   kb: {
     collection: "fazai_kb",
     model: "mxbai-embed-large",
-    dimension: 1024,
+    dimension: 1536, // Padded to 1536
     chunking: CHUNKING_STRATEGIES.kb,
     distanceMetric: "Cosine", // Dense technical docs need direction match
     preprocess: PREPROCESSING_FUNCTIONS.kb,

@@ -192,7 +192,7 @@ describe("Embedding Strategies", () => {
 
       expect(strategy.collection).toBe("fazai_personality");
       expect(strategy.model).toBe("nomic-embed-text");
-      expect(strategy.dimension).toBe(768);
+      expect(strategy.dimension).toBe(1536);
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(200);
@@ -203,7 +203,7 @@ describe("Embedding Strategies", () => {
 
       expect(strategy.collection).toBe("fazai_memory");
       expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1024);
+      expect(strategy.dimension).toBe(1536);
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(800);
@@ -214,7 +214,7 @@ describe("Embedding Strategies", () => {
 
       expect(strategy.collection).toBe("fazai_kb");
       expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1024);
+      expect(strategy.dimension).toBe(1536);
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(600);
@@ -225,7 +225,7 @@ describe("Embedding Strategies", () => {
 
       expect(strategy.collection).toBe("fazai_learning");
       expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1024);
+      expect(strategy.dimension).toBe(1536);
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(400);
