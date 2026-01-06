@@ -138,7 +138,7 @@ jobs:
     secrets: 'inherit'
 
   triage:
-      if: false  # Triage desativado temporariamente
+    if: false  # Triage desativado temporariamente
     needs: 'dispatch'
     uses: './.github/workflows/gemini-triage.yml'
     permissions:
