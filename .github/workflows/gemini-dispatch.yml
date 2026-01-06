@@ -138,9 +138,8 @@ jobs:
     secrets: 'inherit'
 
   triage:
+      if: false  # Triage desativado temporariamente
     needs: 'dispatch'
-    if: |-
-      ${{ needs.dispatch.outputs.command == 'triage' }}
     uses: './.github/workflows/gemini-triage.yml'
     permissions:
       contents: 'read'
