@@ -1,8 +1,9 @@
-name: '📋 Gemini Scheduled Issue Triage'
+name: '📋 Gemini Scheduled Issue Triage (DISABLED)'
 
 on:
-  schedule:
-    - cron: '0 * * * *' # Runs every hour
+  # Triage desativado - workflow não será executado
+  # schedule:
+  #   - cron: '0 * * * *' # Runs every hour
   pull_request:
     branches:
       - 'main'
@@ -27,6 +28,7 @@ defaults:
 
 jobs:
   triage:
+    if: false  # Triage desativado
     runs-on: 'ubuntu-latest'
     timeout-minutes: 7
     permissions:
