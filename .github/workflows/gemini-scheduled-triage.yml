@@ -1,7 +1,7 @@
 name: '📋 Gemini Scheduled Issue Triage (DISABLED)'
 
 on:
-  # Triage disabled - workflow will not execute
+  # Triage disabled - schedule commented out to prevent automatic execution
   # schedule:
   #   - cron: '0 * * * *' # Runs every hour
   pull_request:
