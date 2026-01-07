@@ -50,9 +50,8 @@ describe('Vector Store Integrity (ECOA Standards)', () => {
         
         if (size !== TARGET_DIMENSION) {
            console.warn(`⚠️ Collection ${col.name} has dimension ${size}, expected ${TARGET_DIMENSION}.`);
-           // This is a warning, not a hard fail, for developer flexibility.
         }
-         expect(size).toBe(TARGET_DIMENSION);
+        expect(size).toBe(TARGET_DIMENSION);
       }
     }
   });
