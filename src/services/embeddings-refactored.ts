@@ -231,17 +231,19 @@ class OllamaEmbeddingService implements EmbeddingService {
 
               const rawEmbedding = data.embedding as number[];
 
-              // VALIDAÇÃO ESTRITA DE DIMENSÃO - Proteção contra corrupção de vetores
-              // FazAI usa exclusivamente nomic-embed-text (768 dim) mas faz padding para 1536
+              // STRICT DIMENSION VALIDATION - Protection against vector corruption
+              // FazAI primarily uses nomic-embed-text (768 dim) or mxbai-embed-large (1024 dim)
+              // All embeddings are normalized to 1536 dimensions for cross-compatibility
               const EXPECTED_INPUT_DIM = 768; // nomic-embed-text native dimension
 
-              // Validamos se o modelo retornou o que esperamos
+              // Validate that the model returned expected dimensions
               if (rawEmbedding.length !== EXPECTED_INPUT_DIM && rawEmbedding.length !== 1024) {
-                 // Permitimos 1024 (mxbai) também, mas o ideal é 768
-                 logger.warn(`Unexpected embedding dimension: ${rawEmbedding.length}. Expected 768.`);
+                 // We accept both 768 and 1024 dimensions, but 768 is preferred
+                 logger.warn(`Unexpected embedding dimension: ${rawEmbedding.length}. Expected 768 or 1024.`);
               }
 
-              // PADDING PARA 1536 (OpenAI compatible)
+              // NORMALIZE TO 1536 DIMENSIONS (OpenAI compatible)
+              // Pad embeddings smaller than target dimension
               if (rawEmbedding.length < this.TARGET_DIMENSION) {
                   const paddingSize = this.TARGET_DIMENSION - rawEmbedding.length;
                   const paddedEmbedding = [
@@ -249,6 +251,14 @@ class OllamaEmbeddingService implements EmbeddingService {
                       ...new Array(paddingSize).fill(0)
                   ];
                   return paddedEmbedding;
+              }
+
+              // Truncate embeddings larger than target dimension
+              if (rawEmbedding.length > this.TARGET_DIMENSION) {
+                  logger.warn(
+                    `Truncating embedding from ${rawEmbedding.length} to ${this.TARGET_DIMENSION} dimensions`
+                  );
+                  return rawEmbedding.slice(0, this.TARGET_DIMENSION);
               }
 
               return rawEmbedding;
@@ -574,10 +584,12 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
 /**
  * Get embedding dimension for collection type
  *
- * Returns native dimension (no padding).
+ * Returns standardized dimension of 1536 for all collections that require embeddings.
+ * This ensures cross-compatibility between Ollama models (768/1024 native dimensions)
+ * and OpenAI models (1536 native dimension).
  *
  * @param collectionType Collection type
- * @returns Embedding dimension
+ * @returns Embedding dimension (1536 for collections requiring embeddings, 0 otherwise)
  */
 export async function getEmbeddingDimension(
   collectionType: CollectionType
