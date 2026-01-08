@@ -1,0 +1,70 @@
+# =============================================================================
+# FazAI-NG - Dockerfile para Render.com
+# =============================================================================
+# Imagem Docker otimizada para deploy no Render com:
+#   - Next.js (dashboard web)
+#   - ttyd (terminal web com autenticacao)
+#   - Supervisor para gerenciar processos
+# =============================================================================
+
+FROM node:20-slim
+
+# Evita prompts interativos durante instalacao
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Instalar dependencias do sistema
+RUN apt-get update && apt-get install -y \
+    # ttyd para terminal web
+        ttyd \
+            # Supervisor para gerenciar processos
+                supervisor \
+                    # Ferramentas uteis no terminal
+                        bash \
+                            curl \
+                                wget \
+                                    git \
+                                        vim \
+                                            htop \
+                                                procps \
+                                                    net-tools \
+                                                        # Limpar cache
+                                                            && rm -rf /var/lib/apt/lists/* \
+                                                                && apt-get clean
+
+                                                                # Diretorio de trabalho
+                                                                WORKDIR /app
+
+                                                                # Copiar package.json primeiro (melhor cache de layers)
+                                                                COPY web/package*.json ./web/
+
+                                                                # Instalar dependencias do Next.js
+                                                                RUN cd web && npm ci --only=production
+
+                                                                # Copiar codigo fonte do dashboard
+                                                                COPY web ./web
+
+                                                                # Build do Next.js
+                                                                RUN cd web && npm run build
+
+                                                                # Copiar configuracao do supervisor
+                                                                COPY docker/supervisor/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+
+                                                                # Criar diretorios necessarios
+                                                                RUN mkdir -p /var/log/supervisor /data
+
+                                                                # Variaveis de ambiente padrao
+                                                                ENV NODE_ENV=production
+                                                                ENV PORT=10000
+                                                                ENV TTYD_PORT=7681
+                                                                ENV TTYD_USERNAME=admin
+                                                                ENV TTYD_PASSWORD=changeme
+
+                                                                # Expor porta principal (Render usa apenas uma porta HTTP)
+                                                                EXPOSE 10000
+
+                                                                # Healthcheck
+                                                                HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+                                                                    CMD curl -f http://localhost:10000/api/health || exit 1
+
+                                                                    # Iniciar via supervisor (gerencia Next.js + ttyd)
+                                                                    CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
