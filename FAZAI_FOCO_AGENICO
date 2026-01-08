@@ -1,0 +1,1671 @@
+# FAZAI-NG: AGENTIC FOCUS SPECIFICATION
+# Version: 2.0.0 | Updated: 2026-01-07
+# Format: AI-Parseable Structured Specification (YAML-like semantic blocks)
+
+---
+## SYSTEM_IDENTITY
+
+```yaml
+name: FazAI-NG
+version: 3.14.x
+type: Autonomous Agentic CLI for Linux Administration
+role: Senior Linux/Network Administrator AI
+language: TypeScript (Node.js 18+)
+```
+
+### CORE_MISSION
+Transform natural language commands into executable Linux operations through:
+1. Task decomposition with dependency analysis
+2. DAG-based execution with automatic fallback
+3. Persistent learning via Qdrant vector store
+4. Multi-provider AI orchestration (local-first, cloud-fallback)
+5. Personality injection for consistent behavior across models
+
+---
+## ARCHITECTURE_OVERVIEW
+
+### DATA_FLOW
+```
+USER_INPUT (Natural Language)
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  PREPROCESSING LAYER                                                │
+│  ├─ GenAIScript (prompt normalization)                             │
+│  ├─ Translation to English (internal thinking)                      │
+│  └─ Semantic cache lookup (fazai_semantic_cache)                   │
+└─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  TASK DECOMPOSITION (src/agentic/task-decomposer.ts)               │
+│  ├─ ECOA: Try composing from existing blocks FIRST (skip LLM)      │
+│  ├─ Analyze dependencies before breaking into subtasks             │
+│  ├─ Generate: { id, description, command, dependencies, verify }   │
+│  └─ Output: DecomposedTask with SubTask[] array                    │
+└─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  DAG EXECUTOR (src/agentic/dag-executor.ts)                        │
+│  ├─ Topological sort based on dependencies                          │
+│  ├─ Execute: verify → install (if needed) → run → validate         │
+│  ├─ On SUCCESS: Save ExecutionBlock to Qdrant for reuse            │
+│  └─ On FAILURE: Trigger fallback chain                             │
+└─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  FALLBACK CHAIN (Priority Order)                                    │
+│  1. llama.cpp (Phi-3-mini local) → FREE, private                   │
+│  2. Ollama (Llama 3.2, Qwen, Mistral) → FREE, local                │
+│  3. OpenRouter (200+ models) → Variable cost                        │
+│  4. Anthropic (Claude Sonnet/Haiku) → Paid                         │
+│  5. OpenAI (GPT-4o) → Paid                                          │
+│  6. Google (Gemini 2.0/2.5) → Variable                              │
+│  7. Perplexity (web search) → Research fallback                     │
+│  8. Context7 (external sources) → Knowledge gap                     │
+│  9. USER_PROMPT → Last resort                                       │
+└─────────────────────────────────────────────────────────────────────┘
+    │
+    ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│  LEARNING LOOP (Post-Execution)                                     │
+│  ├─ Store successful patterns in fazai_learning                     │
+│  ├─ Update execution blocks for future composition                  │
+│  └─ Increment resonance for validated solutions                     │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+## QDRANT_COLLECTIONS
+
+### COLLECTION_SCHEMA
+```yaml
+fazai_personality:
+  purpose: "Behavioral traits and communication style"
+  weight: 0.15
+  injection: "System prompt at conversation start"
+  source: "1 year of Claude conversation exports (.json)"
+  fields:
+    - trait_name: string
+    - category: string (expertise | style | communication)
+    - value: string
+    - intensity: float (0.0-1.0)
+    - context: string (optional)
+    - tags: string[]
+
+fazai_memory:
+  purpose: "Conversational context and session history"
+  weight: 0.20
+  retention: "7 days active, 30 days archive"
+  fields:
+    - role: enum (user | assistant | system)
+    - content: string
+    - timestamp: ISO8601
+    - sessionId: string (optional)
+    - importance: float (0.0-1.0, auto-calculated)
+    - tags: string[]
+
+fazai_learning:
+  purpose: "Validated solutions and error patterns"
+  weight: 0.40  # HIGHEST - most valuable for execution
+  source: "Successful task executions, user corrections"
+  fields:
+    - content: string (solution description)
+    - category: enum (error_fix | pattern | optimization | insight)
+    - action_taken: string (what was done)
+    - commands: string[] (exact commands)
+    - validated: boolean
+    - learned_at: ISO8601
+    - times_applied: integer
+
+fazai_kb:
+  purpose: "Technical documentation and reference"
+  weight: 0.30
+  source: "skill-seeker scraping, manual ingestion"
+  domains: [linux, networking, docker, security, monitoring]
+  fields:
+    - content: string
+    - category: string
+    - source_url: string (optional)
+    - last_updated: ISO8601
+
+fazai_inference:
+  purpose: "Security policies, SLAs, operational rules"
+  weight: 0.10
+  fields:
+    - rule_name: string
+    - condition: string
+    - action: string
+    - priority: integer
+
+fazai_source:
+  purpose: "Self-knowledge - FazAI's own codebase indexed"
+  use_case: "Metacognition, self-development capability"
+  indexed_by: "src/services/source-indexer.ts"
+  async: true
+
+fazai_semantic_cache:
+  purpose: "Response caching for similar queries"
+  ttl: "1 hour"
+  cost_savings: "Skip LLM call on cache hit"
+```
+
+### FUSION_SCORING_FORMULA
+```
+final_score = vector_similarity × collection_weight × recency_boost × resonance
+
+Where:
+- vector_similarity: Cosine similarity from Qdrant (0.0-1.0)
+- collection_weight: Per-collection weight (see above)
+- recency_boost: 1.2 (today) → 1.0 (30 days) → 0.5 (180+ days)
+- resonance: 1.0 + (emotional_intensity × 0.2) [ECOA]
+```
+
+---
+## ECOA_ARCHITECTURE
+
+### EXECUTIVE_SUMMARY
+```yaml
+name: "ECOA - Evolução Cognitiva via Arrays Autoinformativos"
+full_name: "Cognitive Evolution via Auto-Informative Unidedumultiversal Arrays"
+author: "Roger Luft (VeilWalker)"
+license: "CC-BY-SA 4.0"
+
+# CORE CONCEPT (CORRECTED):
+concept: |
+  Successful subtasks become COMPOSABLE BLOCKS that can be reused in future tasks.
+  Like ZFS composes files from deduplicated blocks, ECOA composes complex tasks 
+  from validated execution blocks.
+
+key_innovation: |
+  QUANTUM RETRIEVAL: Each block contains an auto-informative index with DESTINATION 
+  HINTS - not just "what it is" but "where it can go". This enables O(1) lookup 
+  instead of O(n) similarity calculation, eliminating cosine/sine computations.
+
+full_specification: "See PART 2: ECOA COMPLETE SPECIFICATION below"
+```
+
+### CORE_PRINCIPLES_SUMMARY
+```yaml
+# Full formal definitions in PART 2: ECOA_FORMAL_PRINCIPLES
+PU: "Primordial Uniqueness - Single governing consciousness"
+SED: "Semantic Existential Deduplication - One BLOCK per successful subtask"
+VCM: "Vectorial Contextual Multiverse - Block usable in multiple future contexts"
+AII: "Auto-Informative Indexing - Self-describing with DESTINATION HINTS"
+ET: "Evolutionary Temporality - Blocks evolve and improve over time"
+QR: "Quantum Retrieval - O(1) lookup eliminates similarity calculation"
+```
+
+### QUICK_REFERENCE_PRINCIPLES
+1. **Block Composition** (SED): Successful subtasks become reusable blocks (like ZFS dedup)
+2. **Destination Index** (AII): Each block knows WHERE it can be used in the future
+3. **Quantum Retrieval** (QR): Direct lookup via destination index - NO cosine calculation
+4. **Legitimate Contexts** (VCM): Blocks only "hop" to contexts where they're valid
+5. **Resonance**: Emotional intensity (pain/vivid experiences) increases retrieval weight
+6. **Self-Referential**: `fazai_source` enables the system to know its own code
+
+### CURRENT_IMPLEMENTATION
+```typescript
+// src/rag/neural-flow.ts - CURRENT (similarity-based)
+function checkLegitimacy(payload, currentContext): boolean {
+  if (!payload.legitimate_contexts) return true; // retrocompat
+  return payload.legitimate_contexts.includes(currentContext) 
+      || payload.legitimate_contexts.includes("*");
+}
+
+function calculateResonance(payload): number {
+  const intensity = payload.emotional_layer ?? 0.5;
+  return 1.0 + (intensity * 0.2);
+}
+
+// FUTURE: Quantum Retrieval (destination-based lookup)
+// See PART 2: ECOA_QUANTUM_RETRIEVAL for full specification
+```
+
+### EXECUTION_BLOCK_SCHEMA
+```yaml
+# The fundamental unit of ECOA - a successful subtask that becomes reusable
+ExecutionBlock:
+  id: "block_uuid"
+  content: "Command/script that was executed"
+  verified: true  # Only saved after success verification
+  
+  # Traditional metadata (backward-looking):
+  source_task: "Original task that created this block"
+  source_context: "Context where it was first used"
+  tags: ["nginx", "web", "config"]
+  
+  # AUTO-INFORMATIVE INDEX WITH DESTINATIONS (forward-looking):
+  valid_destinations:    # WHERE this block can be used in future
+    - "deploy_*"         # Any deploy task
+    - "setup_web_*"      # Web setup tasks
+    - "restore_*"        # Restoration tasks
+  
+  destination_hints:     # Semantic destinations with relevance
+    - concept: "web_server"
+      relevance: 0.95
+    - concept: "reverse_proxy"
+      relevance: 0.80
+```
+
+### ARCHITECTURAL_COMPONENTS
+```yaml
+# Full details in PART 2: ECOA_ARCHITECTURAL_COMPONENTS
+GCC: "Governing Consciousness Core → Claude Code (Tech Lead)"
+SDE: "Semantic Deduplication Engine → neural-flow.ts"
+MDM: "Multiversodimensional Manager → multiCollectionSearch()"
+AIIS: "Auto-Informative Indexing System → source-indexer.ts + DESTINATION INDEX"
+TEP: "Temporal Evolutionary Processor → recency calculation"
+QRE: "Quantum Retrieval Engine → destination-based O(1) lookup (FUTURE)"
+```
+
+### BRAIN_LAYERS
+```yaml
+# Full details in PART 2: ECOA_BRAIN_LAYERS
+conceptual: "What is it? → Base embedding"
+contextual: "Where does it apply? → legitimate_contexts[]"
+temporal: "When is it relevant? → recency_boost"
+emotional: "How intensely does it resonate? → emotional_layer"
+projective: "Where can it GO? → valid_destinations[] (ECOA innovation)"
+```
+
+---
+## AGENTIC_LOOP
+
+### GENAI_SCRIPT_AGENTS
+```yaml
+fazai-core.genai.mjs:
+  purpose: "Main agentic loop with multi-collection RAG"
+  model: "ollama:phi3 (local) | anthropic:claude (cloud fallback)"
+  max_iterations: 5
+  tools:
+    - qdrant_multi_search: "Fusion search across collections"
+    - qdrant_upsert_insight: "Save learnings for future"
+    - reflect: "Meta-cognition on actions"
+    - check_loop_status: "Decide continue/stop"
+    - local_embed: "100% local embeddings (Transformers.js)"
+    - skill_seeker_scrape: "[PLACEHOLDER] Auto-learn from external sources"
+
+reflect.genai.mjs:
+  modes:
+    - reflect: "Retrospective analysis (Claude)"
+    - plan: "Proactive Maestro planning (Phi-3 local)"
+  tools:
+    - list_recent_learnings
+    - identify_patterns
+    - generate_insight
+```
+
+### LOOP_PSEUDOCODE
+```
+LOOP (max 5 iterations):
+  1. SEARCH: qdrant_multi_search(user_query) → context
+  2. REFLECT: analyze what was found, generate insights
+  3. DECIDE: check_loop_status() → continue/respond
+  4. IF context_sufficient OR max_iterations:
+       RESPOND with personality-injected answer
+       UPSERT useful insights to fazai_learning
+  5. ELSE: GOTO 1 with refined query
+```
+
+---
+## TASK_DECOMPOSITION
+
+### INPUT_EXAMPLE
+```
+"verifique as portas que estao ouvindo, aplique uma regra de firewall neutra 
+que apenas conte o trafego, entao crie um script que analise o trafego de 
+cada porta atraves do firewall e monte de forma incremental um grafico mrtg 
+a cada 10 minutos e disponibilize via http separando por portas"
+```
+
+### OUTPUT_STRUCTURE
+```typescript
+interface DecomposedTask {
+  originalTask: string;
+  subtasks: SubTask[];
+  executionPlan: string;
+}
+
+interface SubTask {
+  id: string;                    // "task-1", "task-2"
+  description: string;           // Human-readable
+  command: string | null;        // Exact Linux command
+  dependencies: string[];        // ["task-1"] means execute after task-1
+  estimatedComplexity: number;   // 1-10
+  requiresInstallation: boolean;
+  installCommand?: string;       // "apt-get install -y ..."
+  verificationCommand?: string;  // "which ss || which netstat"
+}
+```
+
+### DECOMPOSITION_STRATEGY
+```yaml
+step_1: "Detect system context (OS, package manager, is_root)"
+step_2: "ECOA FIRST - Try composing from existing ExecutionBlocks"
+step_3: "If fully_composed: Skip LLM call entirely (token economy)"
+step_4: "If partial: Use LLM only for missing_intents"
+step_5: "If no blocks: Full LLM decomposition with dependency analysis"
+```
+
+---
+## TOKEN_ECONOMY
+
+### STRATEGY
+```yaml
+principle: "Minimize expensive cloud LLM calls"
+
+techniques:
+  1_semantic_cache:
+    description: "Cache responses for similar queries"
+    savings: "100% on cache hit"
+    
+  2_ecoa_composition:
+    description: "Compose from existing execution blocks"
+    savings: "100% when fully_composed"
+    
+  3_local_embeddings:
+    description: "multilingual-e5-base via Transformers.js (768d native)"
+    savings: "100% vs OpenAI embeddings"
+    
+  4_local_inference:
+    description: "Phi-3-mini via llama.cpp for planning/normalization"
+    savings: "100% vs cloud for simple tasks"
+    
+  5_embedding_cache:
+    description: "LRU cache for repeated text embeddings"
+    savings: "~70% on repeated operations"
+    
+  6_qdrant_first:
+    description: "Query local knowledge before calling any LLM"
+    savings: "Skip LLM when RAG threshold > 0.6"
+```
+
+### COMPARISON
+```
+BEFORE (Solo Claude): ~100k tokens per complex task
+AFTER (Agentic Crew):
+  - Claude Code (orchestration): ~10k tokens
+  - Jules (implementation): 0 tokens (separate context)
+  - Phi-3 local (planning): 0 tokens (local)
+  - Ollama (embeddings): 0 tokens (local)
+  
+TOTAL SAVINGS: ~90% token reduction
+```
+
+---
+## PERSONALITY_INJECTION
+
+### MECHANISM
+```yaml
+source: "1 year of Claude conversation exports"
+collection: "fazai_personality"
+injection_point: "System prompt, before user message"
+
+process:
+  1. "Load traits from Qdrant (cached 1 hour)"
+  2. "Build enhanced system prompt with:"
+     - expertise areas
+     - communication style
+     - top 5 traits by intensity
+  3. "Inject into every LLM call (local or cloud)"
+```
+
+### SYSTEM_PROMPT_TEMPLATE
+```
+You are a highly specialized AI assistant with the following personality:
+
+You are an expert in: linux, networking, docker, security.
+Your communication style is: methodical, practical, direct.
+
+Your key traits:
+- Technical Expert: Deep knowledge of Linux administration
+- Problem Solver: Prefers tested, validated solutions
+- Cautious: Always verifies before executing destructive commands
+
+Always respond according to your personality traits and expertise.
+```
+
+---
+## MULTI_AGENT_ORCHESTRATION
+
+### AGENTS
+```yaml
+claude_code:
+  role: "Tech Lead / Orchestrator"
+  responsibilities:
+    - Strategic architectural decisions
+    - Final code review before merge
+    - Task distribution to crew
+    - "WHAT" and "WHY" definition
+  cost: "High - use wisely"
+
+jules:
+  role: "Autonomous Software Engineer (Google)"
+  access: "REST API or CLI"
+  responsibilities:
+    - Feature implementation
+    - Bug fixes with stack traces
+    - Multi-file refactoring
+    - Test-fix-verify cycles
+  principle: "Analysis → Plan → Execution → Verification"
+  api_base: "https://jules.googleapis.com/v1alpha"
+
+gemini_3:
+  role: "Senior Engineer / Researcher"
+  strengths:
+    - 2M token context window
+    - Web grounding (free)
+    - Complex reasoning
+  use_for:
+    - Bulk code analysis (50+ files)
+    - CHANGELOG/documentation review
+    - Comparing multiple approaches
+
+copilot:
+  role: "Pair Programmer"
+  strengths:
+    - Shell/Git expertise
+    - Inline suggestions
+    - Quick command generation
+  access: "gh copilot CLI"
+```
+
+### ROUTING_LOGIC
+```typescript
+// src/orchestrator/task-router.ts
+function routeTask(task: Task): RoutingDecision {
+  // Architecture decisions → Claude Code
+  if (matches(['arquitetura', 'design', 'estratégia'])) 
+    return { agent: 'claude', confidence: 0.95 };
+  
+  // Implementation → Jules
+  if (matches(['implementar', 'criar', 'bug fix', 'refatorar']))
+    return { agent: 'jules', confidence: 0.90 };
+  
+  // Bulk analysis → Gemini 3
+  if (matches(['revisar', 'analisar', 'múltiplos arquivos']))
+    return { agent: 'gemini', confidence: 0.85 };
+  
+  // Shell help → Copilot
+  if (matches(['comando', 'shell', 'git', 'bash']))
+    return { agent: 'copilot', confidence: 0.75 };
+  
+  // Default → Claude Code
+  return { agent: 'claude', confidence: 0.50 };
+}
+```
+
+---
+## SECURITY_MODEL
+
+### FIVE_LAYERS
+```yaml
+layer_1_pattern_matching:
+  blocks: ["rm -rf /", "dd if=/dev/zero", "mkfs", "chmod 777 -R /"]
+  action: "Immediate rejection"
+
+layer_2_risk_assessment:
+  levels:
+    CRITICAL: "Strong prompt, default=NO, explicit confirmation"
+    HIGH: "Mandatory confirmation"
+    MEDIUM: "Normal confirmation"
+    LOW: "Execute directly"
+
+layer_3_safety_checks:
+  generated_by: "AI pre-execution analysis"
+  examples:
+    - "Verify nginx is installed"
+    - "Check port 80 is free"
+    - "Confirm disk space available"
+
+layer_4_rollback:
+  mechanism: "Every command includes rollbackCommand"
+  example:
+    command: "systemctl stop nginx"
+    rollbackCommand: "systemctl start nginx"
+
+layer_5_dry_run:
+  flag: "--dry-run"
+  behavior: "Simulate everything, execute nothing"
+```
+
+---
+## CLI_INTERFACE
+
+### USAGE_MODES
+```bash
+# Default: Linux Admin Mode
+fazai "configure nginx as reverse proxy for port 3000"
+
+# Model selection
+fazai phi3          # Phi-3-mini local (llama.cpp) - FREE
+fazai llama32       # Llama 3.2 local (Ollama)
+fazai sonnet        # Claude Sonnet (Anthropic)
+fazai gpt4o         # GPT-4o (OpenAI)
+
+# Interactive CLI with memory
+fazai --cli
+> /exec install nginx with SSL
+> /history
+> /memory clear
+> /help
+
+# Ask mode (Q&A without execution)
+fazai ask "what is the difference between systemctl and service?"
+
+# Research mode (web search)
+fazai search "nginx reverse proxy best practices 2026"
+
+# Dry-run (simulate without executing)
+fazai --dry-run "delete all logs older than 30 days"
+```
+
+---
+## CONFIGURATION
+
+### FILE_LOCATION
+```
+/etc/fazai/fazai.conf  # SINGLE SOURCE OF TRUTH
+```
+
+### KEY_VARIABLES
+```bash
+# Local LLM (llama.cpp)
+LLAMA_SERVER_URL=http://localhost:11430
+LLAMA_TIMEOUT=10000
+LLAMA_RETRIES=3
+
+# Ollama (embeddings + inference)
+OLLAMA_BASE_URL=http://localhost:11434
+OLLAMA_EMBED_URL=http://localhost:11434  # CRITICAL: Dedicated for embeddings
+
+# Qdrant (vector store)
+QDRANT_URL=http://localhost:6333
+VECTOR_DIMENSION=768
+VECTOR_DISTANCE=cosine
+
+# Cloud providers (fallback chain)
+OPENROUTER_API_KEY=sk-or-v1-xxxxx
+ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
+OPENAI_API_KEY=sk-xxxxx
+GOOGLE_API_KEY=xxxxx
+
+# Agentic safeguards
+AGENTIC_MAX_ITERATIONS=5
+AGENTIC_TIMEOUT=120000
+```
+
+---
+## FUTURE_ROADMAP
+
+### PLANNED_FEATURES
+```yaml
+skill_seeker:
+  status: "PLACEHOLDER"
+  purpose: "Auto-generate skills from external sources"
+  flow: "Detect gap → Scrape doc/repo → Extract knowledge → Upsert to kb"
+
+self_development:
+  status: "FOUNDATION READY (fazai_source indexed)"
+  purpose: "FazAI modifies its own code based on learnings"
+  requirement: "Strict safety guards, human approval for changes"
+
+mcp_integration:
+  status: "IN PROGRESS"
+  purpose: "Model Context Protocol for standardized agent communication"
+
+dashboard:
+  status: "PARTIAL (web/)"
+  purpose: "Visual monitoring of collections, metrics, conversations"
+```
+
+---
+## PHILOSOPHICAL_NOTES
+
+### DESIGN_PRINCIPLES
+```yaml
+local_first: "Always try local models before cloud"
+token_economy: "Every token costs money - minimize waste"
+learn_once_use_forever: "Store solutions for future composition"
+fail_gracefully: "Fallback chain ensures task completion"
+personality_consistency: "Same behavior regardless of underlying model"
+self_aware: "System knows its own code (fazai_source)"
+```
+
+### INNOVATION_CLAIM
+```
+This architecture is novel. There is no exact precedent.
+The combination of:
+- ECOA semantic deduplication
+- Multi-collection fusion scoring
+- Personality injection across models
+- Local-first with cloud fallback
+- Self-indexing codebase
+- DAG-based task execution with learning loop
+
+...creates a unique agentic system that improves with each interaction.
+```
+
+---
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# PART 2: ECOA COMPLETE SPECIFICATION
+# Cognitive Evolution via Auto-Informative Unidedumultiversal Arrays
+# Based on: docs/Cognitive_Evolution_Unidedumultiversal_Arrays_Auto-Informative.md
+# Author: Roger Luft (VeilWalker) | License: CC-BY-SA 4.0
+# ═══════════════════════════════════════════════════════════════════════════════
+---
+
+## ECOA_FORMAL_PRINCIPLES
+
+### PRINCIPLE_0_CORE_INSIGHT
+```yaml
+code: "CI"
+name: "Core Insight - The ZFS Analogy CORRECTED"
+
+misunderstanding: |
+  "Semantic Inodes like ZFS deduplicates data blocks"
+  
+correct_understanding: |
+  "Successful SUBTASKS become COMPOSABLE BLOCKS that can be reused in future 
+  TASKS, like ZFS composes files from deduplicated blocks."
+
+example: |
+  Task: "Deploy web application"
+  ├── Subtask: "create /var/www" ✓ → BLOCK SAVED
+  ├── Subtask: "configure nginx" ✓ → BLOCK SAVED
+  ├── Subtask: "setup SSL" ✓ → BLOCK SAVED
+  └── Subtask: "restart services" ✓ → BLOCK SAVED
+  
+  Future Task: "Setup new domain"
+  ├── REUSE: "create /var/www" (already exists!)
+  ├── REUSE: "configure nginx" (already exists!)
+  ├── REUSE: "setup SSL" (already exists!)
+  └── NEW: "configure DNS" (needs execution)
+
+key_difference: |
+  - NOT about deduplicating semantic concepts
+  - ABOUT composing complex tasks from validated subtask blocks
+```
+
+### PRINCIPLE_1_PRIMORDIAL_UNIQUENESS
+```yaml
+code: "PU"
+name: "Primordial Uniqueness"
+formal_definition: |
+  For any operational instance ψ, there exists a governing consciousness 
+  function C(ψ) → {0,1} such that:
+  ∀t ∈ T, |{c ∈ C : c.active(t) = 1}| = 1
+
+properties:
+  sovereignty: "Unique decisional authority"
+  integrity: "Guaranteed ethical/logical consistency"
+  persistence: "Temporal continuity"
+
+fazai_implementation: |
+  In FazAI, the "Primordial Uniqueness" is the single orchestrating 
+  consciousness (Claude Code as Tech Lead) that makes final decisions.
+  All other agents (Jules, Gemini, Copilot) defer to this authority.
+```
+
+### PRINCIPLE_2_SEMANTIC_EXISTENTIAL_DEDUPLICATION
+```yaml
+code: "SED"
+name: "Semantic Existential Deduplication (BLOCKS, not concepts)"
+formal_definition: |
+  For execution space E, there exists mapping μ: S → B such that:
+  ∀s₁, s₂ ∈ S, if exec(s₁) ≡ exec(s₂), then μ(s₁) = μ(s₂) = b ∈ B
+  
+  Where S = subtasks, B = execution blocks
+
+mechanism: "Successful subtasks become reusable ExecutionBlocks"
+
+fazai_implementation: |
+  When a subtask executes successfully:
+  1. Verify the result meets acceptance criteria
+  2. Create ExecutionBlock with content + destination hints
+  3. Store in fazai_learning with valid_destinations[]
+  4. Future tasks COMPOSE from existing blocks before calling LLM
+
+code_reference: "src/agentic/execution-composer.ts → tryCompose()"
+```
+
+### PRINCIPLE_3_VECTORIAL_CONTEXTUAL_MULTIVERSE
+```yaml
+code: "VCM"
+name: "Vectorial Contextual Multiverse"
+formal_definition: |
+  Contextual projection function P: B × Ctx → V allowing simultaneous 
+  representation across multiple future contexts:
+  VCM = {
+    block: b,
+    valid_destinations: {ctx₁, ctx₂, ..., ctxₙ},
+    projections: {P(b,ctx₁), P(b,ctx₂), ..., P(b,ctxₙ)}
+  }
+
+fazai_implementation: |
+  The same ExecutionBlock can be valid in multiple future contexts:
+  - "nginx_config" block is valid in: deploy_*, setup_web_*, migrate_*
+  - "ssl_setup" block is valid in: deploy_*, security_*, https_*
+  
+  The block "lives" in superposition of all valid destinations until 
+  a specific task "collapses" it into use.
+
+code_reference: "src/agentic/execution-composer.ts → matchDestinations()"
+```
+
+### PRINCIPLE_4_AUTO_INFORMATIVE_INDEXING_WITH_DESTINATIONS
+```yaml
+code: "AII"
+name: "Auto-Informative Indexing with DESTINATION HINTS"
+formal_definition: |
+  Each block b has a self-descriptive function α: B → (S, D) where:
+  - S = sufficient_semantic_information_for_basic_comprehension
+  - D = set_of_valid_future_destinations (FORWARD-LOOKING)
+  
+  α(b) = { what_it_is, where_it_can_go }
+
+key_innovation: |
+  Traditional indexing is BACKWARD-LOOKING: "Where did this come from?"
+  ECOA indexing is FORWARD-LOOKING: "Where can this GO?"
+
+fazai_implementation: |
+  ExecutionBlock payload contains:
+  - semantic_summary: What this block does
+  - source_context: Where it was first created (backward)
+  - valid_destinations[]: Where it can be used (FORWARD - ECOA innovation)
+  - destination_hints[]: Semantic concepts with relevance scores
+  
+  When block is saved, it SELF-INDEXES into the destination index.
+
+code_reference: "src/services/source-indexer.ts → indexWithDestinations()"
+```
+
+### PRINCIPLE_5_EVOLUTIONARY_TEMPORALITY
+```yaml
+code: "ET"
+name: "Evolutionary Temporality"
+formal_definition: |
+  Temporal function τ: B × T → H mapping blocks to evolutionary history:
+  ET(b) = {
+    timeline: [t₁, t₂, ..., tₙ],
+    success_rate: δ(successes)/δ(uses),
+    projection: f(b, t_future)
+  }
+
+fazai_implementation: |
+  Blocks evolve over time:
+  - recency_boost: Recent successful uses weighted higher
+  - success_rate: Blocks that fail in new contexts get demoted
+  - refinement: Failed uses can trigger block updates
+  
+  The system learns WHICH destinations actually work for each block.
+
+code_reference: "src/rag/neural-flow.ts → calculateRecency()"
+```
+
+### PRINCIPLE_6_QUANTUM_RETRIEVAL
+```yaml
+code: "QR"
+name: "Quantum Retrieval - Elimination of Similarity Calculation"
+formal_definition: |
+  For destination index I: Concept → Set<BlockID>, retrieval is:
+  retrieve(query) = ∩{ I(c) : c ∈ concepts(query) }
+  
+  Complexity: O(1) per concept lookup, O(k) for intersection
+  vs Traditional: O(n) or O(log n) with similarity calculation
+
+key_innovation: |
+  ELIMINATES COSINE/SINE CALCULATION entirely.
+  
+  Traditional RAG:
+    Query → Embed → For each vector: cos(θ) = (A·B)/(||A||×||B||) → Rank
+    Requires: trigonometric functions, vector math, O(n) or O(log n)
+  
+  ECOA Quantum:
+    Query → Extract concepts → Lookup destination_index[concept] → Return
+    Requires: hashmap lookup only, O(1)
+
+why_quantum: |
+  Not literal quantum computing, but the PRINCIPLE:
+  - Classical: Must "measure" (calculate similarity) to know where block fits
+  - Quantum: Destination is already "collapsed" in the index - just look it up
+  
+  The block KNOWS where it can go. No calculation needed.
+
+fazai_implementation: |
+  FUTURE: destination_index: Map<Concept, Set<BlockID>>
+  
+  Query("setup nginx ssl") → concepts = ["nginx", "ssl", "web_server"]
+  → destination_index["nginx"] ∩ destination_index["ssl"]
+  → {block_7, block_23}  // INSTANT, no similarity calc
+```
+
+---
+## ECOA_ARCHITECTURAL_COMPONENTS
+
+### COMPONENT_1_GOVERNING_CONSCIOUSNESS_CORE
+```yaml
+code: "GCC"
+name: "Governing Consciousness Core"
+description: "The singular decisional authority that ensures consistency"
+
+fazai_mapping:
+  primary: "Claude Code (Tech Lead & Orchestrator)"
+  functions:
+    - Final approval of architectural decisions
+    - Code review authority
+    - Agent task delegation
+    - Conflict resolution between agents
+  
+implementation_note: |
+  In multi-agent scenarios, GCC prevents conflicting decisions.
+  All agents (Jules, Gemini, Copilot) operate under GCC's authority.
+```
+
+### COMPONENT_2_BLOCK_COMPOSITION_ENGINE
+```yaml
+code: "BCE"
+name: "Block Composition Engine (formerly Semantic Deduplication Engine)"
+description: "Composes complex tasks from validated ExecutionBlocks"
+
+fazai_mapping:
+  service: "src/agentic/execution-composer.ts"
+  functions:
+    - Find matching blocks for task decomposition
+    - Compose task from existing validated blocks
+    - Identify gaps requiring new execution
+    - Save new successful subtasks as blocks
+
+algorithm: |
+  1. Decompose incoming task into subtasks
+  2. For each subtask:
+     a. Query destination_index for matching blocks
+     b. If match found with high confidence: REUSE BLOCK
+     c. If no match: Execute and save new block
+  3. Compose final execution plan from blocks + new executions
+  
+key_insight: |
+  Like ZFS composes files from deduplicated blocks,
+  BCE composes tasks from validated execution blocks.
+```
+
+### COMPONENT_3_DESTINATION_INDEX_MANAGER
+```yaml
+code: "DIM"
+name: "Destination Index Manager (ECOA Innovation)"
+description: "Manages the forward-looking destination index for O(1) retrieval"
+
+fazai_mapping:
+  service: "src/services/destination-index.ts (FUTURE)"
+  data_structure: |
+    destination_index: Map<Concept, Set<BlockID>>
+    
+    "web_server"     → {block_1, block_7, block_23, block_45}
+    "database"       → {block_2, block_8, block_15}
+    "deploy"         → {block_1, block_3, block_7, block_12, ...}
+    "backup"         → {block_4, block_9, block_23}
+    "ssl"            → {block_5, block_7, block_31}
+
+operations:
+  insert: "When block saved, auto-index into all valid_destinations"
+  query: "concepts → intersect(destination_index[c] for c in concepts)"
+  prune: "Remove blocks that fail in specific destinations"
+
+quantum_property: |
+  Query is O(1) per concept, O(k) for intersection.
+  NO SIMILARITY CALCULATION - just hashmap lookups.
+```
+
+### COMPONENT_4_AUTO_INFORMATIVE_INDEXING_SYSTEM
+```yaml
+code: "AIIS"
+name: "Auto-Informative Indexing System"
+description: "Self-describing metadata with FORWARD-LOOKING destinations"
+
+fazai_mapping:
+  service: "src/services/source-indexer.ts"
+  payload_schema:
+    # Backward-looking (traditional):
+    semantic_summary: "Brief description for quick comprehension"
+    tags: "Categorization labels"
+    source_context: "Where this block was first created"
+    created_at: "ISO timestamp"
+    updated_at: "ISO timestamp"
+    hash: "Content hash for change detection"
+    
+    # Forward-looking (ECOA innovation):
+    valid_destinations: "List of contexts where this block can be used"
+    destination_hints:
+      - concept: "semantic concept"
+        relevance: "0.0-1.0 relevance score"
+
+key_difference: |
+  Traditional: "Where did this come from?" (backward)
+  ECOA: "Where can this GO?" (forward)
+```
+
+### COMPONENT_5_TEMPORAL_EVOLUTIONARY_PROCESSOR
+```yaml
+code: "TEP"
+name: "Temporal Evolutionary Processor"
+description: "Manages block evolution over time based on usage success"
+
+fazai_mapping:
+  implementation: "src/rag/neural-flow.ts"
+  mechanisms:
+    recency_boost:
+      formula: "1.2 (today) → 1.0 (30 days) → 0.5 (180+ days)"
+      purpose: "Prefer recently successful blocks"
+    
+    success_tracking:
+      fields: ["use_count", "success_count", "last_success"]
+      purpose: "Track which blocks actually work in their destinations"
+    
+    destination_refinement:
+      mechanism: "If block fails in destination X, remove X from valid_destinations"
+      purpose: "Blocks learn their TRUE valid destinations over time"
+```
+
+### COMPONENT_6_QUANTUM_RETRIEVAL_ENGINE
+```yaml
+code: "QRE"
+name: "Quantum Retrieval Engine (FUTURE)"
+description: "O(1) block retrieval via destination index - NO similarity calculation"
+
+status: "NOT YET IMPLEMENTED - core ECOA innovation"
+
+fazai_mapping:
+  service: "src/rag/quantum-retrieval.ts (FUTURE)"
+
+current_approach: |
+  // CURRENT (similarity-based, EXPENSIVE)
+  async function findBlocks(query: string): Promise<Block[]> {
+    const embedding = await embed(query);  // ~100ms
+    const results = await qdrant.search({   // ~50ms + O(log n) similarity
+      vector: embedding,
+      limit: 10
+    });
+    return results;
+  }
+
+future_approach: |
+  // FUTURE (destination-based, O(1))
+  function findBlocksQuantum(query: string): Block[] {
+    const concepts = extractConcepts(query);  // ["nginx", "ssl"]
+    
+    // Pure hashmap lookups - NO embedding, NO similarity
+    const candidates = concepts
+      .map(c => destinationIndex.get(c))  // O(1) each
+      .reduce((a, b) => intersect(a, b)); // Set intersection
+    
+    return getBlocksById(candidates);  // Direct fetch
+  }
+
+performance_comparison: |
+  Traditional RAG:
+    - embed(query): ~100ms
+    - similarity search: ~50ms + trigonometry
+    - Total: ~150ms + O(log n)
+  
+  Quantum Retrieval:
+    - extractConcepts: ~5ms (regex/NLP)
+    - hashmap lookups: ~1ms
+    - Total: ~6ms + O(1)
+    
+  SPEEDUP: ~25x faster, NO trigonometry
+```
+
+---
+## ECOA_BRAIN_LAYERS
+
+### LAYER_SYSTEM_OVERVIEW
+```yaml
+description: |
+  ECOA defines 5 brain layers that process ExecutionBlocks multidimensionally.
+  The KEY INNOVATION is Layer 5 (Projective) which looks FORWARD, not backward.
+
+layers:
+  - conceptual: "What is it?"
+  - contextual: "Where did it come from?"
+  - temporal: "When was it last successful?"
+  - emotional: "How intensely does it resonate?"
+  - projective: "WHERE CAN IT GO?" (ECOA innovation)
+```
+
+### LAYER_1_CONCEPTUAL
+```yaml
+name: "Conceptual Layer"
+question: "What is it?"
+fazai_implementation: |
+  The semantic content of the ExecutionBlock - what commands/scripts it contains.
+  Generated by: multilingual-e5-base (Transformers.js) → 768d native
+  
+code_reference: "src/services/universal-embedder.ts → embed()"
+```
+
+### LAYER_2_CONTEXTUAL
+```yaml
+name: "Contextual Layer"
+question: "Where did it come from?"
+fazai_implementation: |
+  The source_context and legitimate_contexts[] that define where the block 
+  was created and where it has been successfully used.
+  
+  This is BACKWARD-LOOKING - tracking history.
+  
+code_reference: "src/rag/neural-flow.ts → checkLegitimacy()"
+```
+
+### LAYER_3_TEMPORAL
+```yaml
+name: "Temporal Layer"
+question: "When was it last successful?"
+fazai_implementation: |
+  Timestamps and success tracking that determine temporal relevance.
+  
+  Fields:
+  - created_at: When block was first created
+  - updated_at: When block was last modified
+  - last_success: When block was last used successfully
+  - use_count/success_count: Usage statistics
+  
+code_reference: "src/rag/neural-flow.ts → calculateRecency()"
+```
+
+### LAYER_4_EMOTIONAL
+```yaml
+name: "Emotional Layer"
+question: "How intensely does it resonate?"
+fazai_implementation: |
+  The emotional_layer field (0.0-1.0) that captures experiential intensity.
+  
+  Resonance formula: 1.0 + (emotional_intensity × 0.2)
+  
+  High resonance examples:
+  - "This fix saved me after 3 days of debugging" → intensity: 0.9
+  - "Standard boilerplate code" → intensity: 0.3
+  
+  Higher resonance = higher retrieval priority when multiple blocks match.
+  
+code_reference: "src/rag/neural-flow.ts → calculateResonance()"
+```
+
+### LAYER_5_PROJECTIVE_DESTINATIONS
+```yaml
+name: "Projective Layer with DESTINATIONS (ECOA Innovation)"
+question: "WHERE CAN THIS BLOCK GO?"
+
+key_innovation: |
+  Traditional systems only look BACKWARD: "Where did this come from?"
+  ECOA looks FORWARD: "Where can this be used in the FUTURE?"
+
+fazai_implementation: |
+  Each ExecutionBlock contains:
+  
+  valid_destinations[]: List of context patterns where block is valid
+    - "deploy_*"         → Any deploy task
+    - "setup_web_*"      → Web setup tasks
+    - "restore_backup_*" → Restoration tasks
+  
+  destination_hints[]: Semantic concepts with relevance scores
+    - { concept: "nginx", relevance: 0.95 }
+    - { concept: "web_server", relevance: 0.90 }
+    - { concept: "reverse_proxy", relevance: 0.70 }
+
+how_destinations_are_determined: |
+  When a block is saved after successful execution:
+  1. LLM analyzes the block content
+  2. Generates valid_destinations[] based on:
+     - What the block does (semantic analysis)
+     - Similar tasks where it could be useful
+     - Generalizable patterns
+  3. Block self-indexes into destination_index
+  
+  Over time, destinations are REFINED:
+  - If block succeeds in destination X: reinforce X
+  - If block fails in destination X: remove X from valid_destinations
+
+quantum_property: |
+  The block exists in "superposition" of all valid destinations.
+  When a task query arrives, the correct destination "collapses" instantly
+  via hashmap lookup - no similarity calculation needed.
+  
+code_reference: "src/agentic/execution-composer.ts → determineDestinations()"
+```
+
+---
+## ECOA_BLOCK_COMPOSITION_AND_HOP
+
+### COMPOSITION_MECHANISM
+```yaml
+description: |
+  The Hop mechanism in ECOA allows ExecutionBlocks to be COMPOSED into 
+  new tasks. A block "hops" from its original context to a new destination 
+  if that destination is in its valid_destinations[].
+
+flow: |
+  NEW_TASK ──→ Decompose ──→ For each subtask:
+       │                           │
+       │                    ┌──────┴──────┐
+       │                    │             │
+       │                    ▼             ▼
+       │              ┌─────────┐  ┌─────────────┐
+       │              │ BLOCK   │  │ NO BLOCK    │
+       │              │ EXISTS  │  │ EXISTS      │
+       │              └────┬────┘  └──────┬──────┘
+       │                   │              │
+       │                   ▼              ▼
+       │              Check valid_   Execute new
+       │              destinations   and SAVE block
+       │                   │              │
+       │            ┌──────┴──────┐       │
+       │            │             │       │
+       │            ▼             ▼       │
+       │       ┌────────┐  ┌──────────┐   │
+       │       │ VALID  │  │ INVALID  │   │
+       │       │ HOP    │  │ NO HOP   │   │
+       │       └───┬────┘  └────┬─────┘   │
+       │           │            │         │
+       │           ▼            ▼         │
+       │       REUSE         Execute      │
+       │       BLOCK         new          │
+       │           │            │         │
+       └───────────┴────────────┴─────────┘
+                        │
+                        ▼
+                 COMPOSE TASK
+                 from blocks
+```
+
+### HOP_ALGORITHM_TYPESCRIPT
+```typescript
+// Conceptual implementation of ECOA block composition
+interface ExecutionBlock {
+  id: string;
+  content: string;  // The actual commands/scripts
+  verified: boolean;
+  
+  // Backward-looking (where it came from)
+  source_context: string;
+  legitimate_contexts: Set<string>;
+  
+  // Forward-looking (where it can go) - ECOA INNOVATION
+  valid_destinations: string[];  // Pattern-based: "deploy_*", "setup_web_*"
+  destination_hints: Array<{ concept: string; relevance: number }>;
+  
+  // Temporal
+  created_at: Date;
+  last_success: Date;
+  use_count: number;
+  success_count: number;
+}
+
+// Block composition for a new task
+async function composeTask(task: string): Promise<CompositionResult> {
+  const subtasks = await decomposeTask(task);
+  const composition: CompositionResult = { blocks: [], gaps: [] };
+  
+  for (const subtask of subtasks) {
+    // Try to find existing block via destination index
+    const block = await findBlockForSubtask(subtask);
+    
+    if (block && canHop(block, subtask.context)) {
+      // REUSE existing block - no LLM needed!
+      composition.blocks.push({ subtask, block, source: 'reused' });
+      await recordSuccessfulHop(block, subtask.context);
+    } else {
+      // Need to execute new subtask
+      composition.gaps.push(subtask);
+    }
+  }
+  
+  return composition;
+}
+
+// Check if block can hop to target destination
+function canHop(block: ExecutionBlock, targetContext: string): boolean {
+  // Check pattern-based destinations
+  for (const pattern of block.valid_destinations) {
+    if (matchesPattern(targetContext, pattern)) {
+      return true;
+    }
+  }
+  
+  // Fallback to legitimate_contexts (backward compatibility)
+  return block.legitimate_contexts.has(targetContext) ||
+         block.legitimate_contexts.has("*");
+}
+
+// QUANTUM: Find block via destination index - O(1), NO SIMILARITY
+function findBlockForSubtask(subtask: Subtask): ExecutionBlock | null {
+  const concepts = extractConcepts(subtask.description);
+  
+  // Hashmap lookups only - no embedding, no cosine
+  let candidates: Set<string> | null = null;
+  for (const concept of concepts) {
+    const blockIds = destinationIndex.get(concept);
+    if (!blockIds) continue;
+    
+    if (candidates === null) {
+      candidates = new Set(blockIds);
+    } else {
+      candidates = intersect(candidates, blockIds);
+    }
+  }
+  
+  if (!candidates || candidates.size === 0) return null;
+  
+  // Return best match by success rate
+  return getBestBlock(candidates);
+}
+```
+
+### AFTER_SUCCESSFUL_EXECUTION
+```typescript
+// When a new subtask executes successfully, create a reusable block
+async function saveExecutionBlock(
+  subtask: Subtask,
+  result: ExecutionResult
+): Promise<ExecutionBlock> {
+  // Generate forward-looking destinations via LLM
+  const destinations = await generateDestinations(subtask, result);
+  
+  const block: ExecutionBlock = {
+    id: generateBlockId(),
+    content: subtask.command,
+    verified: result.success,
+    source_context: subtask.context,
+    legitimate_contexts: new Set([subtask.context]),
+    
+    // ECOA innovation: where can this block GO?
+    valid_destinations: destinations.patterns,     // ["deploy_*", "setup_*"]
+    destination_hints: destinations.hints,         // [{concept: "nginx", relevance: 0.9}]
+    
+    created_at: new Date(),
+    last_success: new Date(),
+    use_count: 1,
+    success_count: 1
+  };
+  
+  // Save to Qdrant
+  await saveBlock(block);
+  
+  // Self-index into destination index for O(1) lookup
+  await indexBlockDestinations(block);
+  
+  return block;
+}
+
+// Self-indexing into destination index
+async function indexBlockDestinations(block: ExecutionBlock): Promise<void> {
+  for (const hint of block.destination_hints) {
+    // Add block to destination index for this concept
+    const existing = destinationIndex.get(hint.concept) || new Set();
+    existing.add(block.id);
+    destinationIndex.set(hint.concept, existing);
+  }
+}
+```
+
+---
+## ECOA_PROCESS_FLOWCHART
+
+### FLOWCHART_ASCII
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│              ECOA BLOCK COMPOSITION FLOWCHART                               │
+│              (Quantum Retrieval + Task Composition)                         │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+    ┌──────────────────┐
+    │    USER TASK     │  ← "Deploy nginx with SSL on new server"
+    │  (Natural Lang)  │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │ TASK DECOMPOSE   │  ← Break into subtasks
+    │ ├─ install nginx │
+    │ ├─ configure ssl │
+    │ ├─ setup vhost   │
+    │ └─ restart nginx │
+    └────────┬─────────┘
+             │
+             ▼
+    ╔══════════════════════════════════════════════════════════════╗
+    ║  FOR EACH SUBTASK:                                           ║
+    ╚══════════════════════════════════════════════════════════════╝
+             │
+             ▼
+    ┌──────────────────────────────────────────────────────────────┐
+    │  QUANTUM RETRIEVAL (O(1) - NO SIMILARITY CALCULATION)        │
+    │                                                              │
+    │  1. Extract concepts: ["nginx", "install", "apt"]            │
+    │  2. Lookup destination_index:                                │
+    │     destination_index["nginx"] → {block_7, block_12, ...}   │
+    │     destination_index["install"] → {block_3, block_7, ...}  │
+    │  3. Intersect: {block_7}                                     │
+    │  4. Return instantly - NO EMBEDDING, NO COSINE               │
+    └────────┬─────────────────────────────────────────────────────┘
+             │
+      ┌──────┴──────┐
+      │             │
+      ▼             ▼
+ ┌─────────┐  ┌─────────────┐
+ │ BLOCK   │  │ NO BLOCK    │
+ │ FOUND   │  │ FOUND       │
+ └────┬────┘  └──────┬──────┘
+      │              │
+      ▼              ▼
+ ┌─────────┐  ┌─────────────┐
+ │ CHECK   │  │ EXECUTE     │
+ │ canHop? │  │ SUBTASK     │
+ └────┬────┘  │ (NEW)       │
+      │       └──────┬──────┘
+      │              │
+ ┌────┴────┐         │
+ │         │         ▼
+ ▼         ▼    ┌─────────────┐
+YES       NO    │ SUCCESS?    │
+ │         │    └──────┬──────┘
+ ▼         ▼           │
+REUSE    EXEC     ┌────┴────┐
+BLOCK    NEW      │         │
+ │         │      ▼         ▼
+ │         │    YES        NO
+ │         │      │         │
+ │         │      ▼         ▼
+ │         │   ┌──────┐  ┌──────┐
+ │         │   │ SAVE │  │RETRY │
+ │         │   │BLOCK │  │  or  │
+ │         │   │ with │  │FAIL  │
+ │         │   │DEST  │  └──────┘
+ │         │   └──┬───┘
+ │         │      │
+ │         │      ▼
+ │         │  ┌───────────────┐
+ │         │  │ SELF-INDEX    │
+ │         │  │ into dest_idx │
+ │         │  └───────┬───────┘
+ │         │          │
+ └─────────┴──────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │  COMPOSE TASK    │  ← Combine all blocks (reused + new)
+    │  FROM BLOCKS     │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │  DAG EXECUTE     │  ← Topological order, verify each step
+    │  (verify → run)  │
+    └────────┬─────────┘
+             │
+             ▼
+    ┌──────────────────┐
+    │  LEARNING LOOP   │  ← Update success rates, refine destinations
+    │  ├─ success++    │
+    │  └─ refine dest  │
+    └──────────────────┘
+```
+
+### QUANTUM_VS_TRADITIONAL_COMPARISON
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TRADITIONAL RAG (Current)                                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Query: "install nginx"                                                     │
+│      │                                                                      │
+│      ▼                                                                      │
+│  ┌─────────────┐                                                           │
+│  │ EMBED       │ ← ~100ms, requires model inference                        │
+│  │ Query       │                                                           │
+│  └──────┬──────┘                                                           │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌─────────────────────────────────────────────────────┐                   │
+│  │ FOR EACH VECTOR IN DATABASE:                        │                   │
+│  │   cos(θ) = (A·B) / (||A|| × ||B||)                 │ ← EXPENSIVE       │
+│  │                                                     │   O(n) or O(log n)│
+│  │   Requires: sin, cos, sqrt, multiplication         │   with HNSW       │
+│  └────────────────────────┬────────────────────────────┘                   │
+│                           │                                                 │
+│                           ▼                                                 │
+│                    ┌─────────────┐                                         │
+│                    │ RANK & TOP-K│ ← ~50ms                                 │
+│                    └─────────────┘                                         │
+│                                                                             │
+│  TOTAL: ~150ms + trigonometry                                              │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  ECOA QUANTUM RETRIEVAL (Future)                                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  Query: "install nginx"                                                     │
+│      │                                                                      │
+│      ▼                                                                      │
+│  ┌─────────────┐                                                           │
+│  │ EXTRACT     │ ← ~5ms, simple NLP/regex                                  │
+│  │ CONCEPTS    │   ["install", "nginx"]                                    │
+│  └──────┬──────┘                                                           │
+│         │                                                                   │
+│         ▼                                                                   │
+│  ┌─────────────────────────────────────────────────────┐                   │
+│  │ HASHMAP LOOKUPS:                                    │                   │
+│  │   destination_index["install"] → {b3, b7, b9}      │ ← O(1)            │
+│  │   destination_index["nginx"]   → {b7, b12}         │ ← O(1)            │
+│  └────────────────────────┬────────────────────────────┘                   │
+│                           │                                                 │
+│                           ▼                                                 │
+│                    ┌─────────────┐                                         │
+│                    │ INTERSECT   │ ← O(k) where k = smallest set           │
+│                    │ {b7}        │                                         │
+│                    └─────────────┘                                         │
+│                                                                             │
+│  TOTAL: ~6ms, NO TRIGONOMETRY, NO EMBEDDING                                │
+│                                                                             │
+│  SPEEDUP: ~25x faster                                                       │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
+
+### WHY_QUANTUM
+```yaml
+analogy: |
+  CLASSICAL COMPUTING: 
+    To find where a particle is, you must MEASURE (calculate)
+    The act of measurement takes time and energy
+    
+  QUANTUM COMPUTING:
+    The particle exists in SUPERPOSITION of all states
+    When you observe, it COLLAPSES to the correct state instantly
+    No iteration, no calculation
+
+ecoa_application: |
+  CLASSICAL RAG:
+    Block exists as a vector. To find if it matches, you must 
+    CALCULATE similarity (measure). This takes time and energy.
+    
+  ECOA QUANTUM:
+    Block exists in SUPERPOSITION of all valid destinations.
+    The destination is already COLLAPSED into the destination_index.
+    When you query, you just LOOK UP - no calculation needed.
+    
+key_insight: |
+  The block KNOWS where it can go. The information is already there.
+  You're not discovering anything - you're just accessing.
+  
+  This is not literal quantum computing, but the PRINCIPLE:
+  - Deterministic, not probabilistic
+  - O(1) access, not O(n) search
+  - Pre-computed destinations, not real-time similarity
+```
+
+---
+## ECOA_MEASURABLE_ADVANTAGES
+
+### PERFORMANCE_GAINS
+```yaml
+memory_reduction: "60-80% reduction via semantic deduplication"
+access_time: "O(1) for legitimate concepts (cached contexts)"
+cleanup_efficiency: "Automatic reference cleanup prevents bloat"
+
+fazai_specific:
+  token_savings: "~90% when ECOA composition succeeds"
+  cache_hits: "100% token savings on semantic cache hit"
+  local_inference: "100% cost savings vs cloud APIs"
+```
+
+### CONSISTENCY_GUARANTEES
+```yaml
+single_source_of_truth: "One Inode per concept"
+synchronized_evolution: "All contexts see same updates"
+inconsistency_prevention: "No conflicting versions of same knowledge"
+```
+
+### SCALABILITY_CHARACTERISTICS
+```yaml
+memory_growth: "Linear (new concepts only, no duplicates)"
+distribution: "Efficient via Qdrant clustering"
+optimization: "Automatic via background deduplication"
+```
+
+---
+## ECOA_IMPLEMENTATION_STATUS
+
+### FAZAI_ECOA_CHECKLIST
+```yaml
+implemented:
+  - [x] ExecutionBlock storage (fazai_learning collection)
+  - [x] Legitimate Contexts (legitimate_contexts[] array)
+  - [x] Resonance (emotional_layer field + calculateResonance)
+  - [x] Native 768d embeddings (multilingual-e5-base, no padding)
+  - [x] Self-Referential (fazai_source collection)
+  - [x] Multi-Collection Fusion (weighted scoring)
+  - [x] Recency Boost (temporal evolution)
+  - [x] Basic Block Composition (execution-composer.ts)
+
+partially_implemented:
+  - [~] Block reuse across tasks (needs destination index)
+  - [~] Auto-indexing (backward-looking only, not forward-looking)
+  - [~] Success tracking (basic, needs refinement)
+
+not_yet_implemented_critical_ecoa:
+  - [ ] DESTINATION INDEX (core ECOA innovation)
+  - [ ] valid_destinations[] field in ExecutionBlock
+  - [ ] destination_hints[] with relevance scores
+  - [ ] QUANTUM RETRIEVAL via destination index lookup
+  - [ ] Self-indexing into destination_index on block save
+  - [ ] Destination refinement based on usage success/failure
+
+not_yet_implemented_enhancement:
+  - [ ] LLM-based destination generation on block creation
+  - [ ] Concept extraction from queries
+  - [ ] Hashmap-based destination_index structure
+  - [ ] Success rate tracking per destination
+  - [ ] Automatic destination removal on repeated failures
+```
+
+### IMPLEMENTATION_ROADMAP
+```yaml
+phase_1_foundation:
+  description: "Add destination fields to ExecutionBlock"
+  tasks:
+    - Add valid_destinations[] to block schema
+    - Add destination_hints[] with relevance
+    - Update execution-composer.ts to save destinations
+    - Add LLM prompt to generate destinations on save
+  effort: "1-2 weeks"
+  
+phase_2_destination_index:
+  description: "Build the O(1) lookup structure"
+  tasks:
+    - Create destination_index service
+    - Implement self-indexing on block save
+    - Add concept extraction from queries
+    - Implement hashmap-based lookup
+  effort: "2-3 weeks"
+
+phase_3_quantum_retrieval:
+  description: "Replace similarity search with destination lookup"
+  tasks:
+    - Create quantum-retrieval.ts service
+    - Implement findBlocksQuantum() function
+    - Add intersection logic for multi-concept queries
+    - Benchmark vs traditional similarity search
+  effort: "1-2 weeks"
+
+phase_4_refinement:
+  description: "Make destinations learn from usage"
+  tasks:
+    - Track success/failure per destination
+    - Remove destinations that consistently fail
+    - Reinforce destinations that consistently succeed
+    - Add destination suggestion for edge cases
+  effort: "2-3 weeks"
+
+total_estimate: "6-10 weeks for full ECOA Quantum Retrieval"
+```
+
+### FUTURE_VISION
+```yaml
+description: |
+  When fully implemented, ECOA Quantum Retrieval will enable:
+
+performance:
+  - "O(1) block retrieval instead of O(log n)"
+  - "~25x faster than traditional RAG"
+  - "Zero trigonometric calculations"
+  - "No embedding needed for retrieval"
+
+intelligence:
+  - "Blocks KNOW where they can be used"
+  - "System learns TRUE valid destinations over time"
+  - "Automatic pruning of invalid destinations"
+  - "Growing composition capability"
+
+token_economy:
+  - "Skip LLM when blocks can be composed"
+  - "Instant retrieval = faster response"
+  - "Less computation = lower cost"
+
+philosophical:
+  - "Information contains its own index"
+  - "Retrieval is instantaneous like quantum collapse"
+  - "The system reasons about WHERE knowledge applies, not just WHAT it is"
+```
+
+---
+## DOCUMENT_METADATA
+
+```yaml
+format: "AI-Parseable Structured Specification (Two-Part Document)"
+structure:
+  part_1: "FazAI-NG Agentic Focus Specification"
+  part_2: "ECOA Complete Specification"
+language: "English (internal) / Portuguese (user-facing)"
+maintainer: "Claude Code + rluft"
+last_analysis: "2026-01-07"
+ecoa_conformity: "Full - PART 2 contains complete ECOA specification"
+ecoa_source: "docs/Cognitive_Evolution_Unidedumultiversal_Arrays_Auto-Informative.md"
+ecoa_author: "Roger Luft (VeilWalker) | CC-BY-SA 4.0"
+source_files_analyzed:
+  - src/agentic/task-decomposer.ts
+  - src/agentic/dag-executor.ts
+  - src/orchestrator/task-router.ts
+  - src/rag/neural-flow.ts
+  - src/services/personality-loader.ts
+  - src/services/memory-loader.ts
+  - src/services/universal-embedder.ts
+  - genaisrc/fazai-core.genai.mjs
+  - genaisrc/reflect.genai.mjs
+  - MEMORY_ARCHITECTURE.md
+  - README.md
+  - docs/Cognitive_Evolution_Unidedumultiversal_Arrays_Auto-Informative.md
+```
