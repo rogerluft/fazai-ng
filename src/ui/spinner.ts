@@ -18,12 +18,13 @@ export class Spinner {
 
   /**
    * Inicia o spinner com uma mensagem
+   * @returns this para permitir chaining
    */
-  start(message: string): void {
+  start(message: string): this {
     if (this.isActive && this.spinner) {
       // Se já está ativo, apenas atualiza o texto
       this.spinner.text = message;
-      return;
+      return this;
     }
 
     this.spinner = ora({
@@ -32,6 +33,7 @@ export class Spinner {
       spinner: "dots",
     }).start();
     this.isActive = true;
+    return this;
   }
 
   /**

@@ -4,11 +4,18 @@ import { ResilienceOrchestrator } from '../src/orchestrator/resilience-orchestra
 import { AgenticWebCrawler } from '../src/research/web-crawler';
 import * as askAIModule from '../src/askAI';
 import * as configModule from '../src/config';
+import * as modelsModule from '../src/models';
 
 // Mock das dependências externas
 vi.mock('../src/askAI');
 vi.mock('../src/config');
 vi.mock('../src/research/web-crawler');
+vi.mock('../src/models', () => ({
+  models: [
+    { name: 'claude-opus-4', provider: 'anthropic', enabled: true },
+    { name: 'gpt-4', provider: 'openai', enabled: true },
+  ],
+}));
 
 describe('ResilienceOrchestrator', () => {
   beforeEach(() => {
@@ -16,9 +23,10 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve ter sucesso no nível 1 (IA primária)', async () => {
-    const mockAskAI = vi.mocked(askAIModule.askAI).mockResolvedValue(async function* () {
+    // askAI é um async generator, precisa retornar um generator, não uma Promise
+    const mockAskAI = vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
       yield 'Resposta da IA Primária';
-    }());
+    });
 
     const orchestrator = new ResilienceOrchestrator();
     const result = await orchestrator.executeTaskWithResilience('teste');
@@ -30,11 +38,17 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve fazer fallback para o nível 2 (IA secundária) se a primária falhar', async () => {
-    const mockAskAI = vi.mocked(askAIModule.askAI)
-      .mockRejectedValueOnce(new Error('Falha na IA Primária'))
-      .mockResolvedValue(async function* () {
-        yield 'Resposta da IA Secundária';
-      }());
+    // Primeiro: falha 3x no primário (MAX_RETRIES=3), depois sucesso no fallback
+    let callCount = 0;
+    const mockAskAI = vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      callCount++;
+      if (callCount <= 3) {
+        // Primeiras 3 chamadas falham (retries do modelo primário)
+        throw new Error('Falha na IA Primária');
+      }
+      // A partir da 4ª chamada (modelo fallback), sucesso
+      yield 'Resposta da IA Secundária';
+    });
 
     const orchestrator = new ResilienceOrchestrator();
     const result = await orchestrator.executeTaskWithResilience('teste');
@@ -42,11 +56,14 @@ describe('ResilienceOrchestrator', () => {
     expect(result.success).toBe(true);
     expect(result.level).toBe('fallback_ai');
     expect(result.finalAnswer).toBe('Resposta da IA Secundária');
-    expect(mockAskAI).toHaveBeenCalledTimes(2);
+    // 3 retries primário + 1 fallback = 4 chamadas
+    expect(mockAskAI).toHaveBeenCalledTimes(4);
   });
 
   it('deve fazer fallback para o nível 3 (Context7) se as IAs falharem', async () => {
-    vi.mocked(askAIModule.askAI).mockRejectedValue(new Error('Falha na IA'));
+    vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      throw new Error('Falha na IA');
+    });
     vi.mocked(configModule.getConfigValue).mockReturnValue('http://fake-context7.com');
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -62,7 +79,9 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve fazer fallback para o nível 4 (Web Search) se os níveis anteriores falharem', async () => {
-    vi.mocked(askAIModule.askAI).mockRejectedValue(new Error('Falha na IA'));
+    vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      throw new Error('Falha na IA');
+    });
     vi.mocked(configModule.getConfigValue).mockReturnValue(null); // Desativa Context7
     const mockSearch = vi.mocked(AgenticWebCrawler.prototype.searchMultiSource).mockResolvedValue([
       { title: 'Resultado da Web', link: 'http://web.com', snippet: 'Snippet', source: 'DuckDuckGo', category: 'web' }
@@ -86,7 +105,9 @@ describe('ResilienceOrchestrator', () => {
   });
 
   it('deve retornar falha crítica se todos os níveis falharem', async () => {
-    vi.mocked(askAIModule.askAI).mockRejectedValue(new Error('Falha na IA'));
+    vi.mocked(askAIModule.askAI).mockImplementation(async function* () {
+      throw new Error('Falha na IA');
+    });
     vi.mocked(configModule.getConfigValue).mockReturnValue(null);
     vi.mocked(AgenticWebCrawler.prototype.searchMultiSource).mockResolvedValue([]);
 

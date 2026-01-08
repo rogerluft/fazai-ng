@@ -2,6 +2,16 @@
 
 ## 🚨 Prioridade Crítica (Pós-Jules)
 
+### 0. Pendências da Sessão Atual (2025-12-31)
+- **Ajustar timeout da AI local nos testes e ambiente**
+  - Testes com AI local estão com timeout muito curto
+  - Verificar vitest.config.ts e variáveis de ambiente
+- **Fazer cleaner ignorar pasta `restricted/`**
+  - Adicionar `restricted` aos diretórios protegidos em `genaisrc/cleaner.genai.mjs`
+  - Pasta contém documentos confidenciais/avaliações
+
+---
+
 ### 1. Implementar fzagent (Proactive Bastion)
 - **Status:** Planejado
 - **Descrição:** Novo agente de infraestrutura (TraumaZero + Kaseya + ZeroTrust) para monitoramento proativo.
@@ -162,3 +172,29 @@
 
 **Versão Atual:** 3.6.12-beta
 **Última Atualização:** 2025-12-17
+
+## [FUTURO] Web API - 38 funções pendentes
+
+### Memory
+- getMemory, createMemory, deleteMemory, searchMemory
+
+### Learning  
+- getLearning, createLearning, deleteLearning, searchLearning
+
+### Knowledge
+- getKnowledge, createKnowledge, deleteKnowledge, searchKnowledge
+
+### Inference
+- getRules, createRule, updateRule, deleteRule, testRule
+
+### Personality
+- getPersonality, updatePersonality, getTraits, updateTrait
+
+### Agent
+- getAgentStatus, getRecentActions, controlAgent
+
+### Samba
+- getSambaStatus, testSambaConnection
+
+---
+*Adicionado: 2025-12-31 (sessão cleaner v3.14.1)*

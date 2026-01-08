@@ -32,8 +32,16 @@ else
    echo "⚠ Build web não encontrado. Execute 'npm run build:web' para incluir interface web."
 fi
 
-# Cria diretório se não existir
+# Cria diretórios se não existirem
 mkdir -p "$INSTALL_DIR"
+mkdir -p "/etc/fazai/ingest"
+mkdir -p "/opt/fazai/data"
+
+# Define permissões corretas
+chmod 755 "/etc/fazai/ingest"
+chmod 755 "/opt/fazai/data"
+
+echo "✓ Diretórios criados: /etc/fazai/ingest, /opt/fazai/data"
 
 # Sincroniza arquivos (exclui node_modules, .git, etc)
 echo "📦 Sincronizando arquivos..."

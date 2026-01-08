@@ -50,7 +50,8 @@ function loadModelsFromConfig(): Model[] {
       provider: ProviderType;
       limit: number;
     }> = [
-      { key: "MODELS_OLLAMA", provider: "ollama", limit: 3 },
+      { key: "MODELS_LLAMA", provider: "llama", limit: 3 },   // llama.cpp local (Phi-3) - primary
+      { key: "MODELS_OLLAMA", provider: "ollama", limit: 3 }, // Ollama remote - only for embeddings
       { key: "MODELS_OPENROUTER", provider: "openrouter", limit: 3 },
       { key: "MODELS_OPENAI", provider: "openai", limit: 3 },
       { key: "MODELS_ANTHROPIC", provider: "anthropic", limit: 3 },

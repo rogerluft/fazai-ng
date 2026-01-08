@@ -1,5 +1,13 @@
 #!/bin/bash
 
+# --- Verificação de Root ---
+if [ "$EUID" -ne 0 ]; then
+  echo "Este script precisa ser executado com sudo."
+  exec sudo "$0" "$@"
+  exit 1
+fi
+# --- Fim da Verificação ---
+
 # Funcao: criar ou atualizar usuario
 criauser() {
     local user="$1"
@@ -20,29 +28,31 @@ criauser() {
     smbpasswd -a "$user" || return 1
 
     echo "Compartilhamentos existentes:"
-    grep '^\[' /etc/samba/smb.conf | tr -d '[]'
-    
+    list
+
     read -p "Atribuir permissao a qual compartilhamento (deixe em branco para pular)? " share
 
     if [ -n "$share" ]; then
-        path=$(grep -A5 "^\[$share\]$" /etc/samba/smb.conf | grep 'path =' | cut -d= -f2 | xargs)
+        path=$(awk -v share="[$share]" '$0 == share {f=1} f && /path/ {print $3; exit}' /etc/samba/smb.conf)
         
         if [ -z "$path" ]; then
             read -p "Compartilhamento nao existe. Criar novo? (s/n): " resp
             if [ "$resp" = "s" ]; then
                 read -p "Caminho do novo diretorio: " path
                 mkdir -p "$path" || return 1
-                chown "$user":"$user" "$path"
+                chown "$user:$user" "$path"
                 chmod 770 "$path"
-                echo "" >> /etc/samba/smb.conf
-                echo "[$share]" >> /etc/samba/smb.conf
-                echo "   path = $path" >> /etc/samba/smb.conf
-                echo "   valid users = $user" >> /etc/samba/smb.conf
-                echo "   writable = yes" >> /etc/samba/smb.conf
-                echo "   browseable = yes" >> /etc/samba/smb.conf
+                {
+                    echo ""
+                    echo "[$share]"
+                    echo "   path = $path"
+                    echo "   valid users = $user"
+                    echo "   writable = yes"
+                    echo "   browseable = yes"
+                } >> /etc/samba/smb.conf
             fi
         else
-            setfacl -m u:$user:rwx "$path" || echo "Aviso: falha ao definir ACL"
+            setfacl -m u:"$user":rwx "$path" || echo "Aviso: falha ao definir ACL"
         fi
     fi
 }
@@ -68,18 +78,20 @@ criadir() {
     getent group "$grupo" &>/dev/null || groupadd "$grupo"
 
     mkdir -p "$dir" || return 1
-    chown "$dono":"$grupo" "$dir"
+    chown "$dono:$grupo" "$dir"
     chmod 2770 "$dir"
-    setfacl -m g:$grupo:rwx "$dir" || echo "Aviso: falha ao definir ACL"
-    setfacl -d -m g:$grupo:rwx "$dir" || echo "Aviso: falha ao definir ACL padrao"
+    setfacl -m g:"$grupo":rwx "$dir" || echo "Aviso: falha ao definir ACL"
+    setfacl -d -m g:"$grupo":rwx "$dir" || echo "Aviso: falha ao definir ACL padrao"
 
     nome=$(basename "$dir")
-    echo "" >> /etc/samba/smb.conf
-    echo "[$nome]" >> /etc/samba/smb.conf
-    echo "   path = $dir" >> /etc/samba/smb.conf
-    echo "   valid users = $dono" >> /etc/samba/smb.conf
-    echo "   writable = yes" >> /etc/samba/smb.conf
-    echo "   browseable = yes" >> /etc/samba/smb.conf
+    {
+        echo ""
+        echo "[$nome]"
+        echo "   path = $dir"
+        echo "   valid users = $dono"
+        echo "   writable = yes"
+        echo "   browseable = yes"
+    } >> /etc/samba/smb.conf
 }
 
 # Funcao: criar grupo e aplicar em diretorio
@@ -106,32 +118,164 @@ criagroup() {
         mkdir -p "$dir" || return 1
         chown root:"$grupo" "$dir"
         chmod 2770 "$dir"
-        setfacl -m g:$grupo:rwx "$dir" || echo "Aviso: falha ao definir ACL"
-        setfacl -d -m g:$grupo:rwx "$dir" || echo "Aviso: falha ao definir ACL padrao"
+        setfacl -m g:"$grupo":rwx "$dir" || echo "Aviso: falha ao definir ACL"
+        setfacl -d -m g:"$grupo":rwx "$dir" || echo "Aviso: falha ao definir ACL padrao"
 
         nome=$(basename "$dir")
-        echo "" >> /etc/samba/smb.conf
-        echo "[$nome]" >> /etc/samba/smb.conf
-        echo "   path = $dir" >> /etc/samba/smb.conf
-        echo "   force group = $grupo" >> /etc/samba/smb.conf
-        echo "   writable = yes" >> /etc/samba/smb.conf
-        echo "   browseable = yes" >> /etc/samba/smb.conf
+        {
+            echo ""
+            echo "[$nome]"
+            echo "   path = $dir"
+            echo "   force group = $grupo"
+            echo "   writable = yes"
+            echo "   browseable = yes"
+        } >> /etc/samba/smb.conf
     fi
+}
+
+# Funcao: adicionar compartilhamento existente
+add() {
+    local dir="$1"
+    
+    if [ -z "$dir" ]; then
+        echo "Erro: informe o caminho do diretorio"
+        return 1
+    fi
+
+    dir="${dir%/}"
+
+    if [ ! -d "$dir" ]; then
+        echo "Erro: Diretorio $dir nao encontrado"
+        return 1
+    fi
+
+    local nome=$(basename "$dir")
+    
+    if grep -q "^\[$nome\]" /etc/samba/smb.conf; then
+        echo "Erro: Compartilhamento [$nome] ja existe."
+        return 1
+    fi
+    
+    local dono=$(stat -c '%U' "$dir")
+
+    echo "Adicionando compartilhamento [$nome] para $dir..."
+    {
+        echo ""
+        echo "[$nome]"
+        echo "   path = $dir"
+        if [ -n "$dono" ] && [ "$dono" != "root" ]; then
+            echo "   valid users = $dono"
+        fi
+        echo "   writable = yes"
+        echo "   browseable = yes"
+    } >> /etc/samba/smb.conf
+}
+
+# Funcao: deletar compartilhamento de forma segura
+del() {
+    local share_name="$1"
+
+    if [ -z "$share_name" ]; then
+        echo "Erro: informe o nome do compartilhamento a ser deletado"
+        list
+        return 1
+    fi
+
+    if ! grep -q "^\[$share_name\]" /etc/samba/smb.conf; then
+        echo "Erro: Compartilhamento [$share_name] nao encontrado."
+        return 1
+    fi
+
+    read -p "Tem certeza que deseja remover o compartilhamento [$share_name] do smb.conf? (s/n): " resp
+    if [ "$resp" != "s" ]; then
+        echo "Operacao cancelada."
+        return 0
+    fi
+    
+    cp /etc/samba/smb.conf "/etc/samba/smb.conf.bak.$(date +%s)"
+
+    # Usa awk para recriar o arquivo, excluindo o bloco do compartilhamento
+    awk -v share="[$share_name]" '
+        BEGIN { printing=1 }
+        $0 == share { printing=0 }
+        /^\[/ && $0 != share { printing=1 }
+        printing { print }
+    ' /etc/samba/smb.conf > /tmp/smb.conf.tmp && mv /tmp/smb.conf.tmp /etc/samba/smb.conf
+    
+    echo "Compartilhamento [$share_name] removido."
+}
+
+# Funcao: listar compartilhamentos
+list() {
+    echo "--- Compartilhamentos Samba ---"
+    awk '
+    /^\[.*\]$/ { 
+        if (share) print ""; 
+        share = substr($0, 2, length($0)-2); 
+        printf "Nome: \033[1;32m%s\033[0m\n", share 
+    } 
+    /^[[:space:]]*path[[:space:]]*=/ { 
+        path = $0; sub(/^[[:space:]]*path[[:space:]]*=[[:space:]]*/, "", path); 
+        printf "  Caminho: %s\n", path 
+    } 
+    /^[[:space:]]*valid users[[:space:]]*=/ { 
+        users = $0; sub(/^[[:space:]]*valid users[[:space:]]*=[[:space:]]*/, "", users); 
+        printf "  Usuários Válidos: %s\n", users 
+    }' /etc/samba/smb.conf
+    echo "------------------------------"
+}
+
+
+# Funcao: gerar completion para bash
+completion() {
+    echo "Gerando script de completion... Para instalar, execute: sudo ./scripts/fzsamba completion > /etc/bash_completion.d/fzsamba"
+    cat <<'EOF'
+_fzsamba() {
+    local cur prev opts
+    COMPREPLY=()
+    cur="${COMP_WORDS[COMP_CWORD]}"
+    prev="${COMP_WORDS[COMP_CWORD-1]}"
+    opts="criauser criadir criagroup add del list completion"
+
+    case "${prev}" in
+        criauser)
+            COMPREPLY=( $(compgen -u -- "${cur}") )
+            return 0
+            ;;
+        criadir|add)
+            COMPREPLY=( $(compgen -d -- "${cur}") )
+            return 0
+            ;;
+        criagroup)
+            COMPREPLY=( $(compgen -g -- "${cur}") )
+            return 0
+            ;;
+        del)
+            local shares=$(awk -F'[][]' '/^\[.*\]$/{print $2}' /etc/samba/smb.conf)
+            COMPREPLY=( $(compgen -W "${shares}" -- "${cur}") )
+            return 0
+            ;;
+        *)
+            COMPREPLY=( $(compgen -W "${opts}" -- "${cur}") )
+            return 0
+            ;;
+    esac
+}
+complete -F _fzsamba fzsamba
+EOF
 }
 
 # Dispatcher
 case "$1" in
-    criauser)
-        criauser "$2"
+    criauser|add|del|criadir|criagroup)
+        "$1" "$2"
         ;;
-    criadir)
-        criadir "$2"
-        ;;
-    criagroup)
-        criagroup "$2"
+    list|completion)
+        "$1"
+        exit 0
         ;;
     *)
-        echo "Uso: fzsamba [criauser|criadir|criagroup] [argumento]"
+        echo "Uso: fzsamba [criauser|criadir|criagroup|add|del|list|completion] [argumento]"
         exit 1
         ;;
 esac

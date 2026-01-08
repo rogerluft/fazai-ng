@@ -2,15 +2,18 @@ import { spawn } from "child_process";
 import chalk from "chalk";
 import { LinuxCommand, CRITICAL_COMMANDS, HIGH_RISK_COMMANDS } from "./types-linux";
 import { ResearchCoordinator } from "./research";
+import { confirm } from "@inquirer/prompts"; // FIX: Importar prompt de confirmação real
 import { logger } from "./logger";
 
 export class LinuxCommandExecutor {
   private executedCommands: Array<{ command: LinuxCommand; output: string; success: boolean }> = [];
   private dryRun: boolean = false;
+  private autoConfirm: boolean = false;
   private researchCoordinator?: ResearchCoordinator;
 
-  constructor(dryRun: boolean = false, researchCoordinator?: ResearchCoordinator) {
+  constructor(dryRun: boolean = false, researchCoordinator?: ResearchCoordinator, autoConfirm: boolean = false) {
     this.dryRun = dryRun;
+    this.autoConfirm = autoConfirm;
     this.researchCoordinator = researchCoordinator;
   }
 
@@ -63,8 +66,28 @@ export class LinuxCommandExecutor {
     if (command.expectedOutput) {
       logger.info(chalk.gray(`🎯 Saída esperada: ${command.expectedOutput}`));
     }
-    logger.info(chalk.yellow("(Confirmação automática habilitada)"));
-    return true;
+
+    // FIX: Lógica real de confirmação baseada no risco
+    // O código anterior retornava true automaticamente, ignorando o riskLevel
+    const risk = command.riskLevel || this.assessRiskLevel(command);
+
+    // YOLO mode: skip all confirmations (except critical)
+    if (this.autoConfirm && risk !== 'critical') {
+        logger.debug(`[YOLO] Auto-confirming command (risk: ${risk})`);
+        return true;
+    }
+
+    // Se for baixo risco e não exigir confirmação explícita, permite.
+    if (risk === 'low' && !command.requiresConfirmation) {
+        return true;
+    }
+
+    // Para riscos médios/altos/críticos, exige interação do usuário
+    // Default é false (seguro) para qualquer coisa que não seja 'low'
+    return await confirm({
+        message: `Executar este comando (Risco: ${risk.toUpperCase()})?`,
+        default: risk === 'low'
+    });
   }
 
   async executeCommand(command: LinuxCommand): Promise<{ success: boolean; output: string }> {
@@ -86,7 +109,21 @@ export class LinuxCommandExecutor {
       // Usar spawn para melhor controle e output em tempo real
       // SECURITY: shell: false (default) prevents command injection
       const result = await new Promise<{ success: boolean; output: string }>((resolve) => {
-        const [cmd, ...args] = command.command.split(' ');
+        // FIX: Parseamento de argumentos respeitando aspas
+        // O split(' ') original quebrava argumentos citados (ex: git commit -m "msg")
+        // Este regex captura: sequências sem espaço OU strings entre aspas simples/duplas
+        const argsMatch = command.command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+
+        const parsedArgs = argsMatch.map(arg => {
+            // Remove aspas envolventes se existirem para passar limpo ao spawn
+            if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+                return arg.slice(1, -1);
+            }
+            return arg;
+        });
+
+        const [cmd, ...args] = parsedArgs;
+
         const child = spawn(cmd, args, {
           stdio: ['inherit', 'pipe', 'pipe'],
           // shell: false is default - NOT enabling to prevent RCE

@@ -5,5 +5,8 @@ export default defineConfig({
   publicDir: false,
   clean: true,
   minify: true,
-  format: ["cjs"], // 👈 Node
+  format: ["esm"], // Changed to ESM
+  banner: {
+    js: `import { createRequire } from 'module';const require = createRequire(import.meta.url);`,
+  },
 });

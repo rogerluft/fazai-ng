@@ -1,7 +1,7 @@
 import { create } from "zustand";
-import type { AgentStatus, Action } from "@/types/jarvis";
+import type { AgentStatus, Action } from "@/types/fazai";
 
-interface JarvisStore {
+interface FazaiStore {
   agentStatus: AgentStatus | null;
   recentActions: Action[];
   isLoading: boolean;
@@ -26,7 +26,7 @@ const defaultAgentStatus: AgentStatus = {
   cpu_usage_percent: 0,
 };
 
-export const useJarvisStore = create<JarvisStore>((set) => ({
+export const useFazaiStore = create<FazaiStore>((set) => ({
   agentStatus: defaultAgentStatus,
   recentActions: [],
   isLoading: false,

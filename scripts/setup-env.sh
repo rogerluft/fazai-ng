@@ -128,4 +128,80 @@ else
     info "No Fazai log files found in /var/log/. Skipping permission adjustment."
 fi
 
+# --- Service User Permissions Verification ---
+# Verifica se o usuário fazai pode acessar os symlinks em /opt/fazai
+# Isso é necessário para o serviço systemd funcionar corretamente
+
+verify_service_permissions() {
+    local CURRENT_USER=$(whoami)
+    local CURRENT_GROUP=$(id -gn "$CURRENT_USER")
+    local HOME_DIR=$(eval echo ~$CURRENT_USER)
+    local ISSUES_FOUND=0
+
+    info "Verificando permissões para o serviço fazai-worker..."
+
+    # 1. Verificar se usuário fazai existe
+    if ! id fazai > /dev/null 2>&1; then
+        warn "Usuário 'fazai' não existe. Execute 'install.sh' para criá-lo."
+        ISSUES_FOUND=1
+    else
+        # 2. Verificar se fazai está no grupo do usuário atual
+        if ! groups fazai 2>/dev/null | grep -q "$CURRENT_GROUP"; then
+            warn "Usuário 'fazai' não está no grupo '$CURRENT_GROUP'."
+            info "Corrigindo: adicionando fazai ao grupo $CURRENT_GROUP..."
+            sudo usermod -aG "$CURRENT_GROUP" fazai 2>/dev/null && \
+                success "fazai adicionado ao grupo $CURRENT_GROUP" || \
+                warn "Falha ao adicionar fazai ao grupo (requer sudo)"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # 3. Verificar permissão do home directory (precisa ser 755 ou mais)
+    if [ -d "$HOME_DIR" ]; then
+        local HOME_PERMS=$(stat -c "%a" "$HOME_DIR" 2>/dev/null || echo "000")
+        if [ "$HOME_PERMS" -lt 755 ] 2>/dev/null; then
+            warn "Home directory $HOME_DIR com permissão restritiva ($HOME_PERMS)"
+            info "Corrigindo: alterando para 755..."
+            sudo chmod 755 "$HOME_DIR" 2>/dev/null && \
+                success "$HOME_DIR agora tem permissão 755" || \
+                warn "Falha ao alterar permissão (requer sudo)"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # 4. Verificar se fazai-ng é acessível pelo grupo
+    if [ -d "$FAZAI_REPO_PATH" ]; then
+        # Verificar se o grupo tem permissão de leitura
+        if ! sudo -u fazai test -r "$FAZAI_REPO_PATH/dist/app.js" 2>/dev/null; then
+            warn "Diretório $FAZAI_REPO_PATH não acessível pelo usuário fazai"
+            info "Corrigindo: ajustando permissões do grupo..."
+            chmod -R g+rX "$FAZAI_REPO_PATH" 2>/dev/null && \
+                success "Permissões de $FAZAI_REPO_PATH ajustadas" || \
+                warn "Falha ao ajustar permissões"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # 5. Verificar symlinks em /opt/fazai
+    if [ -L "/opt/fazai/dist" ]; then
+        if ! sudo -u fazai test -r "/opt/fazai/dist/app.js" 2>/dev/null; then
+            warn "Symlink /opt/fazai/dist não acessível pelo usuário fazai"
+            ISSUES_FOUND=1
+        fi
+    fi
+
+    # Resultado
+    if [ "$ISSUES_FOUND" -eq 0 ]; then
+        success "Todas as permissões do serviço estão corretas!"
+    else
+        warn "Alguns problemas de permissão foram encontrados e corrigidos."
+        info "Se o serviço falhar, execute: sudo systemctl restart fazai-worker"
+    fi
+}
+
+# Executar verificação apenas se o usuário fazai existir (indica instalação completa)
+if id fazai > /dev/null 2>&1; then
+    verify_service_permissions
+fi
+
 success "Environment setup check complete."

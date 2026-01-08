@@ -10,6 +10,7 @@ import { collectionsRouter } from "./collections";
 import { searchRouter } from "./search";
 import { agentRouter } from "./agent";
 import { skillsRouter } from "./skills";
+import { sambaRouter } from "./samba";
 
 export const apiRouter = Router();
 
@@ -19,6 +20,7 @@ apiRouter.use("/collections", collectionsRouter);
 apiRouter.use("/search", searchRouter);
 apiRouter.use("/agent", agentRouter);
 apiRouter.use("/skills", skillsRouter);
+apiRouter.use("/samba", sambaRouter);
 
 // API info endpoint
 apiRouter.get("/", (req, res) => {
@@ -46,6 +48,15 @@ apiRouter.get("/", (req, res) => {
       skills: {
         "POST /api/skills/seek": "Trigger skill seeker",
         "GET /api/skills": "List generated skills",
+      },
+      samba: {
+        "GET /api/samba/shares": "List Samba shares",
+        "POST /api/samba/shares": "Add share for directory",
+        "DELETE /api/samba/shares/:name": "Remove share",
+        "GET /api/samba/status": "Samba service status",
+        "POST /api/samba/users": "Create Samba user (info)",
+        "POST /api/samba/groups": "Create Samba group (info)",
+        "POST /api/samba/restart": "Restart Samba services",
       },
     },
   });

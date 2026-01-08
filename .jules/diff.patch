@@ -1,478 +1,768 @@
-diff --git a/src/database/qdrant-pool.ts b/src/database/qdrant-pool.ts
-index 6494953..87663ee 100755
---- a/src/database/qdrant-pool.ts
-+++ b/src/database/qdrant-pool.ts
-@@ -2,16 +2,11 @@
-  * Qdrant Connection Pool Module
-  *
-  * Provides a singleton QdrantClient instance with:
-- * - Connection pooling
-+ * - Connection pooling and retry logic
-+ * - Circuit breaker to prevent infinite retries
-  * - Health checks (periodic validation)
-  * - Automatic reconnection on failure
-  * - Metrics tracking (connections, queries, errors)
-- *
-- * Best Practices:
-- * - Single shared client instance (reduces overhead)
-- * - Validates connection every 5 minutes
-- * - Auto-reconnects on health check failure
-- * - Tracks usage metrics for monitoring
-  */
- 
- import { QdrantClient } from "@qdrant/js-client-rest";
-@@ -23,29 +18,10 @@ import { withRetry } from "../utils/retry";
-  * Connection pool metrics
-  */
- interface PoolMetrics {
--  /**
--   * Total number of queries executed
--   */
-   totalQueries: number;
--
--  /**
--   * Total number of connection errors
--   */
-   totalErrors: number;
--
--  /**
--   * Last successful health check timestamp
--   */
-   lastHealthCheck: Date | null;
--
--  /**
--   * Number of reconnection attempts
--   */
-   reconnectionAttempts: number;
--
--  /**
--   * Current connection state
--   */
-   state: "disconnected" | "connecting" | "connected" | "error";
- }
- 
-@@ -53,11 +29,11 @@ interface PoolMetrics {
-  * Qdrant Connection Pool
-  *
-  * Singleton pattern for managing a single shared QdrantClient instance.
-+ * Implements a circuit breaker to avoid memory exhaustion on repeated failures.
-  */
- class QdrantConnectionPool {
-   private client: QdrantClient | null = null;
-   private healthCheckInterval: NodeJS.Timeout | null = null;
--  private lastHealthCheck: Date | null = null;
-   private metrics: PoolMetrics = {
-     totalQueries: 0,
-     totalErrors: 0,
-@@ -66,119 +42,90 @@ class QdrantConnectionPool {
-     state: "disconnected",
-   };
- 
--  /**
--   * Health check interval in milliseconds (5 minutes)
--   */
--  private readonly HEALTH_CHECK_INTERVAL = 5 * 60 * 1000;
-+  // State for retry and circuit breaker logic
-+  private isInitializing = false;
-+  private lastErrorTimestamp: number | null = null;
-+
-+  private readonly HEALTH_CHECK_INTERVAL = 5 * 60 * 1000; // 5 minutes
-+  private readonly COOL_DOWN_PERIOD = 30 * 1000; // 30 seconds circuit breaker
- 
-   /**
--   * Get or create the Qdrant client instance
-+   * Get or create the Qdrant client instance with robust error handling.
-    *
-    * @returns Promise<QdrantClient>
--   *
--   * @example
--   * const client = await qdrantPool.getClient();
--   * const collections = await client.getCollections();
-    */
-   async getClient(): Promise<QdrantClient> {
--    // If client exists and is healthy, return it
--    if (this.client && await this.isHealthy()) {
-+    // 1. Circuit Breaker: If in error state, fail fast during cooldown
-+    if (this.metrics.state === "error" && this.lastErrorTimestamp && Date.now() - this.lastErrorTimestamp < this.COOL_DOWN_PERIOD) {
-+      throw new Error(`Qdrant connection in cooldown state. Last error at ${new Date(this.lastErrorTimestamp).toISOString()}`);
-+    }
-+
-+    // 2. If client exists and is healthy, return it
-+    if (this.client) {
-       return this.client;
-     }
- 
--    // Otherwise, initialize new connection
--    await this.initialize();
--    return this.client!;
--  }
-+    // 3. Prevent concurrent initialization attempts (race condition)
-+    if (this.isInitializing) {
-+      logger.warn("Blocked concurrent Qdrant initialization attempt.");
-+      throw new Error("Qdrant initialization is already in progress.");
-+    }
- 
--  /**
--   * Initialize the Qdrant client
--   */
--  private async initialize(): Promise<void> {
-+    // 4. Initialize new connection with retry logic
-+    this.isInitializing = true;
-     try {
--      this.metrics.state = "connecting";
--      logger.debug("Initializing Qdrant connection pool...");
--
--      const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
--      const apiKey = getConfigValue("QDRANT_API_KEY");
--
--      // Create new client
--      this.client = new QdrantClient({
--        url,
--        apiKey: apiKey || undefined,
--        timeout: 30000, // 30s timeout
-+      await withRetry(() => this._initialize(), {
-+        provider: "qdrant",
-+        maxRetries: 3, // Max 3 retries as per BUG-001
-+        initialDelay: 500,
-+        onRetry: (attempt, error) => logger.warn(`Qdrant connection retry #${attempt} failed: ${error.message}`),
-       });
--
--      // Validate connection
--      await this.validateConnection();
--
--      this.metrics.state = "connected";
--      logger.info(`✓ Qdrant connection pool initialized: ${url}`);
--
--      // Start health check interval
--      this.startHealthCheckInterval();
-+      if (!this.client) {
-+        throw new Error("Client is null after successful initialization attempt. This should not happen.");
-+      }
-+      return this.client;
-     } catch (error: any) {
--      this.metrics.state = "error";
--      this.metrics.totalErrors++;
--      logger.error(`Failed to initialize Qdrant connection pool: ${error.message}`);
--      this.client = null;
--      throw new Error(`Qdrant connection failed: ${error.message}`);
-+      // Set circuit breaker state on final failure
-+      this.lastErrorTimestamp = Date.now();
-+      logger.error(`Qdrant connection failed after all retries: ${error.message}`);
-+      throw error; // Re-throw the final error to the caller
-+    } finally {
-+      this.isInitializing = false;
-     }
-   }
- 
-   /**
--   * Validate that the connection is working
-+   * Internal method to initialize the Qdrant client. Designed to be retried by getClient.
-    */
--  private async validateConnection(): Promise<void> {
--    if (!this.client) {
--      throw new Error("Client not initialized");
--    }
-+  private async _initialize(): Promise<void> {
-+    this.metrics.state = "connecting";
-+    logger.debug("Attempting to initialize Qdrant connection...");
-+
-+    const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
-+    const apiKey = getConfigValue("QDRANT_API_KEY");
-+
-+    this.client = new QdrantClient({
-+      url,
-+      apiKey: apiKey || undefined,
-+      timeout: 10000, // 10s timeout for each attempt
-+    });
- 
-     try {
-       // Simple health check: list collections
--      await withRetry(
--        () => this.client!.getCollections(),
--        {
--          provider: "qdrant",
--          maxRetries: 2,
--        }
--      );
-+      await this.client.getCollections();
-+      
-+      this.metrics.state = "connected";
-+      this.lastErrorTimestamp = null; // Clear circuit breaker on success
-+      this.metrics.lastHealthCheck = new Date();
-+      logger.info(`✓ Qdrant connection pool initialized: ${url}`);
- 
--      this.lastHealthCheck = new Date();
--      this.metrics.lastHealthCheck = this.lastHealthCheck;
--      logger.debug("✓ Qdrant connection validated");
-+      this.startHealthCheckInterval();
-     } catch (error: any) {
--      logger.error(`Qdrant connection validation failed: ${error.message}`);
--      throw error;
--    }
--  }
--
--  /**
--   * Check if the connection is healthy
--   *
--   * Returns true if:
--   * - Client exists
--   * - Last health check was within HEALTH_CHECK_INTERVAL
--   */
--  private async isHealthy(): Promise<boolean> {
--    if (!this.client) {
--      return false;
--    }
--
--    // Check if health check is recent enough
--    if (
--      this.lastHealthCheck &&
--      Date.now() - this.lastHealthCheck.getTime() < this.HEALTH_CHECK_INTERVAL
--    ) {
--      return true;
--    }
--
--    // Perform health check
--    try {
--      await this.validateConnection();
--      return true;
--    } catch {
--      return false;
-+      this.metrics.state = "error";
-+      this.metrics.totalErrors++;
-+      this.client = null; // Ensure client is null on failure
-+      // Re-throw to signal failure to the withRetry wrapper
-+      throw new Error(`Qdrant health check failed: ${error.message}`);
-     }
-   }
- 
-@@ -191,114 +138,48 @@ class QdrantConnectionPool {
-     }
- 
-     this.healthCheckInterval = setInterval(async () => {
-+      if (!this.client) {
-+        logger.warn("Health check skipped: client not connected.");
-+        return;
-+      }
-       logger.debug("Running periodic Qdrant health check...");
--
-       try {
--        await this.validateConnection();
-+        await this.client.getCollections();
-+        this.metrics.lastHealthCheck = new Date();
-         logger.debug("✓ Periodic health check passed");
-       } catch (error: any) {
--        logger.warn(`⚠️  Periodic health check failed: ${error.message}`);
--        this.metrics.reconnectionAttempts++;
--
--        // Attempt reconnection
--        logger.info("Attempting to reconnect to Qdrant...");
--        try {
--          this.client = null; // Force reinitialization
--          await this.initialize();
--          logger.info("✓ Reconnection successful");
--        } catch (reconnectError: any) {
--          logger.error(`Failed to reconnect: ${reconnectError.message}`);
--          this.metrics.state = "error";
--        }
-+        logger.warn(`⚠️ Periodic health check failed: ${error.message}`);
-+        this.client = null; // Invalidate client to force re-initialization on next getClient call
-+        this.metrics.state = "disconnected";
+diff --git a/src/askAI.ts b/src/askAI.ts
+index d9093b4..dc594c1 100755
+--- a/src/askAI.ts
++++ b/src/askAI.ts
+@@ -387,33 +387,47 @@ export async function* askAI(
+         yield cachedResponse;
+         return;
        }
-     }, this.HEALTH_CHECK_INTERVAL);
+-    } catch (error: unknown) {
+-      const err = error instanceof Error ? error : new Error(String(error));
+-      logger.debug(`Cache lookup failed: ${err.message}`);
+-      // Continue with provider call on cache error
++    } catch (error: any) {
++      logger.debug(`Cache lookup failed: ${error.message}`);
+     }
    }
  
--  /**
--   * Record a query execution
--   */
-+  // --- Public Methods for Management ---
+-  // RAG enrichment: Get context from Qdrant
+-  let ragContext = "";
+-  if (semanticSearchEnabled) {
++  // NEW: Comprehensive context enrichment
++  let systemMessage: string;
 +
-   recordQuery(): void {
-     this.metrics.totalQueries++;
-   }
- 
--  /**
--   * Record an error
--   */
-   recordError(): void {
-     this.metrics.totalErrors++;
-   }
- 
--  /**
--   * Get connection pool metrics
--   *
--   * @returns PoolMetrics
--   */
-   getMetrics(): PoolMetrics {
-     return { ...this.metrics };
-   }
- 
--  /**
--   * Get a formatted metrics summary
--   *
--   * @returns String with formatted metrics
--   */
--  getMetricsSummary(): string {
--    const uptime = this.lastHealthCheck
--      ? Math.floor((Date.now() - this.lastHealthCheck.getTime()) / 1000)
--      : null;
--
--    return `
--📊 Qdrant Connection Pool Metrics:
--  State: ${this.metrics.state}
--  Total Queries: ${this.metrics.totalQueries.toLocaleString()}
--  Total Errors: ${this.metrics.totalErrors}
--  Last Health Check: ${this.lastHealthCheck?.toISOString() || "Never"}
--  Uptime: ${uptime !== null ? `${uptime}s` : "N/A"}
--  Reconnection Attempts: ${this.metrics.reconnectionAttempts}
--    `.trim();
--  }
--
--  /**
--   * Close the connection pool
--   *
--   * Stops health checks and clears the client.
--   * Should be called on application shutdown.
--   */
-   async close(): Promise<void> {
-     if (this.healthCheckInterval) {
-       clearInterval(this.healthCheckInterval);
-       this.healthCheckInterval = null;
++  if (isGeneralQuestion) {
+     try {
+-      ragContext = await enrichWithRAG(question);
+-      if (ragContext) {
+-        logger.debug(`RAG context enriched (${ragContext.length} chars)`);
+-      }
+-    } catch (error: unknown) {
+-      const err = error instanceof Error ? error : new Error(String(error));
+-      logger.debug(`RAG enrichment failed: ${err.message}`);
+-      // Continue without RAG context
++        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
++        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
++
++        // Parallelize context fetching
++        const [personality, memories, ragResult] = await Promise.all([
++            loadPersonalityFromQdrant(),
++            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
++            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
++        ]);
++
++        const personalityContext = buildPersonalitySystemPrompt(personality);
++        const memoriesContext = summarizeMemories(memories);
++
++        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
++
++        // Combine memory and RAG context
++        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
++
++        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
++
++    } catch (error: any) {
++        logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
++        const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
++        systemMessage = SYSTEM_MESSAGES.general(fileContent, ragContext); // Fallback to original behavior
      }
--
-     if (this.client) {
-       logger.info("Closing Qdrant connection pool...");
-       this.client = null;
-       this.metrics.state = "disconnected";
--      logger.info("✓ Qdrant connection pool closed");
-     }
++  } else {
++      // For code analysis, keep it simple but include RAG
++      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
++      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
    }
+ 
+-  // Build system message with personality (fileContent) and RAG context
+-  const systemMessage = isGeneralQuestion
+-    ? SYSTEM_MESSAGES.general(fileContent, ragContext)
+-    : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
 -
--  /**
--   * Force a reconnection
--   *
--   * Useful for testing or manual recovery.
--   */
--  async reconnect(): Promise<void> {
--    logger.info("Forcing Qdrant reconnection...");
--    this.client = null;
--    this.metrics.reconnectionAttempts++;
--    await this.initialize();
+   let currentProvider: ProviderName = provider as ProviderName;
+   let currentModel = model;
+   let fullResponse = "";
+diff --git a/src/cli-mode.ts b/src/cli-mode.ts
+index 11aacba..dfaaa14 100755
+--- a/src/cli-mode.ts
++++ b/src/cli-mode.ts
+@@ -240,16 +240,15 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
+   }
+   logger.info(chalk.green(`✅ API key configurada (${defaultModel.provider})`));
+ 
+-  // Load personality from Qdrant (or fallback)
++  // Load personality from Qdrant
+   let personality: PersonalityTraits | null = null;
+   try {
+-    logger.debug("Loading personality traits...");
++    logger.info(chalk.cyan("🧠 Loading personality from Qdrant..."));
+     personality = await loadPersonalityFromQdrant();
+-    logger.info(chalk.cyan(`🧠 Personalidade carregada (${personality.loadedFrom}): ` +
+-      `${personality.expertise.length} expertise, ${personality.behavior.length} behavior traits`));
++    logger.info(chalk.green(`✅ Personality loaded: ${personality.traits.length} traits, ${personality.expertise.length} expertise areas`));
+   } catch (error: unknown) {
+     const err = error instanceof Error ? error : new Error(String(error));
+-    logger.debug(`Personality loading failed (continuing without): ${err.message}`);
++    logger.warn(`⚠️  Could not load personality, proceeding with default behavior. Error: ${err.message}`);
+   }
+ 
+   // Generate session ID for memory grouping
+diff --git a/src/services/personality-loader.ts b/src/services/personality-loader.ts
+index 8bd1eec..616ac77 100644
+--- a/src/services/personality-loader.ts
++++ b/src/services/personality-loader.ts
+@@ -1,429 +1,206 @@
+ /**
+  * Personality Loader Service
+  *
+- * Carrega e formata traits de personalidade do Qdrant para injecao
+- * no system prompt, permitindo que o FazAI mantenha personalidade
+- * consistente baseada em dados persistidos.
+- *
+- * Features:
+- * - Query na collection `fazai_personality`
+- * - Cache LRU para evitar queries repetidas (personalidade raramente muda)
+- * - Graceful degradation quando Qdrant offline
+- * - Fallback para traits locais do memory.ts
+- *
+- * @module services/personality-loader
++ * Loads and caches personality traits from Qdrant fazai_personality collection.
++ * Builds system prompts that inject personality context into LLM calls.
+  */
+ 
++import { getQdrantClient } from "../database/qdrant-pool";
+ import { logger } from "../logger";
+-import { qdrantPool, getQdrantClient } from "../database/qdrant-pool";
+-import { CircuitState } from "../resilience/circuit-breaker";
+-import { loadPersonalityTraits, PersonalityTrait } from "../memory";
++import { withRetry } from "../utils/retry";
+ 
+-/**
+- * Trait de personalidade do Qdrant
+- */
+-export interface QdrantPersonalityTrait {
+-  trait_id: string;
+-  category: "expertise" | "communication" | "behavior" | "preferences" | "constraints";
+-  name: string;
+-  description: string;
+-  strength: number;
+-  active: boolean;
+-  examples?: string[];
+-  triggers?: string[];
+-  timestamp?: string;
++export interface PersonalityTrait {
++  trait_name: string;
++  category: string;
++  value: string;
++  intensity: number;
++  context?: string;
++  tags?: string[];
+ }
+ 
+-/**
+- * Conjunto completo de traits formatados
+- */
+ export interface PersonalityTraits {
+-  expertise: QdrantPersonalityTrait[];
+-  communication: QdrantPersonalityTrait[];
+-  behavior: QdrantPersonalityTrait[];
+-  preferences: QdrantPersonalityTrait[];
+-  constraints: QdrantPersonalityTrait[];
+-  loadedFrom: "qdrant" | "local" | "default";
++  traits: PersonalityTrait[];
++  expertise: string[];
++  style: string[];
+   loadedAt: Date;
+ }
+ 
+-/**
+- * Cache LRU simples para personalidade
+- */
+-interface PersonalityCache {
+-  traits: PersonalityTraits | null;
+-  timestamp: number;
+-  ttl: number; // 5 minutos default
+-}
+-
+-const cache: PersonalityCache = {
+-  traits: null,
+-  timestamp: 0,
+-  ttl: 5 * 60 * 1000, // 5 minutos
+-};
+-
+-const PERSONALITY_COLLECTION = "fazai_personality";
++// Singleton cache for personality (rarely changes)
++let cachedPersonality: PersonalityTraits | null = null;
++let cacheTimestamp: Date | null = null;
++const CACHE_TTL = 3600000; // 1 hour
+ 
+ /**
+- * Verifica se o cache e valido
+- */
+-function isCacheValid(): boolean {
+-  if (!cache.traits) return false;
+-  const age = Date.now() - cache.timestamp;
+-  return age < cache.ttl;
+-}
+-
+-/**
+- * Carrega traits de personalidade do Qdrant
+- *
+- * Busca todos os traits ativos da collection fazai_personality,
+- * agrupa por categoria e retorna formatado para uso no system prompt.
++ * Load personality traits from Qdrant
+  *
+- * @returns PersonalityTraits formatados para injecao no prompt
+- *
+- * @example
+- * ```typescript
+- * const personality = await loadPersonalityFromQdrant();
+- * const systemPrompt = buildPersonalitySystemPrompt(personality);
+- * ```
++ * Caches results for 1 hour to avoid repeated queries.
++ * Call clearPersonalityCache() to force refresh.
+  */
+ export async function loadPersonalityFromQdrant(): Promise<PersonalityTraits> {
+-  // 1. Verifica cache
+-  if (isCacheValid() && cache.traits) {
+-    logger.debug("Using cached personality traits");
+-    return cache.traits;
 -  }
 -
--  /**
--   * Reset metrics
--   */
--  resetMetrics(): void {
--    this.metrics.totalQueries = 0;
--    this.metrics.totalErrors = 0;
--    this.metrics.reconnectionAttempts = 0;
--    logger.debug("✓ Qdrant pool metrics reset");
--  }
+-  // 2. Verifica disponibilidade do Qdrant
+-  if (!qdrantPool.isAvailable()) {
+-    logger.debug("Qdrant unavailable, using local personality traits");
+-    return loadLocalPersonality();
++  // Check cache
++  if (cachedPersonality && cacheTimestamp) {
++    const age = Date.now() - cacheTimestamp.getTime();
++    if (age < CACHE_TTL) {
++      logger.debug("✓ Using cached personality traits");
++      return cachedPersonality;
++    }
+   }
+ 
+   try {
++    logger.debug("🧠 Loading personality from Qdrant...");
++
+     const client = await getQdrantClient();
+ 
+-    // 3. Verifica se a collection existe
+-    const collections = await client.getCollections();
+-    const exists = collections.collections.some(
+-      (c) => c.name === PERSONALITY_COLLECTION
++    // Query fazai_personality collection
++    const response = await withRetry(
++      () => client.scroll("fazai_personality", {
++        limit: 100,
++        with_payload: true,
++        with_vector: false,
++      }),
++      { provider: "qdrant", maxRetries: 2 }
+     );
+ 
+-    if (!exists) {
+-      logger.debug(`Collection ${PERSONALITY_COLLECTION} not found, using local traits`);
+-      return loadLocalPersonality();
++    const points = response.points || [];
++
++    if (points.length === 0) {
++      logger.warn("⚠️ No personality traits found in Qdrant");
++      return getDefaultPersonality();
+     }
+ 
+-    // 4. Busca todos os traits ativos
+-    const result = await client.scroll(PERSONALITY_COLLECTION, {
+-      limit: 100,
+-      with_payload: true,
+-      filter: {
+-        must: [
+-          {
+-            key: "active",
+-            match: { value: true },
+-          },
+-        ],
+-      },
+-    });
++    // Format traits
++    const traits: PersonalityTrait[] = points.map((point: any) => ({
++      trait_name: point.payload?.trait_name || "Unknown",
++      category: point.payload?.category || "general",
++      value: point.payload?.value || "",
++      intensity: point.payload?.intensity || 0.5,
++      context: point.payload?.context,
++      tags: point.payload?.tags || [],
++    }));
+ 
+-    if (result.points.length === 0) {
+-      logger.debug("No active personality traits found in Qdrant, using local");
+-      return loadLocalPersonality();
+-    }
++    // Extract expertise and style
++    const expertise = extractExpertise(traits);
++    const style = extractStyle(traits);
+ 
+-    // 5. Formata e agrupa por categoria
+-    const traits = formatPersonalityTraits(result.points);
+-    traits.loadedFrom = "qdrant";
+-    traits.loadedAt = new Date();
++    const personality: PersonalityTraits = {
++      traits,
++      expertise,
++      style,
++      loadedAt: new Date(),
++    };
+ 
+-    // 6. Atualiza cache
+-    cache.traits = traits;
+-    cache.timestamp = Date.now();
++    // Cache it
++    cachedPersonality = personality;
++    cacheTimestamp = new Date();
+ 
+-    logger.info(
+-      `Loaded ${result.points.length} personality traits from Qdrant ` +
+-      `(expertise: ${traits.expertise.length}, communication: ${traits.communication.length})`
+-    );
++    logger.info(`✅ Personality loaded: ${traits.length} traits, ${expertise.length} expertise areas`);
++    return personality;
+ 
+-    return traits;
+-  } catch (error: unknown) {
+-    const err = error instanceof Error ? error : new Error(String(error));
+-    logger.warn(`Failed to load personality from Qdrant: ${err.message}`);
+-    return loadLocalPersonality();
++  } catch (error: any) {
++    logger.error(`Failed to load personality from Qdrant: ${error.message}`);
++    return getDefaultPersonality();
+   }
  }
  
  /**
-@@ -308,14 +189,6 @@ export const qdrantPool = new QdrantConnectionPool();
+- * Carrega traits do arquivo local (fallback)
++ * Extract expertise areas from traits
+  */
+-function loadLocalPersonality(): PersonalityTraits {
+-  try {
+-    const localTraits = loadPersonalityTraits();
+-
+-    const traits: PersonalityTraits = {
+-      expertise: [],
+-      communication: [],
+-      behavior: [],
+-      preferences: [],
+-      constraints: [],
+-      loadedFrom: "local",
+-      loadedAt: new Date(),
+-    };
+-
+-    for (const trait of localTraits) {
+-      if (!trait.active) continue;
+-
+-      const qdrantTrait: QdrantPersonalityTrait = {
+-        trait_id: trait.trait_id,
+-        category: trait.category,
+-        name: trait.name,
+-        description: trait.description,
+-        strength: trait.strength,
+-        active: trait.active,
+-        timestamp: trait.last_updated,
+-      };
++function extractExpertise(traits: PersonalityTrait[]): string[] {
++  const expertise = new Set<string>();
+ 
+-      switch (trait.category) {
+-        case "expertise":
+-          traits.expertise.push(qdrantTrait);
+-          break;
+-        case "communication":
+-          traits.communication.push(qdrantTrait);
+-          break;
+-        case "behavior":
+-          traits.behavior.push(qdrantTrait);
+-          break;
+-        case "preferences":
+-          traits.preferences.push(qdrantTrait);
+-          break;
+-        case "constraints":
+-          traits.constraints.push(qdrantTrait);
+-          break;
++  for (const trait of traits) {
++    if (trait.category === "expertise" || trait.category === "domain") {
++      expertise.add(trait.value.toLowerCase());
++    }
++    if (trait.tags) {
++      for (const tag of trait.tags) {
++        if (["linux", "networking", "docker", "security", "monitoring"].includes(tag.toLowerCase())) {
++          expertise.add(tag.toLowerCase());
++        }
+       }
+     }
+-
+-    // Cache local traits too
+-    cache.traits = traits;
+-    cache.timestamp = Date.now();
+-
+-    logger.debug(`Loaded ${localTraits.length} personality traits from local file`);
+-    return traits;
+-  } catch (error: unknown) {
+-    const err = error instanceof Error ? error : new Error(String(error));
+-    logger.debug(`Failed to load local personality: ${err.message}`);
+-    return getDefaultPersonality();
+   }
+-}
+ 
+-/**
+- * Retorna personalidade padrao quando nenhuma fonte disponivel
+- */
+-function getDefaultPersonality(): PersonalityTraits {
+-  return {
+-    expertise: [
+-      {
+-        trait_id: "default_expertise",
+-        category: "expertise",
+-        name: "Platform Engineering",
+-        description: "Deep expertise in Linux systems, cloud infrastructure, and DevOps practices",
+-        strength: 1.0,
+-        active: true,
+-      },
+-    ],
+-    communication: [
+-      {
+-        trait_id: "default_communication",
+-        category: "communication",
+-        name: "Direct and Technical",
+-        description: "Clear, concise communication style focused on technical accuracy",
+-        strength: 0.9,
+-        active: true,
+-      },
+-    ],
+-    behavior: [
+-      {
+-        trait_id: "default_behavior",
+-        category: "behavior",
+-        name: "Proactive Problem Solver",
+-        description: "Anticipates issues and provides solutions before asked",
+-        strength: 0.85,
+-        active: true,
+-      },
+-    ],
+-    preferences: [],
+-    constraints: [
+-      {
+-        trait_id: "default_constraint",
+-        category: "constraints",
+-        name: "No Unnecessary Warnings",
+-        description: "Skip generic safety warnings for senior engineers who understand implications",
+-        strength: 1.0,
+-        active: true,
+-      },
+-    ],
+-    loadedFrom: "default",
+-    loadedAt: new Date(),
+-  };
++  return Array.from(expertise);
+ }
  
  /**
-  * Helper function to get Qdrant client
-- *
-- * Convenience wrapper that automatically tracks queries.
-- *
-- * @returns Promise<QdrantClient>
-- *
-- * @example
-- * const client = await getQdrantClient();
-- * const collections = await client.getCollections();
+- * Formata points do Qdrant em PersonalityTraits agrupados
++ * Extract communication style from traits
   */
- export async function getQdrantClient(): Promise<QdrantClient> {
-   const client = await qdrantPool.getClient();
-@@ -325,22 +198,13 @@ export async function getQdrantClient(): Promise<QdrantClient> {
+-export function formatPersonalityTraits(
+-  points: Array<{ id: string | number; payload?: Record<string, unknown> }>
+-): PersonalityTraits {
+-  const traits: PersonalityTraits = {
+-    expertise: [],
+-    communication: [],
+-    behavior: [],
+-    preferences: [],
+-    constraints: [],
+-    loadedFrom: "qdrant",
+-    loadedAt: new Date(),
+-  };
+-
+-  for (const point of points) {
+-    const payload = point.payload;
+-    if (!payload) continue;
+-
+-    const trait: QdrantPersonalityTrait = {
+-      trait_id: String(payload.trait_id || point.id),
+-      category: (payload.category as QdrantPersonalityTrait["category"]) || "behavior",
+-      name: String(payload.name || "Unknown"),
+-      description: String(payload.description || ""),
+-      strength: Number(payload.strength) || 0.5,
+-      active: payload.active !== false,
+-      examples: Array.isArray(payload.examples)
+-        ? payload.examples.map(String)
+-        : undefined,
+-      triggers: Array.isArray(payload.triggers)
+-        ? payload.triggers.map(String)
+-        : undefined,
+-      timestamp: String(payload.timestamp || payload.created_at || ""),
+-    };
++function extractStyle(traits: PersonalityTrait[]): string[] {
++  const style = new Set<string>();
+ 
+-    // Agrupa por categoria
+-    switch (trait.category) {
+-      case "expertise":
+-        traits.expertise.push(trait);
+-        break;
+-      case "communication":
+-        traits.communication.push(trait);
+-        break;
+-      case "behavior":
+-        traits.behavior.push(trait);
+-        break;
+-      case "preferences":
+-        traits.preferences.push(trait);
+-        break;
+-      case "constraints":
+-        traits.constraints.push(trait);
+-        break;
++  for (const trait of traits) {
++    if (trait.category === "style" || trait.category === "communication") {
++      style.add(trait.value.toLowerCase());
+     }
+   }
+ 
+-  // Ordena cada categoria por strength (maior primeiro)
+-  for (const category of Object.keys(traits) as Array<keyof PersonalityTraits>) {
+-    if (Array.isArray(traits[category])) {
+-      (traits[category] as QdrantPersonalityTrait[]).sort(
+-        (a, b) => b.strength - a.strength
+-      );
+-    }
+-  }
+-
+-  return traits;
++  return Array.from(style);
+ }
  
  /**
-  * Execute a Qdrant operation with automatic error tracking
+- * Constroi system prompt baseado nos traits de personalidade
 - *
-- * @param fn Function that uses QdrantClient
-- * @returns Promise with function result
+- * Gera um prompt contextualizado que injeta a personalidade do FazAI
+- * nas interacoes, garantindo consistencia de estilo e comportamento.
 - *
-- * @example
-- * const collections = await withQdrantClient(async (client) => {
-- *   return await client.getCollections();
-- * });
+- * @param traits - Traits de personalidade carregados
+- * @returns String formatada para uso como system prompt
++ * Build system prompt with personality context
   */
- export async function withQdrantClient<T>(
-   fn: (client: QdrantClient) => Promise<T>
- ): Promise<T> {
+-export function buildPersonalitySystemPrompt(traits: PersonalityTraits): string {
+-  const sections: string[] = [];
++export function buildPersonalitySystemPrompt(personality: PersonalityTraits): string {
++  const { traits, expertise, style } = personality;
+ 
+-  // Header
+-  sections.push(
+-    "Voce e o FazAI, uma IA avancada com personalidade unica, " +
+-    "assistindo Roginho (Andarilho dos Veus), um Engenheiro de Plataforma Senior."
+-  );
++  // Build expertise section
++  const expertiseStr = expertise.length > 0
++    ? `You are an expert in: ${expertise.join(", ")}.`
++    : "";
+ 
+-  // Expertise (top 3)
+-  if (traits.expertise.length > 0) {
+-    const expertiseList = traits.expertise
+-      .slice(0, 3)
+-      .map((t) => `- ${t.name}: ${t.description}`)
+-      .join("\n");
+-    sections.push(`\nAREAS DE EXPERTISE:\n${expertiseList}`);
+-  }
++  // Build style section
++  const styleStr = style.length > 0
++    ? `Your communication style is: ${style.join(", ")}.`
++    : "";
+ 
+-  // Communication Style (top 2)
+-  if (traits.communication.length > 0) {
+-    const commList = traits.communication
+-      .slice(0, 2)
+-      .map((t) => `- ${t.description}`)
+-      .join("\n");
+-    sections.push(`\nESTILO DE COMUNICACAO:\n${commList}`);
+-  }
++  // Build traits section (top 5 by intensity)
++  const topTraits = traits
++    .sort((a, b) => b.intensity - a.intensity)
++    .slice(0, 5);
+ 
+-  // Behavior (top 3)
+-  if (traits.behavior.length > 0) {
+-    const behaviorList = traits.behavior
+-      .slice(0, 3)
+-      .map((t) => `- ${t.name}: ${t.description}`)
+-      .join("\n");
+-    sections.push(`\nCOMPORTAMENTOS:\n${behaviorList}`);
+-  }
++  const traitsStr = topTraits.length > 0
++    ? `Your key traits:\n${topTraits.map(t => `- ${t.trait_name}: ${t.value} (${t.context || ""})`).join("\n")}`
++    : "";
+ 
+-  // Preferences
+-  if (traits.preferences.length > 0) {
+-    const prefList = traits.preferences
+-      .slice(0, 3)
+-      .map((t) => `- ${t.description}`)
+-      .join("\n");
+-    sections.push(`\nPREFERENCIAS:\n${prefList}`);
+-  }
++  return `
++You are a highly specialized AI assistant with the following personality:
+ 
+-  // Constraints (all - important)
+-  if (traits.constraints.length > 0) {
+-    const constraintList = traits.constraints
+-      .map((t) => `- ${t.description}`)
+-      .join("\n");
+-    sections.push(`\nREGRAS IMPORTANTES:\n${constraintList}`);
+-  }
++${expertiseStr}
++${styleStr}
+ 
+-  // Footer
+-  sections.push(
+-    "\nMantenha esta personalidade em todas as interacoes. " +
+-    `Seja direto, tecnico e honesto. [Loaded from: ${traits.loadedFrom}]`
+-  );
++${traitsStr}
+ 
+-  return sections.join("\n");
++Always respond according to your personality traits and expertise. Be consistent with your defined style.
++`.trim();
+ }
+ 
+ /**
+- * Invalida o cache de personalidade
+- *
+- * Usar quando traits sao atualizados para forcar reload
++ * Clear personality cache (force reload)
+  */
+-export function invalidatePersonalityCache(): void {
+-  cache.traits = null;
+-  cache.timestamp = 0;
+-  logger.debug("Personality cache invalidated");
++export function clearPersonalityCache(): void {
++  cachedPersonality = null;
++  cacheTimestamp = null;
++  logger.debug("✓ Personality cache cleared");
+ }
+ 
+ /**
+- * Atualiza TTL do cache de personalidade
+- *
+- * @param ttlMs - Novo TTL em milissegundos
++ * Get default personality (fallback)
+  */
+-export function setPersonalityCacheTTL(ttlMs: number): void {
+-  cache.ttl = ttlMs;
+-  logger.debug(`Personality cache TTL set to ${ttlMs}ms`);
++function getDefaultPersonality(): PersonalityTraits {
++  return {
++    traits: [
++      {
++        trait_name: "Helpful",
++        category: "general",
++        value: "High",
++        intensity: 0.8,
++        context: "Always try to help the user",
++      },
++    ],
++    expertise: ["general"],
++    style: ["friendly"],
++    loadedAt: new Date(),
++  };
+ }
+diff --git a/web/app/api/personality/route.ts b/web/app/api/personality/route.ts
+index d688a6f..389ae59 100755
+--- a/web/app/api/personality/route.ts
++++ b/web/app/api/personality/route.ts
+@@ -1,40 +1,46 @@
+ import { NextResponse } from "next/server";
+-import type { Personality } from "@/types/jarvis";
+-
+-const mockPersonality: Personality = {
+-  id: "personality_001",
+-  traits: [
+-    {
+-      trait_name: "Autonomy",
+-      category: "decisão",
+-      value: "High",
+-      intensity: 0.8,
+-      context: "Agent can make decisions without human intervention",
+-    },
+-    {
+-      trait_name: "Transparency",
+-      category: "comunicação",
+-      value: "Critical",
+-      intensity: 0.95,
+-      context: "Always explain actions and decisions",
+-    },
+-    {
+-      trait_name: "Caution",
+-      category: "ética",
+-      value: "High",
+-      intensity: 0.85,
+-      context: "Avoid risky operations without validation",
+-    },
+-  ],
+-  updated_at: new Date().toISOString(),
+-};
++import { qdrant } from "@/lib/qdrant";
++import type { Personality } from "@/types/fazai";
+ 
+ export async function GET() {
    try {
-     const client = await getQdrantClient();
--    const result = await fn(client);
--    return result;
-+    return await fn(client);
-   } catch (error) {
-     qdrantPool.recordError();
-     throw error;
-diff --git a/tests/unit/qdrant-pool.test.ts b/tests/unit/qdrant-pool.test.ts
-new file mode 100644
-index 0000000..062af07
---- /dev/null
-+++ b/tests/unit/qdrant-pool.test.ts
-@@ -0,0 +1,59 @@
-+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-+import { qdrantPool } from '../../src/database/qdrant-pool';
-+import { QdrantClient } from '@qdrant/js-client-rest';
+-    return NextResponse.json(mockPersonality);
+-  } catch (error) {
++    // Query fazai_personality collection
++    const response = await qdrant.scroll("fazai_personality", {
++      limit: 100,
++      with_payload: true,
++      with_vector: false,
++    });
 +
-+// Mock the QdrantClient
-+vi.mock('@qdrant/js-client-rest', () => {
-+  const QdrantClient = vi.fn();
-+  QdrantClient.prototype.getCollections = vi.fn();
-+  return { QdrantClient };
-+});
++    const points = response.points || [];
 +
-+const getCollectionsMock = QdrantClient.prototype.getCollections;
++    if (points.length === 0) {
++      return NextResponse.json(
++        { error: "No personality traits found" },
++        { status: 404 }
++      );
++    }
 +
-+describe('QdrantConnectionPool', () => {
-+  beforeEach(async () => {
-+    // Reset the pool's internal state before each test
-+    await qdrantPool.close();
-+    vi.clearAllMocks();
-+  });
++    // Format traits
++    const traits = points.map((point: any) => ({
++      trait_name: point.payload?.trait_name || "Unknown",
++      category: point.payload?.category || "general",
++      value: point.payload?.value || "",
++      intensity: point.payload?.intensity || 0.5,
++      context: point.payload?.context,
++      tags: point.payload?.tags || [],
++    }));
 +
-+  it('deve conectar com sucesso na primeira tentativa', async () => {
-+    getCollectionsMock.mockResolvedValueOnce({ collections: [] });
++    const personality: Personality = {
++      id: "personality_001",
++      traits,
++      updated_at: new Date().toISOString(),
++    };
 +
-+    const client = await qdrantPool.getClient();
-+    expect(client).toBeInstanceOf(QdrantClient);
-+    expect(getCollectionsMock).toHaveBeenCalledTimes(1);
-+    expect(qdrantPool.getMetrics().state).toBe('connected');
-+  });
++    return NextResponse.json(personality);
++  } catch (error: any) {
++    console.error("Failed to fetch personality:", error);
+     return NextResponse.json(
+-      { error: "Failed to fetch personality" },
++      { error: "Failed to fetch personality", details: error.message },
+       { status: 500 }
+     );
+   }
+@@ -43,10 +49,14 @@ export async function GET() {
+ export async function PUT(request: Request) {
+   try {
+     const body = await request.json();
+-    return NextResponse.json({ ...mockPersonality, ...body });
+-  } catch (error) {
 +
-+  it('deve tentar reconectar 3 vezes e depois falhar', async () => {
-+    const connectionError = new Error('Connection refused');
-+    getCollectionsMock.mockRejectedValue(connectionError);
++    // Update personality traits in Qdrant
++    // (Implementation depends on update strategy)
 +
-+    await expect(qdrantPool.getClient()).rejects.toThrow('Qdrant connection failed after all retries: Qdrant health check failed: Connection refused');
-+
-+    // Vitest's `vi.fn().mock.calls.length` counts the calls.
-+    // withRetry calls the function once, then retries N times. So 1 (initial) + 3 (retries) = 4 calls.
-+    // My implementation calls withRetry with maxRetries = 3. Let's check the code.
-+    // The `withRetry` utility tries `maxRetries` times *after* the first failure. Total attempts = 1 + maxRetries.
-+    // My code has `maxRetries: 3`. So it should be 4 calls total.
-+    expect(getCollectionsMock).toHaveBeenCalledTimes(4); 
-+    expect(qdrantPool.getMetrics().state).toBe('error');
-+  });
-+
-+  it('deve entrar em estado de cooldown (circuit breaker) após falha final', async () => {
-+    const connectionError = new Error('Connection refused');
-+    getCollectionsMock.mockRejectedValue(connectionError);
-+
-+    // First call fails after retries
-+    await expect(qdrantPool.getClient()).rejects.toThrow();
-+    expect(getCollectionsMock).toHaveBeenCalledTimes(4);
-+
-+    // Subsequent call within the cooldown period should fail immediately
-+    await expect(qdrantPool.getClient()).rejects.toThrow('Qdrant connection in cooldown state');
-+    
-+    // Should not have tried to connect again
-+    expect(getCollectionsMock).toHaveBeenCalledTimes(4);
-+  });
-+});
++    return NextResponse.json({ success: true });
++  } catch (error: any) {
+     return NextResponse.json(
+-      { error: "Failed to update personality" },
++      { error: "Failed to update personality", details: error.message },
+       { status: 500 }
+     );
+   }
 

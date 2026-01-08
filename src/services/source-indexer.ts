@@ -5,6 +5,7 @@ import { logger } from "../logger";
 import { createEmbeddingService } from "./embeddings";
 import { getQdrantClient } from "../database/qdrant-pool";
 import { getConfigValue } from "../config";
+import { semanticChunk, ChunkingConfig } from "./embedding-strategies";
 
 /**
  * FazAI Source Code Auto-Indexer (Metacognition Engine)
@@ -34,8 +35,27 @@ interface IndexState {
 }
 
 const STATE_FILE_PATH = "/opt/fazai/data/source-index.json";
-const MAX_CHUNK_SIZE = 2000; // Characters approx
-const CHUNK_OVERLAP = 200;
+
+/**
+ * P0-4: Configurações de chunking semântico por tipo de arquivo
+ * Usa estratégias inteligentes do embedding-strategies.ts
+ *
+ * IMPORTANTE: mxbai-embed-large tem contexto de ~512 tokens (~1500 chars)
+ * Chunks maiores são truncados pelo embedding service
+ */
+const CODE_CHUNKING: ChunkingConfig = {
+  maxChunkSize: 1200,   // Reduzido para caber no contexto do Ollama
+  overlap: 100,
+  separators: ["\n\n\n", "\n\n", "\nfunction ", "\nclass ", "\nexport ", "\nimport ", "\n"],
+  minChunkSize: 150,
+};
+
+const DOC_CHUNKING: ChunkingConfig = {
+  maxChunkSize: 600,    // Reduzido para docs
+  overlap: 80,
+  separators: ["\n## ", "\n### ", "\n\n", "\n", ". "],
+  minChunkSize: 100,
+};
 
 // Mapping of directories to categories/weights
 const PATH_CONFIG: Record<string, { category: string; weight: number }> = {
@@ -158,15 +178,19 @@ export async function runSourceIndexer(options: IndexerOptions = {}): Promise<vo
         const embedding = await embeddingService.generate(chunk);
         
         // Semantic ID: hash(path + chunk_index + version) to ensure uniqueness and updates
-        const semanticId = crypto
+        const hashHex = crypto
           .createHash("sha256")
           .update(`${relativePath}:${i}:${currentVersion}`)
           .digest("hex");
 
+        // Convert SHA256 hash to UUID format (Qdrant requires UUID or integer IDs)
+        // Take first 32 hex chars and format as UUID: 8-4-4-4-12
+        const semanticId = `${hashHex.slice(0, 8)}-${hashHex.slice(8, 12)}-${hashHex.slice(12, 16)}-${hashHex.slice(16, 20)}-${hashHex.slice(20, 32)}`;
+
         await qdrant.upsert("fazai_source", {
           points: [
             {
-              id: semanticId, // Using UUID-like hash for ID
+              id: semanticId, // UUID format for Qdrant compatibility
               vector: embedding, // 1536 dim (padded if needed by service)
               payload: {
                 semantic_id: semanticId,
@@ -247,24 +271,13 @@ function analyzeCode(content: string, relPath: string) {
   return { category, weight, functions, classes, imports, isJsDoc: relPath.endsWith(".md") };
 }
 
+/**
+ * P0-4: Chunking semântico usando embedding-strategies.ts
+ *
+ * Troca chunking naive por estratégia inteligente com separadores semânticos.
+ * Prioriza quebras em boundaries naturais (funções, classes, parágrafos).
+ */
 function chunkFile(content: string, type: "code" | "doc"): string[] {
-  const chunks: string[] = [];
-  let currentChunk = "";
-  
-  const lines = content.split("\n");
-  
-  for (const line of lines) {
-    if (currentChunk.length + line.length > MAX_CHUNK_SIZE) {
-      chunks.push(currentChunk);
-      // Simple overlap: keep last 5 lines
-      const overlapLines = currentChunk.split("\n").slice(-5).join("\n");
-      currentChunk = overlapLines + "\n" + line;
-    } else {
-      currentChunk += (currentChunk ? "\n" : "") + line;
-    }
-  }
-  
-  if (currentChunk) chunks.push(currentChunk);
-  
-  return chunks;
+  const config = type === "code" ? CODE_CHUNKING : DOC_CHUNKING;
+  return semanticChunk(content, config);
 }

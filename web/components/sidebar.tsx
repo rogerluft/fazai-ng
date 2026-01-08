@@ -15,6 +15,7 @@ import {
   Shield,
   Mail,
   Code,
+  HardDrive,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -57,9 +58,33 @@ const navigationItems = [
 ];
 
 const integrationItems = [
-// ... (rest of the file)
+  {
+    label: "Cloudflare",
+    href: "/integrations/cloudflare",
+    icon: Cloud,
+  },
+  {
+    label: "OPNsense",
+    href: "/integrations/opnsense",
+    icon: Shield,
+  },
+  {
+    label: "SpamExperts",
+    href: "/integrations/spamexperts",
+    icon: Mail,
+  },
+  {
+    label: "Samba",
+    href: "/samba",
+    icon: HardDrive,
+  },
+];
+
+export function Sidebar() {
+  const pathname = usePathname();
+
   return (
-    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-border bg-card p-6">
+    <aside className="fixed left-0 top-0 h-screen w-64 border-r border-border bg-card p-6 overflow-y-auto">
       <div className="mb-8 flex items-center gap-3">
         <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
           <span className="text-sm font-bold text-primary-foreground">F</span>

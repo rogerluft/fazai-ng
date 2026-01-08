@@ -1,0 +1,65 @@
+# =============================================================================
+# FazAI Health Check Service - Verificacao de Saude do Sistema
+# =============================================================================
+# Descricao: Servico oneshot executado pelo timer para verificar a saude
+#            de todos os componentes do FazAI.
+#
+# Este servico NAO deve ser iniciado manualmente, use o timer:
+#   systemctl start fazai-worker.timer
+#
+# Ou execute manualmente o script:
+#   /opt/fazai/scripts/health-check.sh
+# =============================================================================
+
+[Unit]
+Description=FazAI Health Check - Verificacao de Saude
+Documentation=https://github.com/rluft/fazai-ng
+# Nao inicia se o worker nao estiver rodando
+After=fazai-worker.service
+
+[Service]
+# -------------------------------------------------------------------------
+# Tipo de Servico
+# -------------------------------------------------------------------------
+# Oneshot - executa uma vez e termina
+Type=oneshot
+
+# -------------------------------------------------------------------------
+# Identidade do Processo
+# -------------------------------------------------------------------------
+User=fazai
+Group=fazai
+
+# -------------------------------------------------------------------------
+# Comando de Execucao
+# -------------------------------------------------------------------------
+# Script de health check que verifica todos os componentes
+ExecStart=/opt/fazai/scripts/health-check.sh
+
+# -------------------------------------------------------------------------
+# Variaveis de Ambiente
+# -------------------------------------------------------------------------
+Environment=NODE_ENV=production
+Environment=QDRANT_URL=http://localhost:6333
+Environment=OLLAMA_URL=http://localhost:11434
+Environment=OLLAMA_EMBED_URL=http://localhost:11434
+
+# -------------------------------------------------------------------------
+# Arquivos de Ambiente
+# -------------------------------------------------------------------------
+EnvironmentFile=-/etc/fazai/fazai.env
+
+# -------------------------------------------------------------------------
+# Timeout
+# -------------------------------------------------------------------------
+# Maximo de 60 segundos para o health check
+TimeoutStartSec=60
+
+# -------------------------------------------------------------------------
+# Logging
+# -------------------------------------------------------------------------
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fazai-health-check
+
+# Nao precisa de [Install] pois e ativado pelo timer

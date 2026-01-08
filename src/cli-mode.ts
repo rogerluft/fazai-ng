@@ -65,6 +65,7 @@ const SLASH_COMMANDS = [
   "/spam",
   "/opnsense",
   "/ops",
+  "/samba",
   "/api",
   "/dashboard",
   "/quit",
@@ -218,6 +219,10 @@ function getPrompt(): string {
 export async function runCliMode(semanticSearchEnabled: boolean = false): Promise<void> {
   const defaultModel = models[0];
 
+  // Track pending async operations to prevent premature exit on EOF
+  let pendingOperations = 0;
+  let shouldExit = false;
+
   // Exibe logo visual
   console.clear();
   showLogo();
@@ -235,16 +240,15 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   }
   logger.info(chalk.green(`✅ API key configurada (${defaultModel.provider})`));
 
-  // Load personality from Qdrant (or fallback)
+  // Load personality from Qdrant
   let personality: PersonalityTraits | null = null;
   try {
-    logger.debug("Loading personality traits...");
+    logger.info(chalk.cyan("🧠 Loading personality from Qdrant..."));
     personality = await loadPersonalityFromQdrant();
-    logger.info(chalk.cyan(`🧠 Personalidade carregada (${personality.loadedFrom}): ` +
-      `${personality.expertise.length} expertise, ${personality.behavior.length} behavior traits`));
+    logger.info(chalk.green(`✅ Personality loaded: ${personality.traits.length} traits, ${personality.expertise.length} expertise areas`));
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));
-    logger.debug(`Personality loading failed (continuing without): ${err.message}`);
+    logger.warn(`⚠️  Could not load personality, proceeding with default behavior. Error: ${err.message}`);
   }
 
   // Generate session ID for memory grouping
@@ -395,29 +399,43 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
     logger.info(chalk.magentaBright("\n⚙️  Gerando comandos para: "), chalk.magenta(task));
 
-    const commandStream = getLinuxCommandsFromAI(
-      systemInfo,
-      task,
-      defaultModel.name,
-      defaultModel.provider,
-      semanticSearchEnabled
-    );
+    pendingOperations++;
+    try {
+      const commandStream = getLinuxCommandsFromAI(
+        systemInfo,
+        task,
+        defaultModel.name,
+        defaultModel.provider,
+        semanticSearchEnabled
+      );
 
-    const collectedCommands: LinuxCommand[] = [];
+      const collectedCommands: LinuxCommand[] = [];
 
-    for await (const packet of commandStream) {
-      if (packet.type === "command") {
-        collectedCommands.push(packet.command);
+      for await (const packet of commandStream) {
+        if (packet.type === "command") {
+          collectedCommands.push(packet.command);
+        }
       }
-    }
 
-    if (!collectedCommands.length) {
-      logger.warn(chalk.yellow("Nenhum comando gerado para a tarefa informada."));
-      return;
-    }
+      if (!collectedCommands.length) {
+        logger.warn(chalk.yellow("Nenhum comando gerado para a tarefa informada."));
+        return;
+      }
 
-    for (const command of collectedCommands) {
-      await executor.executeCommand(command);
+      for (const command of collectedCommands) {
+        await executor.executeCommand(command);
+      }
+    } catch (error: any) {
+      logger.error(chalk.red(`\n❌ Erro ao gerar comandos: ${error.message}`));
+      if (error.error?.type === "exceed_context_size_error") {
+        logger.info(chalk.gray("Dica: Reduza o tamanho da tarefa ou aumente o contexto do llama-server"));
+      }
+    } finally {
+      pendingOperations--;
+      if (shouldExit && pendingOperations === 0) {
+        logger.info(chalk.green("\nAté breve!"));
+        process.exit(0);
+      }
     }
   };
 
@@ -505,6 +523,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         logger.info("/cloudflare, /cf   Gerenciar Cloudflare (zonas, DNS, workers)");
         logger.info("/spamexperts, /spam Gerenciar SpamExperts (domínios, quarentena)");
         logger.info("/opnsense, /ops    Gerenciar OPNsense (firewall, VPN, NAT)");
+        logger.info("/samba             Gerenciar Samba (shares, users, groups)");
         logger.info("/quit, /exit       Encerra o modo CLI");
         logger.info("");
         logger.info(chalk.cyan("Busca na Web:"));
@@ -587,6 +606,20 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         } catch (error: any) {
           logger.error(chalk.red(`\n❌ ${error.message}`));
         }
+      } else if (line === "/samba" || line.startsWith("/samba ")) {
+        // Samba UI - Gerenciador de compartilhamentos
+        try {
+          const { SambaUI } = await import("./commands/samba/samba-ui");
+          const sambaUI = new SambaUI();
+          const args = line.replace(/^\/samba\s*/, "").trim().split(/\s+/).filter(Boolean);
+          if (args.length === 0) {
+            await sambaUI.showMainMenu();
+          } else {
+            await sambaUI.executeCommand(args);
+          }
+        } catch (error: any) {
+          logger.error(chalk.red(`\n❌ ${error.message}`));
+        }
       } else if (line === "/history") {
         if (!historyBuffer.length) {
           logger.info(chalk.gray("Sem histórico registrado nesta sessão."));
@@ -646,7 +679,21 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   });
 
   rl.on("close", () => {
-    logger.info(chalk.green("\nAté breve!"));
-    process.exit(0);
+    // Detect if running interactively or from pipe
+    const isInteractive = process.stdin.isTTY;
+
+    if (pendingOperations > 0) {
+      shouldExit = true;
+      logger.debug(`Waiting for ${pendingOperations} pending operation(s) to complete...`);
+      // Don't exit yet - handleExec finally block will handle exit
+      return;
+    }
+
+    // Only show exit message and exit when explicitly closed (interactive /exit)
+    // or when pipe completes with no pending operations
+    if (!isInteractive || shouldExit) {
+      logger.info(chalk.green("\nAté breve!"));
+      process.exit(0);
+    }
   });
 }

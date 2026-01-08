@@ -13,7 +13,7 @@ import { execSync } from "child_process";
 describe("CLI --help routing", () => {
   const runCli = (args: string): string => {
     try {
-      return execSync(`node dist/app.cjs ${args} 2>&1`, {
+      return execSync(`node dist/app.js ${args} 2>&1`, {
         encoding: "utf-8",
         timeout: 10000,
       });

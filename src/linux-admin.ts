@@ -3,6 +3,7 @@ import OpenAI from "openai";
 import { linuxAdminPrompt } from "./linux-prompt";
 import { LinuxCommandGenerator, LinuxCommand } from "./types-linux";
 import { logger } from "./logger";
+import { getOllamaUrl } from "./config";
 import { withRetry } from "./utils/retry";
 import { API_TIMEOUTS } from "./config/timeouts";
 import chalk from "chalk";
@@ -10,22 +11,27 @@ import { neuralQuery } from "./rag/neural-flow";
 import { captureLearning } from "./rag/auto-learning";
 import { createEmbeddingService } from "./services/embeddings";
 import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
+import { SemanticCache } from "./services/semantic-cache";
+import { tryGetFallbackForRequest } from "./command-fallbacks";
 
-type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google";
+type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google" | "llama";
 
 // Fallback chains for each provider
-// Standard fallback order: ollama → openrouter → anthropic → openai → google
+// Prefer Ollama (faster) over llama.cpp (slower)
 const FALLBACK_CHAINS: Record<Provider, Provider[]> = {
-  ollama: ["openrouter", "anthropic", "openai", "google"],
-  openrouter: ["anthropic", "openai", "google", "ollama"],
-  anthropic: ["openai", "google", "ollama", "openrouter"],
-  openai: ["google", "ollama", "openrouter", "anthropic"],
-  google: ["ollama", "openrouter", "anthropic", "openai"],
+  ollama: ["openrouter", "anthropic", "openai", "google", "llama"],
+  llama: ["ollama", "openrouter", "anthropic", "openai", "google"],
+  openrouter: ["ollama", "anthropic", "openai", "google", "llama"],
+  anthropic: ["ollama", "openai", "google", "openrouter", "llama"],
+  openai: ["ollama", "google", "openrouter", "anthropic", "llama"],
+  google: ["ollama", "openrouter", "anthropic", "openai", "llama"],
 };
 
 // Check if a provider is configured
 function isProviderAvailable(provider: Provider): boolean {
   switch (provider) {
+    case "llama":
+      return true; // Always try llama.cpp local server
     case "ollama":
       return true; // Always try Ollama
     case "openrouter":
@@ -48,6 +54,7 @@ function getDefaultModel(provider: Provider): string {
 
   // Try to get from config first (same as models.ts)
   const configKeys: Record<Provider, string> = {
+    llama: "MODELS_LLAMA",
     ollama: "MODELS_OLLAMA",
     openrouter: "MODELS_OPENROUTER",
     anthropic: "MODELS_ANTHROPIC",
@@ -65,6 +72,8 @@ function getDefaultModel(provider: Provider): string {
 
   // Fallback defaults
   switch (provider) {
+    case "llama":
+      return "phi3-mini";
     case "ollama":
       return "llama3.2:latest";
     case "openrouter":
@@ -92,8 +101,8 @@ function isRecoverableError(error: any): boolean {
   // Rate limits
   if (status === 429 || error?.code === 429) return true;
 
-  // Timeout
-  if (message.includes("timeout")) return true;
+  // Timeout / Abort (OpenAI SDK) - "timeout", "timed out", "abort"
+  if (message.includes("timeout") || message.includes("timed out") || message.includes("abort") || error?.name === "AbortError") return true;
 
   // Connection errors
   if (message.includes("econnrefused") || message.includes("enotfound")) return true;
@@ -425,10 +434,38 @@ export async function* getLinuxCommandsFromAI(
   let commandsYielded = false;
   const triedProviders: Provider[] = [];
 
+  // 🎯 SEMANTIC CACHE: Verifica se já temos comandos cacheados para esta tarefa
+  if (semanticSearchEnabled) {
+    try {
+      const cache = await SemanticCache.getInstance();
+      const cachedResponse = await cache.lookup(task, model, provider);
+
+      if (cachedResponse) {
+        logger.info(chalk.green("🎯 Cache hit! Usando comandos cacheados"));
+        try {
+          const cachedCommands: LinuxCommand[] = JSON.parse(cachedResponse);
+          if (Array.isArray(cachedCommands) && cachedCommands.length > 0) {
+            for (const cmd of cachedCommands) {
+              yield { type: "command", command: cmd };
+            }
+            yield { type: "allcommands", commands: cachedCommands };
+            return;
+          }
+        } catch {
+          logger.debug("Cache inválido, ignorando...");
+        }
+      }
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.debug(`Cache lookup failed: ${err.message}`);
+    }
+  }
+
   // 🧠 NEURAL FLOW: Tenta buscar padrão aprendido primeiro
   const learnedCommands = semanticSearchEnabled ? await consultNeuralFlow(task, systemInfo) : null;
 
   let enhancedSystemInfo = systemInfo;
+  const collectedCommands: LinuxCommand[] = []; // Para cachear depois
 
   if (learnedCommands && learnedCommands.length > 0) {
     // Enrich learned commands with RAG context for validation
@@ -472,15 +509,42 @@ export async function* getLinuxCommandsFromAI(
       const generator = getGeneratorForProvider(currentProvider, enhancedSystemInfo, task, currentModel);
 
       for await (const result of generator) {
-        if (result.type === "command" || result.type === "allcommands") {
+        if (result.type === "command") {
           commandsYielded = true;
+          collectedCommands.push(result.command);
+        } else if (result.type === "allcommands") {
+          commandsYielded = true;
+          // Usa allcommands se collectedCommands estiver vazio
+          if (collectedCommands.length === 0 && result.commands) {
+            collectedCommands.push(...result.commands);
+          }
         }
         yield result;
       }
 
-      // If we got here without yielding commands, consider it a failure
+      // If we got here without yielding commands, try fallback system
       if (!commandsYielded) {
-        throw new Error(`Provider ${currentProvider} returned no commands`);
+        const fallbackCmd = tryGetFallbackForRequest(task);
+        if (fallbackCmd) {
+          logger.info(chalk.yellow(`⚡ Usando comando fallback para: ${task.substring(0, 50)}...`));
+          yield { type: "command", command: fallbackCmd };
+          yield { type: "allcommands", commands: [fallbackCmd] };
+          commandsYielded = true;
+          collectedCommands.push(fallbackCmd);
+        } else {
+          throw new Error(`Provider ${currentProvider} returned no commands`);
+        }
+      }
+
+      // 🎯 SEMANTIC CACHE: Armazena comandos bem-sucedidos
+      if (semanticSearchEnabled && collectedCommands.length > 0) {
+        try {
+          const cache = await SemanticCache.getInstance();
+          await cache.store(task, JSON.stringify(collectedCommands), currentModel, currentProvider);
+          logger.debug(chalk.gray(`💾 Cache stored: ${collectedCommands.length} comandos`));
+        } catch (cacheErr) {
+          logger.debug(`Cache store failed: ${cacheErr}`);
+        }
       }
 
       break; // Success, exit loop
@@ -529,6 +593,8 @@ function getGeneratorForProvider(
       return getLinuxCommandsFromOpenRouter(systemInfo, task, model);
     case "ollama":
       return getLinuxCommandsFromOllama(systemInfo, task, model);
+    case "llama":
+      return getLinuxCommandsFromLlama(systemInfo, task, model);
     case "google":
       return getLinuxCommandsFromGemini(systemInfo, task, model);
     default:
@@ -660,7 +726,7 @@ async function* getLinuxCommandsFromOllama(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const baseUrl = process.env.OLLAMA_BASE_URL || "http://192.168.0.101:11434";
+  const baseUrl = getOllamaUrl();
 
   logger.debug(`[DEBUG] Ollama baseURL: ${baseUrl}`);
   logger.debug(`[DEBUG] Model: ${model}`);
@@ -675,26 +741,35 @@ IMPORTANTE: Responda APENAS com um objeto JSON válido no formato:
 {"commands": [{"explain": "...", "command": "...", "riskLevel": "low|medium|high|critical", "requiresConfirmation": true|false}]}`;
 
   // Use native Ollama API with format: "json" for reliable JSON output
+  // Add timeout to fail fast and trigger fallback chain
   const response = await withRetry(
     async () => {
-      const res = await fetch(`${baseUrl}/api/generate`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model,
-          system: systemMessage,
-          prompt,
-          format: "json",
-          stream: false,
-        }),
-      });
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout (same as llama)
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(`Ollama error ${res.status}: ${text}`);
+      try {
+        const res = await fetch(`${baseUrl}/api/generate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            model,
+            system: systemMessage,
+            prompt,
+            format: "json",
+            stream: false,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(`Ollama error ${res.status}: ${text}`);
+        }
+
+        return res.json();
+      } finally {
+        clearTimeout(timeoutId);
       }
-
-      return res.json();
     },
     { provider: "ollama" }
   );
@@ -772,4 +847,89 @@ Cada comando deve ter a estrutura exata definida no prompt do usuário.`;
   // Use unified streaming parser
   const { parseStreamingJSON, iterateGoogleStream } = await import("./streaming-parser");
   yield* parseStreamingJSON(iterateGoogleStream(result.stream), "google");
+}
+
+/**
+ * Get Linux commands from llama.cpp local server
+ * Uses OpenAI-compatible API at configurable port (default: 11430)
+ */
+async function* getLinuxCommandsFromLlama(
+  systemInfo: string,
+  task: string,
+  model: string
+): LinuxCommandGenerator {
+  const { getConfigValue } = await import("./config");
+  const baseUrl = getConfigValue("LLAMA_SERVER_URL") || "http://localhost:11430";
+
+  logger.info(`\n\n🖥️  Gerando comandos Linux com llama.cpp (${model}) em ${baseUrl}...`);
+
+  const systemMessage = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.`;
+
+  const prompt = `${linuxAdminPrompt(task)}
+
+IMPORTANTE: Responda APENAS com um objeto JSON válido no formato:
+{"commands": [{"explain": "...", "command": "...", "riskLevel": "low|medium|high|critical", "requiresConfirmation": true|false}]}`;
+
+  // llama.cpp server uses OpenAI-compatible API
+  // Fail-fast: 60 segundos. Se não responder, vai pro fallback chain
+  // Phi-3 em CPU é muito lento (~2.6 tok/s), não vale esperar 5 minutos
+  const openai = new OpenAI({
+    baseURL: `${baseUrl}/v1`,
+    apiKey: "not-needed", // llama.cpp server doesn't require API key
+    timeout: 60000, // 60 segundos - fail-fast para ir pro fallback
+    maxRetries: 0, // Sem retries - deixa fallback chain cuidar
+  });
+
+  try {
+    // Direct call without withRetry - OpenAI SDK handles timeout internally
+    // This allows faster fallback when llama-server is unavailable
+    const response = await openai.chat.completions.create({
+      model,
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      response_format: { type: "json_object" },
+      max_tokens: 1024, // Limita resposta para evitar geração infinita
+      temperature: 0, // Determinístico para comandos
+      stream: false,
+    });
+
+    // Parse the response
+    const content = response.choices[0]?.message?.content || "";
+    const jsonResponse = JSON.parse(content);
+
+    const { LinuxCommandSchema } = await import("./types-linux");
+
+    if (jsonResponse.commands && Array.isArray(jsonResponse.commands)) {
+      const validCommands: LinuxCommand[] = [];
+
+      for (const cmd of jsonResponse.commands) {
+        try {
+          const validated = LinuxCommandSchema.parse(cmd);
+          validCommands.push(validated);
+          yield { type: "command", command: validated };
+        } catch (e) {
+          logger.warn(`⚠️  Comando inválido ignorado: ${JSON.stringify(cmd).substring(0, 50)}`);
+        }
+      }
+
+      logger.info(`✓ Commands: ${validCommands.length} valid`);
+      yield { type: "allcommands", commands: validCommands };
+    } else {
+      throw new Error("Resposta não contém array de comandos");
+    }
+  } catch (error: any) {
+    // Check if llama-server is not running
+    if (error.code === "ECONNREFUSED" || error.message?.includes("ECONNREFUSED")) {
+      logger.warn(chalk.yellow(`\n⚠️  llama-server não disponível em ${baseUrl}`));
+      logger.info(chalk.gray("Dica: Inicie com 'systemctl start fazai-llama' ou use outro provider"));
+    }
+    // Check for context size exceeded error
+    else if (error.error?.type === "exceed_context_size_error" || error.message?.includes("exceeds the available context")) {
+      logger.warn(chalk.yellow(`\n⚠️  Prompt muito grande para llama-server (${error.error?.n_prompt_tokens || "?"} tokens > ${error.error?.n_ctx || "?"} contexto)`));
+      logger.info(chalk.gray("Dica: Aumente --ctx-size no llama-server ou use outro provider"));
+    }
+    throw error;
+  }
 }

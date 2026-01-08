@@ -6,12 +6,12 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { TraitEditor } from "@/components/personality/trait-editor";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import * as api from "@/lib/api";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 
 const queryClient = new QueryClient();
 
 function PersonalityContent() {
-  const { setLoading, setError } = useJarvisStore();
+  const { setLoading, setError } = useFazaiStore();
 
   const { data: personality, isLoading, refetch } = useQuery({
     queryKey: ["personality"],
@@ -57,7 +57,7 @@ function PersonalityContent() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Personality</h1>
         <p className="text-muted-foreground">
-          Manage the traits and behavioral characteristics of the Jarvis agent
+          Manage the traits and behavioral characteristics of the FazAI agent
         </p>
       </div>
 

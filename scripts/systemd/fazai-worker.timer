@@ -1,0 +1,55 @@
+# =============================================================================
+# FazAI Worker Timer - Health Check Periodico
+# =============================================================================
+# Descricao: Timer opcional que executa verificacao de saude periodica
+#            do servico FazAI Worker. Util para monitoramento e alertas.
+#
+# Funcionamento:
+#   - Executa fazai-health-check.service a cada 5 minutos
+#   - O health check verifica: Qdrant, Ollama, Worker, Disk, Memory
+#   - Registra resultado no journal para analise
+#
+# Instalacao:
+#   sudo cp fazai-worker.timer /etc/systemd/system/
+#   sudo cp fazai-health-check.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable fazai-worker.timer
+#   sudo systemctl start fazai-worker.timer
+#
+# Verificar proximas execucoes:
+#   systemctl list-timers fazai-worker.timer
+#
+# Logs:
+#   journalctl -u fazai-health-check -f
+# =============================================================================
+
+[Unit]
+Description=FazAI Worker Health Check Timer
+Documentation=https://github.com/rluft/fazai-ng
+
+[Timer]
+# -------------------------------------------------------------------------
+# Agendamento
+# -------------------------------------------------------------------------
+# Executa 1 minuto apos o boot
+OnBootSec=1min
+
+# Executa a cada 5 minutos apos a ultima execucao
+OnUnitActiveSec=5min
+
+# Adiciona randomizacao de ate 30 segundos para evitar picos
+RandomizedDelaySec=30
+
+# Garante que executa mesmo se perdeu algum ciclo
+Persistent=true
+
+# Precisao do timer (permite economia de energia)
+AccuracySec=1min
+
+# -------------------------------------------------------------------------
+# Unidade a ser ativada
+# -------------------------------------------------------------------------
+Unit=fazai-health-check.service
+
+[Install]
+WantedBy=timers.target

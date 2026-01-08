@@ -127,7 +127,7 @@ export class CircuitBreaker {
   private resetTimer: NodeJS.Timeout | null = null;
 
   constructor(private readonly config: CircuitBreakerConfig) {
-    logger.info(
+    logger.debug(
       `[CircuitBreaker] Inicializado para serviço "${config.serviceName}" ` +
         `(threshold: ${config.failureThreshold}, resetTimeout: ${config.resetTimeout}ms, ` +
         `operationTimeout: ${config.operationTimeout}ms)`

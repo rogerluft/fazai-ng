@@ -8,7 +8,7 @@
  * - Automatic fallback handling
  *
  * Key Changes from Original:
- * - ❌ Removed: Zero padding (1024 → 1536)
+ * - ✅ Updated: Zero padding enforced (768/1024 → 1536) for cross-compatibility
  * - ✅ Added: Collection-specific strategies
  * - ✅ Added: Semantic chunking
  * - ✅ Added: Model availability checking
@@ -16,7 +16,7 @@
  * @module services/embeddings
  */
 
-import { getConfigValue } from "../config";
+import { getConfigValue, getOllamaEmbedUrl } from "../config";
 import { logger } from "../logger";
 import { withRetry } from "../utils/retry";
 import { API_TIMEOUTS } from "../config/timeouts";
@@ -79,14 +79,15 @@ export interface EmbeddingService {
 /**
  * Ollama Embedding Service - Refactored
  *
- * Uses native dimensions (1024 or 768) without zero padding.
+ * Uses zero padding to enforce 1536 dimensions for compatibility.
  * Model selection based on collection type.
  */
 class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private modelCache: Map<CollectionType, EmbeddingModel>;
+  private readonly TARGET_DIMENSION = 1536;
 
-  constructor(baseUrl: string = "http://192.168.0.101:11434") {
+  constructor(baseUrl: string = getOllamaEmbedUrl()) {
     this.baseUrl = baseUrl;
     this.modelCache = new Map();
   }
@@ -262,7 +263,7 @@ class OllamaEmbeddingService implements EmbeddingService {
         logger.error(
           `Failed to generate embedding for text ${i + 1}: ${error.message}`
         );
-        embeddings.push(new Array(dimension).fill(0));
+        embeddings.push(new Array(this.TARGET_DIMENSION).fill(0));
       }
     }
 
@@ -303,8 +304,8 @@ class OllamaEmbeddingService implements EmbeddingService {
     // Return info for default model (will vary by collection at runtime)
     return {
       provider: "ollama" as const,
-      model: "mxbai-embed-large (dynamic)",
-      dimension: 1024, // Most common dimension
+      model: "nomic-embed-text (dynamic + padding)",
+      dimension: 1536, // Standardized dimension
       isLocal: true,
     };
   }
@@ -588,5 +589,6 @@ export async function getEmbeddingDimension(
     return 0;
   }
 
-  return strategy.dimension;
+  // Enforce 1536 for all collections
+  return 1536;
 }

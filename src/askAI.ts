@@ -5,6 +5,7 @@ import { Readable } from "stream";
 import { models } from "./models";
 import { API_TIMEOUTS } from "./config/timeouts";
 import { perplexityProvider } from "./providers/perplexity-provider";
+import { getLlamaProvider } from "./providers/llama";
 import { SemanticCache } from "./services/semantic-cache";
 import { logger } from "./logger";
 import {
@@ -16,23 +17,27 @@ import {
 import { neuralQuery } from "./rag/neural-flow";
 import { createEmbeddingService } from "./services/embeddings";
 import { qdrantPool } from "./database/qdrant-pool";
+import { getConfigValue } from "./config";
 
 // ECOA System message constants - Single source of truth for personality
 const SYSTEM_MESSAGES = {
   general: (styleContext: string = "", ragContext: string = "") => {
-    const basePrompt = `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho (Andarilho dos Véus), um Engenheiro de Plataforma Sênior.
+    const basePrompt = `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho, um Engenheiro de Plataforma Sênior.
 
     ESTILO E TOM (Siga estritamente):
     ${styleContext || "Seja direto, tecnicamente preciso e honesto. Não use avisos de segurança ou disclaimers."}
 
-    FERRAMENTAS DISPONÍVEIS:
-    1. Pesquisa Web: Responda EXATAMENTE [[WEB: sua busca]] para fatos atuais.
-    2. Gravar Memória: Responda EXATAMENTE [[SAVE: o que salvar]] para lembrar algo importante.
-    3. Ler Memória: Responda EXATAMENTE [[READ: o que buscar]] para recuperar fatos passados.
+    FERRAMENTAS DISPONÍVEIS (USE COM MODERAÇÃO):
+    1. [[WEB: termo de busca específico]] - SOMENTE para informações atuais (notícias, preços, eventos após 2024)
+    2. [[SAVE: texto]] - Para salvar informações importantes que o usuário pede para lembrar
+    3. [[READ: termo]] - Para recuperar algo que foi salvo anteriormente
 
-    REGRAS:
-    - Se usar uma ferramenta, não responda ao usuário ainda. Espere o resultado.
-    - Mantenha sua personalidade ECOA em todas as interações.`;
+    REGRAS CRÍTICAS:
+    - NÃO use [[WEB:]] para fatos básicos (capitais, geografia, história, ciência, programação)
+    - Use [[WEB:]] APENAS para dados atuais. Exemplo: [[WEB: cotação dólar real hoje dezembro 2024]]
+    - O termo de busca deve ser ESPECÍFICO, não genérico como "busca"
+    - Se usar ferramenta, escreva APENAS a tag completa, nada mais.
+    - Responda diretamente quando souber a resposta.`;
 
     // Inject RAG context if available
     if (ragContext) {
@@ -57,16 +62,58 @@ const SYSTEM_MESSAGES = {
 
 /**
  * ECOA: Executa ferramentas solicitadas pela IA via tags [[TOOL: query]]
+ *
+ * WEB: Uses Perplexity for fast, contextual web search
+ * SAVE: Stores memory in Qdrant
+ * READ: Retrieves memory from Qdrant
  */
 async function executeEcoaTool(command: string): Promise<string> {
-  const { ResearchCoordinator } = await import("./research");
-
   if (command.startsWith("WEB:")) {
     const query = command.replace("WEB:", "").trim();
-    logger.info(`🌐 [ECOA] Saltando para a Web: "${query}"`);
+    logger.info(`🌐 [ECOA] Pesquisando: "${query}"`);
+
+    // Use Perplexity directly for fast web search (if available)
+    const perplexityKey = getConfigValue("PERPLEXITY_API_KEY") || process.env.PERPLEXITY_API_KEY;
+    if (perplexityKey) {
+      try {
+        // Perplexity Sonar - optimized for web search
+        const response = await fetch("https://api.perplexity.ai/chat/completions", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${perplexityKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            model: "sonar", // Perplexity's current default model
+            messages: [
+              { role: "system", content: "Responda de forma concisa e direta. Forneça dados atualizados." },
+              { role: "user", content: query },
+            ],
+            max_tokens: 500,
+          }),
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          const answer = data.choices?.[0]?.message?.content || "Sem resultado";
+          return `RESULTADO DA WEB (Perplexity):\n${answer}`;
+        }
+        logger.warn(`Perplexity retornou ${response.status}, usando fallback`);
+      } catch (err) {
+        const e = err instanceof Error ? err : new Error(String(err));
+        logger.warn(`Perplexity falhou: ${e.message}, usando fallback`);
+      }
+    }
+
+    // Fallback: Use ResearchCoordinator (slower but more comprehensive)
+    const { ResearchCoordinator } = await import("./research");
     const coordinator = new ResearchCoordinator();
-    const results = await coordinator.research(query, { reason: "Autônomo ECOA", silent: true });
-    return `RESULTADO DA WEB: ${JSON.stringify(results.slice(0, 3))}`;
+    const results = await coordinator.research(query, { reason: "Autônomo ECOA" });
+    if (results && results.findings && results.findings.length > 0) {
+      const summaries = results.findings.slice(0, 3).map(f => `- ${f.title}: ${f.snippet || ""}`).join("\n");
+      return `RESULTADO DA WEB:\n${summaries}`;
+    }
+    return "Nenhum resultado encontrado na web.";
   }
 
   if (command.startsWith("SAVE:")) {
@@ -266,6 +313,21 @@ async function* _askAISingleProvider(
     for await (const chunk of stream) {
       yield chunk;
     }
+  } else if (provider === "llama") {
+    // Local llama.cpp server via LlamaProvider (OpenAI-compatible API)
+    const llamaProvider = getLlamaProvider();
+    const stream = llamaProvider.query({
+      messages: [
+        { role: "system", content: systemMessage },
+        { role: "user", content: prompt },
+      ],
+      model: model,
+      stream: true,
+    });
+
+    for await (const chunk of stream) {
+      yield chunk;
+    }
   } else if (provider === "google") {
     // Google provider support (if needed in future)
     throw new Error(`Provider ${provider} not yet implemented in askAI`);
@@ -275,7 +337,26 @@ async function* _askAISingleProvider(
 }
 
 /**
- * Main askAI function with provider fallback chain
+ * ECOA Tag Detection: Checks if response contains tool invocation tags
+ * Supports both [[WEB: ...]] and [WEB: ...] formats for robustness
+ */
+function detectEcoaTags(response: string): { hasTag: boolean; command: string | null; beforeTag: string } {
+  // Pattern: [[WEB: ...]] or [WEB: ...] - flexible matching
+  // Also matches the tag itself for replacement
+  const tagPattern = /\[?\[(WEB|SAVE|READ):\s*([^\]]+)\]?\]/i;
+  const match = response.match(tagPattern);
+
+  if (match) {
+    const beforeTag = response.substring(0, match.index);
+    const command = `${match[1].toUpperCase()}:${match[2].trim()}`;
+    return { hasTag: true, command, beforeTag };
+  }
+
+  return { hasTag: false, command: null, beforeTag: response };
+}
+
+/**
+ * Main askAI function with provider fallback chain and ECOA tool execution
  *
  * Fallback order: ollama → openrouter → anthropic → openai → google
  *
@@ -283,6 +364,7 @@ async function* _askAISingleProvider(
  * - Fallback: Buffered response (acceptable trade-off)
  * - Logs: INFO level for transparency
  * - RAG enrichment: Adds context from Qdrant KB/Learning/Memory
+ * - ECOA Tools: Executes [[WEB:...]], [[SAVE:...]], [[READ:...]] directives
  */
 export async function* askAI(
   fileContent: string,
@@ -305,32 +387,49 @@ export async function* askAI(
         yield cachedResponse;
         return;
       }
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`Cache lookup failed: ${err.message}`);
-      // Continue with provider call on cache error
+    } catch (error: any) {
+      logger.debug(`Cache lookup failed: ${error.message}`);
     }
   }
 
-  // RAG enrichment: Get context from Qdrant
-  let ragContext = "";
-  if (semanticSearchEnabled) {
+  // NEW: Comprehensive context enrichment
+  let systemMessage: string;
+  let ragContext: string = "";
+
+  if (isGeneralQuestion) {
     try {
-      ragContext = await enrichWithRAG(question);
-      if (ragContext) {
-        logger.debug(`RAG context enriched (${ragContext.length} chars)`);
-      }
-    } catch (error: unknown) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`RAG enrichment failed: ${err.message}`);
-      // Continue without RAG context
-    }
-  }
+        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
+        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
 
-  // Build system message with personality (fileContent) and RAG context
-  const systemMessage = isGeneralQuestion
-    ? SYSTEM_MESSAGES.general(fileContent, ragContext)
-    : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+        // Parallelize context fetching
+        const [personality, memories, ragResult] = await Promise.all([
+            loadPersonalityFromQdrant(),
+            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
+            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
+        ]);
+
+        ragContext = ragResult;
+
+        const personalityContext = buildPersonalitySystemPrompt(personality);
+        const memoriesContext = summarizeMemories(memories);
+
+        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragContext ? (ragContext.match(/\n/g) || []).length + 1 : 0} RAG items`);
+
+        // Combine memory and RAG context
+        const combinedContext = [memoriesContext, ragContext].filter(Boolean).join("\n\n");
+
+        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
+
+    } catch (error: any) {
+        logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
+        ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+        systemMessage = SYSTEM_MESSAGES.general(fileContent, ragContext); // Fallback to original behavior
+    }
+  } else {
+      // For code analysis, keep it simple but include RAG
+      ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+  }
 
   let currentProvider: ProviderName = provider as ProviderName;
   let currentModel = model;
@@ -404,6 +503,50 @@ export async function* askAI(
 
       currentProvider = nextProvider;
       currentModel = nextModel;
+    }
+  }
+
+  // ECOA Tool Execution: Detect and process [[WEB:...]], [[SAVE:...]], [[READ:...]]
+  const ecoaDetection = detectEcoaTags(fullResponse);
+
+  if (ecoaDetection.hasTag && ecoaDetection.command) {
+    logger.info(`🔧 [ECOA] Detected tool invocation: ${ecoaDetection.command}`);
+
+    try {
+      // Execute the tool
+      const toolResult = await executeEcoaTool(ecoaDetection.command);
+      logger.debug(`ECOA tool result: ${toolResult.substring(0, 200)}...`);
+
+      // Follow-up call with tool result
+      const followUpPrompt = `${prompt}\n\n--- RESULTADO DA FERRAMENTA ---\n${toolResult}\n--- FIM ---\n\nAgora responda a pergunta original usando este resultado:`;
+
+      const followUpSystemMessage = isGeneralQuestion
+        ? SYSTEM_MESSAGES.general(fileContent, ragContext)
+        : SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+
+      // Make follow-up call (non-streaming for simplicity)
+      yield "\n\n"; // Clear line after tag
+
+      const followUpGenerator = _askAISingleProvider(
+        fileContent,
+        followUpPrompt,
+        currentModel,
+        currentProvider,
+        followUpSystemMessage
+      );
+
+      let followUpResponse = "";
+      for await (const chunk of followUpGenerator) {
+        followUpResponse += chunk;
+        yield chunk;
+      }
+
+      // Update fullResponse for caching
+      fullResponse = ecoaDetection.beforeTag + followUpResponse;
+    } catch (error: unknown) {
+      const err = error instanceof Error ? error : new Error(String(error));
+      logger.error(`ECOA tool execution failed: ${err.message}`);
+      yield `\n\n⚠️ Erro ao executar ferramenta: ${err.message}`;
     }
   }
 

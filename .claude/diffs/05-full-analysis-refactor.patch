@@ -1,0 +1,232 @@
+diff --git a/src/agentic/agentic-loop.ts b/src/agentic/agentic-loop.ts
+index 2fae0a3..dfe2996 100644
+--- a/src/agentic/agentic-loop.ts
++++ b/src/agentic/agentic-loop.ts
+@@ -124,41 +124,40 @@ export class AgenticLoop {
+     }
+ 
+     const embedding = await this.embeddingService.generate(query);
+-    const results: ContextItem[] = [];
+-
++    
+     // Busca em paralelo em todas as collections
+     const searchPromises = Object.entries(FUSION_WEIGHTS).map(async ([collName, weight]) => {
+       const fullName = COLLECTIONS[collName as keyof typeof COLLECTIONS];
++      const searchResults = await this.client.search(fullName, {
++        vector: embedding,
++        limit: 5,
++        with_payload: true,
++      });
++      return searchResults.map((r) => ({
++        source: collName,
++        content: (r.payload as Record<string, unknown>)?.content as string ||
++          JSON.stringify(r.payload),
++        score: r.score,
++        fusedScore: r.score * weight,
++      }));
++    });
+ 
+-      try {
+-        const searchResults = await this.client.search(fullName, {
+-          vector: embedding,
+-          limit: 5,
+-          with_payload: true,
+-        });
++    const settledResults = await Promise.allSettled(searchPromises);
++    const results: ContextItem[] = [];
+ 
+-        return searchResults.map((r) => ({
+-          source: collName,
+-          content: (r.payload as Record<string, unknown>)?.content as string ||
+-            JSON.stringify(r.payload),
+-          score: r.score,
+-          fusedScore: r.score * weight,
+-        }));
+-      } catch (error) {
++    settledResults.forEach((result, index) => {
++      if (result.status === "fulfilled") {
++        results.push(...result.value);
++      } else {
+         if (this.config.verbose) {
+-          console.error(`Erro ao buscar em ${fullName}:`, error);
++          const collName = Object.keys(FUSION_WEIGHTS)[index];
++          const fullName = COLLECTIONS[collName as keyof typeof COLLECTIONS];
++          console.error(`Erro ao buscar em ${fullName}:`, result.reason);
+         }
+-        return [];
+       }
+     });
+ 
+-    const allResults = await Promise.all(searchPromises);
+-
+-    // Flatten e ordena por fusedScore
+-    for (const collResults of allResults) {
+-      results.push(...collResults);
+-    }
+-
++    // Ordena por fusedScore
+     results.sort((a, b) => b.fusedScore - a.fusedScore);
+ 
+     return results.slice(0, 10);
+diff --git a/src/app.ts b/src/app.ts
+index 4f3933d..b064ab8 100755
+--- a/src/app.ts
++++ b/src/app.ts
+@@ -200,11 +200,15 @@ async function main() {
+ 
+   // Sync command
+   if (inputs[0] === "sync") {
+-    const { syncCommand } = await import("./commands/sync");
+-    await syncCommand({
+-      verbose: debugFlag || verboseFlag,
+-      dryRun: inputs.includes("--dry-run")
+-    });
++    try {
++      const { syncCommand } = await import("./commands/sync");
++      await syncCommand({
++        verbose: debugFlag || verboseFlag,
++        dryRun: inputs.includes("--dry-run")
++      });
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'sync' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+@@ -216,49 +220,77 @@ async function main() {
+ 
+   // Cloudflare command
+   if (inputs[0] === "cf" || inputs[0] === "cloudflare") {
+-    const { handleCloudflare } = await import("./commands/cloudflare");
+-    await handleCloudflare(inputs.slice(1));
++    try {
++      const { handleCloudflare } = await import("./commands/cloudflare");
++      await handleCloudflare(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'cloudflare' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+   // GitHub command
+   if (inputs[0] === "github") {
+-    await handleGitHubCommand(inputs.slice(1));
++    try {
++      await handleGitHubCommand(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'github' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+   // Qdrant command
+   if (inputs[0] === "qdrant") {
+-    const { handleQdrantCommand } = await import("./commands/qdrant");
+-    await handleQdrantCommand(inputs.slice(1));
++    try {
++      const { handleQdrantCommand } = await import("./commands/qdrant");
++      await handleQdrantCommand(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'qdrant' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+   // Alias command
+   if (inputs[0] === "alias") {
+-    const { handleAliasCommand } = await import("./commands/alias");
+-    await handleAliasCommand(inputs.slice(1));
++    try {
++      const { handleAliasCommand } = await import("./commands/alias");
++      await handleAliasCommand(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'alias' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+   // Inference command - Gerencia conhecimento injetado pelo usuário
+   if (inputs[0] === "inference") {
+-    const { handleInferenceCommand } = await import("./commands/inference");
+-    await handleInferenceCommand(inputs.slice(1));
++    try {
++      const { handleInferenceCommand } = await import("./commands/inference");
++      await handleInferenceCommand(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'inference' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+   // Agent command - Coração agêntico do FazAI
+   if (inputs[0] === "agent") {
+-    const { handleAgentCommand } = await import("./commands/agent");
+-    await handleAgentCommand(inputs.slice(1));
++    try {
++      const { handleAgentCommand } = await import("./commands/agent");
++      await handleAgentCommand(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'agent' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+   // Dashboard command - REST API Server
+   if (inputs[0] === "dashboard") {
+-    const { handleDashboardCommand } = await import("./commands/dashboard");
+-    await handleDashboardCommand(inputs.slice(1));
++    try {
++      const { handleDashboardCommand } = await import("./commands/dashboard");
++      await handleDashboardCommand(inputs.slice(1));
++    } catch (e: any) {
++      logger.error(`Error loading or executing 'dashboard' command: ${e.message}`);
++    }
+     process.exit(0);
+   }
+ 
+@@ -590,3 +622,9 @@ main().catch((error) => {
+   logger.error("Unhandled error:", error);
+   process.exit(1);
+ });
++
++process.on('unhandledRejection', (reason, promise) => {
++  logger.error('Unhandled Rejection at:', promise, 'reason:', reason);
++  // Consider exiting the process to avoid unpredictable state
++  // process.exit(1);
++});
+diff --git a/src/dashboard/server.ts b/src/dashboard/server.ts
+index 20f3043..38a25a7 100644
+--- a/src/dashboard/server.ts
++++ b/src/dashboard/server.ts
+@@ -151,7 +151,15 @@ export class DashboardServer {
+ 
+       logger.info("Shutting down dashboard server...");
+ 
++      const forceCloseTimeout = setTimeout(() => {
++        logger.warn("Force closing server after timeout");
++        this.server?.closeAllConnections?.();
++        this.server = null;
++        resolve();
++      }, 5000);
++
+       this.server.close((error) => {
++        clearTimeout(forceCloseTimeout); // Clear the timeout
+         if (error) {
+           logger.error(`Error shutting down: ${error.message}`);
+           reject(error);
+@@ -161,14 +169,6 @@ export class DashboardServer {
+           resolve();
+         }
+       });
+-
+-      // Force close after 5 seconds
+-      setTimeout(() => {
+-        logger.warn("Force closing server after timeout");
+-        this.server?.closeAllConnections?.();
+-        this.server = null;
+-        resolve();
+-      }, 5000);
+     });
+   }
+ 
+

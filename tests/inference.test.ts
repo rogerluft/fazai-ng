@@ -23,7 +23,7 @@ vi.mock("../src/database/qdrant-pool", () => ({
 describe("Inference Command", () => {
   const runCli = (args: string): string => {
     try {
-      return execSync(`node dist/app.cjs ${args} 2>&1`, {
+      return execSync(`node dist/app.js ${args} 2>&1`, {
         encoding: "utf-8",
         timeout: 10000,
       });

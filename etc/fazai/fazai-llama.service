@@ -1,0 +1,48 @@
+[Unit]
+Description=FazAI LLaMA Server (Phi-3-mini)
+Documentation=https://github.com/ggerganov/llama.cpp
+After=network.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+Group=fazai
+
+# Garantir permissoes antes de iniciar
+ExecStartPre=/bin/mkdir -p /var/log/fazai
+ExecStartPre=/bin/chown root:fazai /var/log/fazai
+ExecStartPre=/bin/chmod 774 /var/log/fazai
+ExecStartPre=/bin/chown -R root:fazai /opt/fazai/models
+ExecStartPre=/bin/chmod -R 774 /opt/fazai/models
+
+WorkingDirectory=/opt/fazai/models/phi3
+
+# Comando principal - Otimizado para alta memoria + NUMA
+# Ajuste --threads e --parallel conforme seu hardware
+ExecStart=/usr/local/bin/llama-server \
+    --model /opt/fazai/models/phi3/Phi-3-mini-4k-instruct-q4.gguf \
+    --host 0.0.0.0 \
+    --port 11430 \
+    --ctx-size 4096 \
+    --threads 8 \
+    --parallel 4 \
+    --mlock \
+    --numa distribute \
+    --log-file /var/log/fazai/llama-server.log
+
+# Restart automatico em caso de falha
+Restart=on-failure
+RestartSec=5
+
+# Limites de recursos - Otimizado para alta memoria
+LimitNOFILE=65536
+LimitMEMLOCK=infinity
+
+# Logs: stderr vai para journal, stdout desativado (usa --log-file)
+StandardOutput=null
+StandardError=journal
+SyslogIdentifier=fazai-llama
+
+[Install]
+WantedBy=multi-user.target

@@ -18,17 +18,8 @@ if (process.platform === "win32") {
   process.exit(0);
 }
 
-try {
-  ensureDir(LOG_DIR);
-  ensureFile(LOG_FILE);
-} catch (error) {
-  if (isPermissionError(error)) {
-    console.warn(`[fazai] ⚠️  Não foi possível preparar ${LOG_DIR}: ${error.message}`);
-    console.warn("[fazai]     Execute manualmente: sudo mkdir -p /var/log/fazai && sudo chmod 775 /var/log/fazai");
-  } else {
-    console.warn(`[fazai] ⚠️  Postbuild não conseguiu preparar logs: ${error instanceof Error ? error.message : String(error)}`);
-  }
-}
+// Setup log directory with proper permissions
+await setupLogDirectory();
 
 // Auto-generate completions
 try {
@@ -116,7 +107,8 @@ try {
 async function installBashCompletion() {
   const sourceFile = path.join(projectRoot, "completion/fazai-completion.bash");
   const targetDir = "/etc/bash_completion.d";
-  const targetFile = path.join(targetDir, "fazai-completion.bash");
+  // Use simple name 'fazai' to avoid duplicates with completion-sync.mjs
+  const targetFile = path.join(targetDir, "fazai");
 
   // Skip installation in CI/CD environments
   if (process.env.CI === "true" || process.env.CONTINUOUS_INTEGRATION === "true") {
@@ -196,36 +188,80 @@ async function installBashCompletion() {
   }
 }
 
-function ensureDir(target) {
-  if (!fs.existsSync(target)) {
-    fs.mkdirSync(target, { recursive: true });
-    fs.chmodSync(target, 0o775);
-    console.log(`[fazai] Diretório de log preparado em ${target}`);
+
+/**
+ * Setup log directory with proper permissions
+ * Automatic setup - no manual steps required
+ * Uses sudo with password prompt if needed
+ */
+async function setupLogDirectory() {
+  const { spawnSync } = await import("node:child_process");
+
+  // Skip in CI environment
+  if (process.env.CI === "true" || process.env.CONTINUOUS_INTEGRATION === "true") {
+    console.log("[fazai] ℹ️  CI environment - skipping log directory setup");
     return;
   }
 
+  // First, check if we can write to the directory
   try {
-    const stats = fs.statSync(target);
-    if (!stats.isDirectory()) {
-      throw new Error(`${target} existe, mas não é um diretório`);
+    if (fs.existsSync(LOG_DIR)) {
+      // Directory exists, check if writable
+      fs.accessSync(LOG_DIR, fs.constants.W_OK);
+      // Try to touch a test file
+      const testFile = path.join(LOG_DIR, ".write-test");
+      fs.writeFileSync(testFile, "");
+      fs.unlinkSync(testFile);
+      console.log(`[fazai] ✅ Log directory ${LOG_DIR} is writable`);
+      return;
     }
-  } catch (error) {
-    throw error;
+  } catch (e) {
+    // Need to fix permissions
   }
-}
 
-function ensureFile(target) {
+  // Setup with sudo (will prompt for password if needed)
+  console.log("[fazai] 🔧 Setting up log directory with proper permissions...");
+
   try {
-    if (!fs.existsSync(target)) {
-      fs.closeSync(fs.openSync(target, "a"));
-    }
-  } catch (error) {
-    if (!isPermissionError(error)) {
-      throw error;
-    }
-  }
-}
+    const currentUser = process.env.USER || process.env.LOGNAME || "root";
 
-function isPermissionError(error) {
-  return !!error && typeof error === "object" && "code" in error && error.code === "EACCES";
+    // Create directory
+    let result = spawnSync("sudo", ["mkdir", "-p", LOG_DIR], {
+      stdio: "inherit",
+      timeout: 30000,
+    });
+    if (result.status !== 0) {
+      throw new Error("mkdir failed");
+    }
+
+    // Create fazai group if it doesn't exist
+    spawnSync("sudo", ["groupadd", "-f", "fazai"], {
+      stdio: "pipe",
+      timeout: 10000,
+    });
+
+    // Add current user to fazai group
+    spawnSync("sudo", ["usermod", "-aG", "fazai", currentUser], {
+      stdio: "pipe",
+      timeout: 10000,
+    });
+
+    // Set ownership: $USER:fazai
+    result = spawnSync("sudo", ["chown", `${currentUser}:fazai`, LOG_DIR], {
+      stdio: "pipe",
+      timeout: 10000,
+    });
+
+    // Set permissions: 774 (rwxrwxr--)
+    result = spawnSync("sudo", ["chmod", "774", LOG_DIR], {
+      stdio: "pipe",
+      timeout: 10000,
+    });
+
+    console.log(`[fazai] ✅ Log directory configured: ${LOG_DIR} (${currentUser}:fazai 774)`);
+    console.log(`[fazai] ✅ User ${currentUser} added to group 'fazai'`);
+
+  } catch (error) {
+    console.warn(`[fazai] ⚠️  Log directory setup failed: ${error.message}`);
+  }
 }

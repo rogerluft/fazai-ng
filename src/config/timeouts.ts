@@ -8,6 +8,8 @@
  * - Provider-specific timeouts
  * - AbortController wrapper for fetch
  * - Timeout tracking and monitoring
+ *
+ * Note: LlamaProvider has its own timeout via LLAMA_TIMEOUT in fazai.conf
  */
 
 import { logger } from "../logger";

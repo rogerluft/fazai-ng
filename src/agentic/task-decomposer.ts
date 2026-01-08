@@ -1,6 +1,7 @@
 import { askAI } from "../askAI";
 import { logger } from "../logger";
 import chalk from "chalk";
+import { composeExecution, SystemContext, ExecutionBlock, saveExecutionBlock } from "./execution-composer";
 
 export interface SubTask {
   id: string;
@@ -67,6 +68,60 @@ Responda APENAS com JSON válido neste formato:
   "executionPlan": "Primeiro verifica ferramentas, depois instala faltantes, então executa a tarefa principal"
 }`;
 
+/**
+ * Converte ExecutionBlock para SubTask
+ */
+function blockToSubTask(block: ExecutionBlock, index: number): SubTask {
+  return {
+    id: `task-${index + 1}`,
+    description: block.intent,
+    command: block.steps.length > 0 ? block.steps[0].command : undefined,
+    dependencies: index > 0 ? [`task-${index}`] : [],
+    estimatedComplexity: Math.min(10, Math.max(1, block.steps.length * 2)),
+    requiresInstallation: false,
+    verificationCommand: block.validation_command,
+  };
+}
+
+/**
+ * Detecta contexto do sistema (simplificado)
+ */
+async function detectSystemContext(): Promise<SystemContext> {
+  const { exec } = await import("child_process");
+  const { promisify } = await import("util");
+  const execAsync = promisify(exec);
+
+  let os = "linux";
+  let pkgManager = "apt";
+
+  try {
+    const { stdout: osRelease } = await execAsync("cat /etc/os-release 2>/dev/null || true");
+
+    if (osRelease.includes("ubuntu")) os = "ubuntu";
+    else if (osRelease.includes("debian")) os = "debian";
+    else if (osRelease.includes("fedora")) os = "fedora";
+    else if (osRelease.includes("centos") || osRelease.includes("rhel")) os = "rhel";
+    else if (osRelease.includes("arch")) os = "arch";
+
+    // Detecta package manager
+    const { stdout: whichApt } = await execAsync("which apt 2>/dev/null || true");
+    const { stdout: whichDnf } = await execAsync("which dnf 2>/dev/null || true");
+    const { stdout: whichPacman } = await execAsync("which pacman 2>/dev/null || true");
+
+    if (whichDnf.trim()) pkgManager = "dnf";
+    else if (whichPacman.trim()) pkgManager = "pacman";
+    else if (whichApt.trim()) pkgManager = "apt";
+  } catch {
+    // Fallback silencioso
+  }
+
+  return {
+    os,
+    pkg_manager: pkgManager,
+    is_root: process.getuid?.() === 0,
+  };
+}
+
 export async function decomposeTask(
   task: string,
   model: string,
@@ -74,6 +129,41 @@ export async function decomposeTask(
 ): Promise<DecomposedTask> {
   logger.info(chalk.cyan("\n🧩 Decompondo tarefa complexa..."));
   logger.debug(`Provider: ${provider}, Model: ${model}`);
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // 🧩 ECOA: Tenta compor de blocos existentes ANTES de chamar LLM
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  try {
+    const context = await detectSystemContext();
+    const composition = await composeExecution(task, context);
+
+    if (composition.fully_composed && composition.matched_blocks.length > 0) {
+      logger.info(chalk.green("✅ Solução composta de blocos existentes (skip LLM)"));
+      logger.info(chalk.gray(`   ⏱️  Composição: ${composition.composition_time_ms}ms`));
+      logger.info(chalk.gray(`   📦 Blocos reutilizados: ${composition.matched_blocks.length}`));
+
+      // Converte blocos para subtasks
+      const subtasks = composition.matched_blocks.map((block, i) => blockToSubTask(block, i));
+
+      return {
+        originalTask: task,
+        subtasks,
+        executionPlan: `Composição de ${composition.matched_blocks.length} blocos conhecidos (ECOA)`,
+      };
+    }
+
+    if (composition.coverage > 0.5) {
+      logger.info(chalk.yellow(
+        `📦 ${Math.round(composition.coverage * 100)}% composto, LLM só para: ` +
+        composition.missing_intents.join(", ")
+      ));
+      // Por enquanto, continua com LLM completo
+      // TODO: Implementar decomposição parcial
+    }
+  } catch (error) {
+    logger.debug(`Composição falhou, usando LLM: ${error}`);
+  }
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   const prompt = DECOMPOSER_PROMPT.replace("{{TASK}}", task);
 

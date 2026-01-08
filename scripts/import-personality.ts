@@ -5,8 +5,8 @@
  * Importa conversas do Claude Desktop e extrai traços de personalidade
  * para a collection fazai_personality com embeddings REAIS.
  *
- * Uso:
- *   npx ts-node scripts/import-personality.ts ./claudio15-11-25/conversations.json
+ * Usage:
+ *   npx ts-node scripts/import-personality.ts ./claude-export/conversations.json
  */
 
 import fs from "fs";
@@ -214,7 +214,7 @@ async function main() {
     const args = process.argv.slice(2);
     if (args.length === 0) {
         console.log("Uso: npx ts-node scripts/import-personality.ts <arquivo.json>");
-        console.log("Exemplo: npx ts-node scripts/import-personality.ts ./claudio15-11-25/conversations.json");
+        console.log("Example: npx ts-node scripts/import-personality.ts ./claude-export/conversations.json");
         process.exit(1);
     }
 

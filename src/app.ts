@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-import { input } from "@inquirer/prompts";
 import chalk from "chalk";
-import { models } from "./models";
+import { models, type Model } from "./models";
 import { checkAPIKey, getAndSetAPIKey, listConfiguredKeys } from "./apiKeyUtils-fazai";
 import { getLinuxCommandsFromAI } from "./linux-admin";
 import { collectSystemInfo } from "./system-info";
@@ -20,6 +19,7 @@ import { handleAskCommand } from "./commands/ask";
 import { handleVectorCommand } from "./commands/vector";
 import { handleImportCommand } from "./commands/import";
 import { handleIndexCommand } from "./commands/index-command";
+import { handleCompletionCommand } from "./commands/completion";
 
 import { getConfigValue } from "./config";
 import { normalizeTask } from "./utils/task-normalizer";
@@ -80,6 +80,7 @@ Usage:
   fazai search "query"                               # Manual research via Context7/Web (supports SPAs)
   fazai vector [validate|recreate]                   # Valida collections vetoriais (Qdrant)
   fazai import <file> --source=<claude|chatgpt>     # Importa conversas para Qdrant
+  fazai ingest <dir> [--batch|--preview]             # Personality data ingestion
   fazai qdrant <command>                             # Qdrant management (status, metrics, backup, etc)
   fazai cloudflare <action>                          # Manage Cloudflare (zones, dns, workers)
   fazai cf zones                                     # Cloudflare: list zones
@@ -90,6 +91,7 @@ Usage:
   fazai inference <command>                          # Gerencia conhecimento injetado pelo usuário
   fazai agent <command>                              # Executa agentes GenAIScript (loop, reflect, etc)
   fazai dashboard <command>                          # Gerencia REST API Dashboard (start, stop, status)
+  fazai samba <command>                              # Gerencia compartilhamentos Samba (list, add, del, etc)
 
 Options:
   --dry-run                Simulate commands without executing
@@ -136,7 +138,7 @@ async function main() {
   
   if (debugFlag) {
     console.log("DEBUG: Raw Args:", rawArgs);
-    console.log("DEBUG: Loaded Models Nicknames:", models.map(m => m.nickName));
+    console.log("DEBUG: Loaded Models:", models.map(m => `${m.name} (${m.provider})`));
   }
   const verboseFlag = rawArgs.includes("--verbose");
 
@@ -171,7 +173,8 @@ async function main() {
   const SUBCOMMANDS_WITH_HELP = [
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
-    "config", "search", "inference", "agent"
+    "config", "search", "inference", "agent", "ingest",
+    "dashboard", "samba", "completion", "cleaner"
   ];
 
   const firstArg = inputs[0];
@@ -262,35 +265,29 @@ async function main() {
     process.exit(0);
   }
 
+  // Ingest command - Personality Data Ingestion
+  if (inputs[0] === "ingest") {
+    const { handleIngestCommand } = await import("./commands/ingest");
+    await handleIngestCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Samba command - Samba Share Management
+  if (inputs[0] === "samba") {
+    const { handleSambaCommand } = await import("./commands/samba");
+    await handleSambaCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "completion") {
-    const suggestions = [
-      "ask",
-      "alias",
-      "config",
-      "completion",
-      "search",
-      "vector",
-      "import",
-      "sync",
-      "cf",
-      "cloudflare",
-      "github",
-      "qdrant",
-      "inference",
-      "agent",
-      "dashboard",
-      "--debug",
-      "--verbose",
-      "--log-file",
-      "--help",
-      "--dry-run",
-      "--cli",
-      "--auto-research",
-      "--yolo",
-      // Add model names for completion (exact names, no nicknames)
-      ...models.map((model) => model.name),
-    ];
-    logger.info(suggestions.join("\n"));
+    await handleCompletionCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Cleaner command - Faxineiro Semântico
+  if (inputs[0] === "cleaner") {
+    const { handleCleanerCommand } = await import("./commands/cleaner");
+    await handleCleanerCommand(inputs.slice(1));
     process.exit(0);
   }
 
@@ -360,6 +357,52 @@ async function main() {
   if (inputs[0] === "ask") {
     await handleAskCommand(inputs.slice(1));
     process.exit(0);
+  }
+
+  // ============================================================================
+  // VALIDATION: Unknown commands/options
+  // Prevents garbage like "fazai --punheta" from being sent to AI
+  // ============================================================================
+  const KNOWN_OPTIONS = [
+    "--dry-run", "--yolo", "-y", "--debug", "--verbose",
+    "--log-file", "--auto-research", "--help", "-h", "--version", "-v",
+    "--cli", "--exec"
+  ];
+
+  // Check for unknown options (args starting with --)
+  if (inputs.length > 0) {
+    const unknownOptions = inputs.filter(arg =>
+      arg.startsWith("--") && !KNOWN_OPTIONS.includes(arg) && !arg.startsWith("--log-file=")
+    );
+
+    if (unknownOptions.length > 0) {
+      logger.error(chalk.red(`❌ Opção desconhecida: ${unknownOptions.join(", ")}`));
+      logger.info(chalk.yellow("💡 Use 'fazai --help' para ver opções disponíveis"));
+      process.exit(1);
+    }
+
+    // Check if first arg looks like a command but isn't known
+    const firstArg = inputs[0];
+    if (firstArg && !firstArg.startsWith("-") && !firstArg.startsWith("--")) {
+      const isKnownCommand = SUBCOMMANDS_WITH_HELP.includes(firstArg);
+      const isModelName = models.some(m => m.name === firstArg);
+      const looksLikeTask = firstArg.includes(" ") || /^[a-z]+\s/i.test(inputs.join(" "));
+
+      // If it's a single word that's not a command or model, it might be a typo
+      if (!isKnownCommand && !isModelName && inputs.length === 1 && !looksLikeTask) {
+        // Check for common typos
+        const similarCommands = SUBCOMMANDS_WITH_HELP.filter(cmd =>
+          cmd.startsWith(firstArg.slice(0, 2)) || firstArg.startsWith(cmd.slice(0, 2))
+        );
+
+        if (similarCommands.length > 0) {
+          logger.error(chalk.red(`❌ Comando desconhecido: ${firstArg}`));
+          logger.info(chalk.yellow(`💡 Você quis dizer: ${similarCommands.join(", ")}?`));
+          logger.info(chalk.gray("   Use 'fazai --help' para ver todos os comandos"));
+          process.exit(1);
+        }
+      }
+    }
   }
 
   // Admin Mode (DEFAULT!)
@@ -438,10 +481,14 @@ async function main() {
   }
 
   // Get task (either from direct command or prompt)
-  const task = directCommand || await input({
-    message: "O que você precisa fazer? ",
-    validate: (input: string) => input.trim() !== "" || "Tarefa não pode estar vazia",
-  });
+  let task = directCommand;
+  if (!task) {
+    const { input } = await import("@inquirer/prompts");
+    task = await input({
+      message: "O que você precisa fazer? ",
+      validate: (input: string) => input.trim() !== "" || "Tarefa não pode estar vazia",
+    });
+  }
 
   // Normalize task to avoid comma ambiguity (NLP fix)
   const normalizedTask = normalizeTask(task);
@@ -457,8 +504,8 @@ async function main() {
     selectedModel.provider
   );
 
-  // Execute commands
-  const executor = new LinuxCommandExecutor(dryRun, researchCoordinator);
+  // Execute commands (pass yoloMode for auto-confirmation)
+  const executor = new LinuxCommandExecutor(dryRun, researchCoordinator, yoloMode);
   let commandCount = 0;
   const attemptedCommands = new Set<string>();
   const maxRetryCycles = 2;

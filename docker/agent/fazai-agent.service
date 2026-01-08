@@ -1,0 +1,27 @@
+[Unit]
+Description=FazAI Host Agent - Executes commands from container
+Documentation=https://github.com/rluft/fazai-ng
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/opt/fazai/fazai-agent.sh
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=5
+
+# Configuração via arquivo
+EnvironmentFile=-/etc/fazai/fazai.conf
+
+# Segurança básica (mas precisa de acesso ao sistema)
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=fazai-agent
+
+[Install]
+WantedBy=multi-user.target

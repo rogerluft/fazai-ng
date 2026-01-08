@@ -45,14 +45,28 @@ let hasWarnedAboutLogFile = false;
 const LOG_RATE_LIMIT = {
   count: 0,
   lastReset: Date.now(),
-  maxPerSecond: 100,
+  maxPerSecond: 200, // Aumentado para suportar streaming com amostragem
   killed: false,
+  killedAt: 0,
+  cooldownMs: 5000, // Recuperação automática após 5 segundos sem excesso
 };
 
 function checkRateLimit(): boolean {
-  if (LOG_RATE_LIMIT.killed) return false;
-
   const now = Date.now();
+
+  // Cooldown: recuperar automaticamente após 5 segundos
+  if (LOG_RATE_LIMIT.killed) {
+    if (now - LOG_RATE_LIMIT.killedAt > LOG_RATE_LIMIT.cooldownMs) {
+      LOG_RATE_LIMIT.killed = false;
+      LOG_RATE_LIMIT.count = 0;
+      LOG_RATE_LIMIT.lastReset = now;
+      // Silenciosamente recuperado - não logar para evitar recursão
+    } else {
+      return false;
+    }
+  }
+
+  // Reset contador a cada segundo
   if (now - LOG_RATE_LIMIT.lastReset > 1000) {
     LOG_RATE_LIMIT.count = 0;
     LOG_RATE_LIMIT.lastReset = now;
@@ -62,7 +76,8 @@ function checkRateLimit(): boolean {
 
   if (LOG_RATE_LIMIT.count > LOG_RATE_LIMIT.maxPerSecond) {
     LOG_RATE_LIMIT.killed = true;
-    console.error("\n🛑 LOOP DETECTADO: Logger desativado (>100 logs/seg). Processo continuando sem logs.\n");
+    LOG_RATE_LIMIT.killedAt = now;
+    console.error(`\n🛑 LOOP DETECTADO: Logger pausado (>${LOG_RATE_LIMIT.maxPerSecond} logs/seg). Recuperação automática em ${LOG_RATE_LIMIT.cooldownMs/1000}s.\n`);
     return false;
   }
 
@@ -117,13 +132,21 @@ function formatArgs(args: unknown[]): string {
     .join(" ");
 }
 
-function writeToFile(level: LogLevel, message: string): void {
+function writeToFile(level: LogLevel, rawArgs: unknown[]): void {
   if (!logStream || !logFilePath) {
     return;
   }
   const timestamp = new Date().toISOString();
-  const plain = stripAnsi(message);
-  logStream.write(`${timestamp} [${level.toUpperCase()}] ${plain}\n`);
+
+  // Structured Logging Logic
+  let content = "";
+  if (rawArgs.length === 1 && typeof rawArgs[0] === 'object' && rawArgs[0] !== null) {
+    content = JSON.stringify(rawArgs[0]);
+  } else {
+    content = stripAnsi(formatArgs(rawArgs));
+  }
+
+  logStream.write(`${timestamp} [${level.toUpperCase()}] ${content}\n`);
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -134,8 +157,8 @@ function log(level: LogLevel, ...args: unknown[]): void {
   // Rate limit para evitar loop infinito consumir memória
   if (!checkRateLimit()) return;
 
-  const message = formatArgs(args);
-  writeToFile(level, message);
+  const message = formatArgs(args); // For console/tracker (human readable)
+  writeToFile(level, args); // Pass raw args to file writer for structure check
 
   // BUGFIX: Captura erros reais no error-tracker
   if (level === "error") {

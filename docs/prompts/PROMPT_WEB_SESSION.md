@@ -1,7 +1,7 @@
 # 🎨 PROMPT PARA SESSÃO WEB INTERFACE (Frontend)
 
 ## Contexto Geral
-Você está trabalhando no **FazAI v4.0 Web Interface**, uma interface web moderna para gerenciar o Terminal Jarvis. Sua responsabilidade é criar um **dashboard Next.js** que permita:
+Você está trabalhando no **FazAI v4.0 Web Interface**, uma interface web moderna para gerenciar o FazAI Agent. Sua responsabilidade é criar um **dashboard Next.js** que permita:
 1. Visualizar e editar **personality traits** do agente
 2. Monitorar **learning outcomes** (acertos/erros)
 3. Ver **cache statistics** e performance
@@ -91,7 +91,7 @@ const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'FazAI Dashboard',
-  description: 'Terminal Jarvis + AutoGPT Management',
+  description: 'FazAI Terminal + AutoGPT Management',
 }
 
 export default function RootLayout({
@@ -139,7 +139,7 @@ export default function Sidebar() {
     <aside className="w-64 bg-gray-900 text-white">
       <div className="p-6">
         <h1 className="text-2xl font-bold">FazAI</h1>
-        <p className="text-sm text-gray-400">Terminal Jarvis</p>
+        <p className="text-sm text-gray-400">Autonomous Linux Agent</p>
       </div>
       
       <nav className="px-4 space-y-2">

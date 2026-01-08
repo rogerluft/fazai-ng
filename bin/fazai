@@ -9,9 +9,18 @@ bash "$(dirname "$0")/../scripts/setup-env.sh" > /dev/null 2>&1 &
 
 set -euo pipefail
 
+# Carrega configurações do sistema (variáveis de ambiente)
+FAZAI_CONFIG="${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+if [[ -f "$FAZAI_CONFIG" ]]; then
+    # shellcheck source=/dev/null
+    set -a  # Exporta automaticamente todas as variáveis
+    source "$FAZAI_CONFIG"
+    set +a
+fi
+
 # Detecta o diretório de instalação
 INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
-APP_JS="${INSTALL_DIR}/dist/app.cjs"
+APP_JS="${INSTALL_DIR}/dist/app.js"
 
 # Verifica se a aplicação existe
 if [[ ! -f "$APP_JS" ]]; then

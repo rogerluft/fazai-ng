@@ -5,6 +5,8 @@ import { getConfigValue } from "./config";
 import { LinuxCommand } from "./types-linux";
 import { logger } from "./logger";
 import { askAI } from "./askAI";
+import { neuralQuery, NeuralQueryResult } from "./rag/neural-flow";
+import { createEmbeddingService } from "./services/embeddings";
 
 export interface ResearchFinding {
   title: string;
@@ -93,6 +95,15 @@ export class ResearchCoordinator {
   private async performResearch(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {
     this.refreshClient();
 
+    // P0-2: ECOA RAG-First Strategy - Consulta local antes de external
+    // Prioridade: RAG Local → Perplexity → Context7 → Web
+    const localRAGResult = await this.tryLocalRAG(query, reason, trigger);
+    if (localRAGResult) {
+      this.logResearch(localRAGResult);
+      return localRAGResult;
+    }
+
+    // Fallback: External sources em paralelo
     const [perplexityResult, context7Result, webResult] = await Promise.allSettled([
       this.tryPerplexity(query, reason, trigger),
       this.tryContext7(query, reason, trigger),
@@ -130,6 +141,79 @@ export class ResearchCoordinator {
 
     logger.info(chalk.gray(`\n🤷  Nenhum resultado de pesquisa encontrado para "${query}" (${reason}).`));
     return null;
+  }
+
+  /**
+   * P0-2: ECOA RAG-First - Busca local via neuralQuery() antes de external
+   *
+   * Consulta as 5 collections ECOA (personality, memory, learning, kb, inference)
+   * usando fusion scoring. Retorna resultado se score >= 0.6 (alta confiança).
+   */
+  private async tryLocalRAG(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {
+    const provider = "local-rag";
+    const minConfidenceScore = 0.6; // Só retorna se alta confiança
+
+    try {
+      logger.debug(`🧠 Tentando RAG local para: "${query.substring(0, 60)}..."`);
+
+      // Gerar embedding da query
+      const embeddingService = await createEmbeddingService();
+      const queryEmbedding = await embeddingService.generate(query);
+
+      // Busca neural multi-collection
+      const result: NeuralQueryResult = await neuralQuery(query, queryEmbedding, {
+        topK: 5,
+        minScore: 0.3, // Filtra resultados ruins
+        collections: [
+          "fazai_learning",
+          "fazai_kb",
+          "fazai_memory",
+          "fazai_inference",
+        ],
+      });
+
+      // Verificar se temos resultados relevantes
+      if (result.fusedResults.length === 0) {
+        logger.debug("RAG local: Nenhum resultado encontrado");
+        return null;
+      }
+
+      const topScore = result.stats.topScore;
+
+      // Se score < 0.6, prefere external sources
+      if (topScore < minConfidenceScore) {
+        logger.debug(`RAG local: Score ${topScore.toFixed(3)} < ${minConfidenceScore} - preferindo external`);
+        return null;
+      }
+
+      // Converter resultados para ResearchFindings
+      const findings: ResearchFinding[] = result.fusedResults.map((r) => ({
+        title: r.metadata.title || r.metadata.learning_id || r.metadata.slug || `[${r.collection}]`,
+        snippet: r.content.substring(0, 300),
+        url: undefined, // Local results don't have URLs
+      }));
+
+      // Gerar summary a partir dos conteúdos
+      const contentParts = result.fusedResults
+        .slice(0, 3)
+        .map((r) => r.content.substring(0, 200))
+        .join("\n\n");
+
+      const summary = `[RAG Local] ${result.fusedResults.length} resultados encontrados (score: ${topScore.toFixed(2)}):\n${contentParts}`;
+
+      logger.info(chalk.green(`✅ RAG local encontrou ${result.fusedResults.length} resultados (score: ${topScore.toFixed(3)})`));
+
+      return {
+        provider,
+        query,
+        reason: this.decorateReason(reason, trigger, provider),
+        findings,
+        summary,
+      };
+    } catch (error: any) {
+      logger.debug(`RAG local error: ${error.message}`);
+      return null;
+    }
   }
 
   private async tryPerplexity(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {

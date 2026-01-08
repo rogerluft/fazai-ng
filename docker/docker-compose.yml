@@ -1,0 +1,118 @@
+# =============================================================================
+# FazAI Brain - Docker Compose
+# =============================================================================
+# Uso:
+#   docker-compose up -d          # Iniciar
+#   docker-compose logs -f        # Ver logs
+#   docker-compose down           # Parar
+#
+# Pré-requisito: Agent instalado no host
+#   sudo ./agent/install.sh
+# =============================================================================
+
+version: '3.8'
+
+services:
+  # ---------------------------------------------------------------------------
+  # Qdrant - Vector Database
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: fazai-qdrant
+    restart: unless-stopped
+    ports:
+      - "6333:6333"
+      - "6334:6334"
+    volumes:
+      - qdrant-data:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:6333/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # Ollama - Local LLM Inference
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: fazai-ollama
+    restart: unless-stopped
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    # GPU support (descomente se tiver NVIDIA)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # ---------------------------------------------------------------------------
+  # FazAI Core - Aplicação Principal
+  # ---------------------------------------------------------------------------
+  fazai:
+    build:
+      context: .
+      dockerfile: Dockerfile.brain
+    container_name: fazai-brain
+    restart: unless-stopped
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    ports:
+      - "8080:8080"   # Dashboard
+    volumes:
+      # Socket do agent no host (CRÍTICO!)
+      - /run/fazai:/run/fazai
+      # Configurações
+      - fazai-config:/etc/fazai
+      # Dados persistentes
+      - fazai-data:/data
+    environment:
+      # Conexões internas
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - OLLAMA_HOST=ollama
+      - OLLAMA_PORT=11434
+      # Agent socket
+      - AGENT_SOCKET=/run/fazai/agent.sock
+      # Carregar do conf
+      - FAZAI_CONFIG_PATH=/etc/fazai/fazai.conf
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# =============================================================================
+# Volumes Persistentes
+# =============================================================================
+volumes:
+  qdrant-data:
+    driver: local
+  ollama-data:
+    driver: local
+  fazai-config:
+    driver: local
+  fazai-data:
+    driver: local
+
+# =============================================================================
+# Rede
+# =============================================================================
+networks:
+  default:
+    name: fazai-network

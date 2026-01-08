@@ -228,9 +228,17 @@ export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIte
   logger.debug("[DEBUG] iterateOpenAIStream: Starting stream iteration");
   let chunkCount = 0;
 
+  // Amostragem de logs: logar apenas a cada N chunks para evitar loop detection
+  const LOG_SAMPLE_RATE = 50;
+
   for await (const chunk of stream) {
     chunkCount++;
-    logger.debug(`[DEBUG] Chunk #${chunkCount} received:`, JSON.stringify(chunk).substring(0, 200));
+
+    // Log apenas a cada N chunks (evita flood no logger)
+    const shouldLogChunk = chunkCount === 1 || chunkCount % LOG_SAMPLE_RATE === 0;
+    if (shouldLogChunk) {
+      logger.debug(`[DEBUG] Chunk #${chunkCount} received:`, JSON.stringify(chunk).substring(0, 200));
+    }
 
     // Handle OpenAI-style streaming (choices array with delta)
     const delta = chunk.choices?.[0]?.delta;
@@ -238,7 +246,10 @@ export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIte
       // Some models use "reasoning" instead of "content"
       const content = delta.content || delta.reasoning;
       if (content) {
-        logger.debug(`[DEBUG] Content (OpenAI): ${content.substring(0, 100)}...`);
+        // Log de conteúdo apenas no primeiro chunk e a cada N chunks
+        if (shouldLogChunk) {
+          logger.debug(`[DEBUG] Content (OpenAI): ${content.substring(0, 100)}...`);
+        }
         yield content;
       }
       continue;
@@ -248,12 +259,15 @@ export async function* iterateOpenAIStream(stream: AsyncIterable<any>): AsyncIte
     // Ollama returns NDJSON with "response" or "thinking" fields
     const ollamaContent = chunk.response || chunk.thinking;
     if (ollamaContent) {
-      logger.debug(`[DEBUG] Content (Ollama): ${ollamaContent.substring(0, 100)}...`);
+      if (shouldLogChunk) {
+        logger.debug(`[DEBUG] Content (Ollama): ${ollamaContent.substring(0, 100)}...`);
+      }
       yield ollamaContent;
     }
   }
 
-  logger.debug(`[DEBUG] Stream iteration complete. Total chunks: ${chunkCount}`);
+  // Log final com total de chunks processados
+  logger.debug(`[DEBUG] Stream completed: ${chunkCount} chunks processed`);
 }
 
 export async function* iterateGoogleStream(stream: AsyncIterable<any>): AsyncIterable<string> {

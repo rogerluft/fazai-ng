@@ -9,14 +9,14 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
 import * as api from "@/lib/api";
-import { useJarvisStore } from "@/lib/store";
+import { useFazaiStore } from "@/lib/store";
 import { Plus, Trash2, Play, ToggleLeft, ToggleRight } from "lucide-react";
-import type { InferenceRule } from "@/types/jarvis";
+import type { InferenceRule } from "@/types/fazai";
 
 const queryClient = new QueryClient();
 
 function InferenceContent() {
-  const { setLoading, setError } = useJarvisStore();
+  const { setLoading, setError } = useFazaiStore();
   const [showForm, setShowForm] = useState(false);
   const [newRule, setNewRule] = useState<Partial<InferenceRule>>({
     priority: 5,
