@@ -1,0 +1,69 @@
+# =============================================================================
+# FazAI-NG - Render Blueprint
+# =============================================================================
+# Deploy automatico do FazAI via Render com terminal web (ttyd)
+# 
+# Requisitos:
+#   - Plano Starter ($7/mes) ou superior para acesso shell nativo
+#   - Variaveis de ambiente configuradas no dashboard do Render
+#
+# Servicos inclusos:
+#   - fazai-web: Dashboard Next.js + terminal ttyd integrado
+#
+# Uso:
+#   1. Conecte seu repo no Render Dashboard
+#   2. Selecione "Blueprint" e aponte para este arquivo
+#   3. Configure as variaveis de ambiente (secrets)
+#   4. Deploy!
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+    # FazAI Web Dashboard + Terminal Web (ttyd)
+      # ---------------------------------------------------------------------------
+        - type: web
+            name: fazai-web
+                runtime: docker
+                    region: oregon
+                        plan: starter  # $7/mes - minimo para shell nativo do Render
+                            dockerfilePath: ./Dockerfile.render
+                                dockerContext: .
+                                    envVars:
+                                          # Configuracao geral
+                                                - key: NODE_ENV
+                                                        value: production
+                                                              - key: PORT
+                                                                      value: "10000"
+
+                                                                                  # Qdrant - Vector Database (configure no dashboard)
+                                                                                        - key: QDRANT_URL
+                                                                                                sync: false
+                                                                                                      - key: QDRANT_API_KEY
+                                                                                                              sync: false
+                                                                                                                    
+                                                                                                                          # APIs de IA (configure no dashboard)
+                                                                                                                                - key: ANTHROPIC_API_KEY
+                                                                                                                                        sync: false
+                                                                                                                                              - key: OPENAI_API_KEY
+                                                                                                                                                      sync: false
+                                                                                                                                                            
+                                                                                                                                                                  # Terminal Web - Credenciais (IMPORTANTE: mude no dashboard!)
+                                                                                                                                                                        - key: TTYD_USERNAME
+                                                                                                                                                                                value: admin
+                                                                                                                                                                                      - key: TTYD_PASSWORD
+                                                                                                                                                                                              sync: false  # Defina uma senha forte no dashboard!
+                                                                                                                                                                                                    
+                                                                                                                                                                                                          # Ollama (opcional - se usar LLM local)
+                                                                                                                                                                                                                - key: OLLAMA_HOST
+                                                                                                                                                                                                                        sync: false
+                                                                                                                                                                                                                              - key: OLLAMA_PORT
+                                                                                                                                                                                                                                      value: "11434"
+                                                                                                                                                                                                                                          
+                                                                                                                                                                                                                                              healthCheckPath: /api/health
+                                                                                                                                                                                                                                                  autoDeploy: true
+                                                                                                                                                                                                                                                      
+                                                                                                                                                                                                                                                          # Disco persistente para dados (opcional)
+                                                                                                                                                                                                                                                              # disk:
+                                                                                                                                                                                                                                                                  #   name: fazai-data
+                                                                                                                                                                                                                                                                      #   mountPath: /data
+                                                                                                                                                                                                                                                                          #   sizeGB: 1
