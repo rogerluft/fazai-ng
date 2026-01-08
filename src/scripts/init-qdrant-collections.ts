@@ -19,7 +19,7 @@ import { logger } from "../logger";
 import chalk from "chalk";
 
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
-const EMBEDDING_DIM = 1536; // Padrão ECOA (OpenAI compatible, zero-padded for local models)
+const EMBEDDING_DIM = process.env.EMBEDDING_DIM ? parseInt(process.env.EMBEDDING_DIM, 10) : 768;
 
 interface CollectionConfig {
   name: string;
