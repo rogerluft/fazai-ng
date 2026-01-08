@@ -12,6 +12,7 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 import { logger } from "./logger";
 import { getConfigValue } from "./config";
 import chalk from "chalk";
+import { createEmbeddingService, EmbeddingService } from "./services/embeddings-refactored";
 
 // ==============================================================================
 // Tipos
@@ -201,13 +202,14 @@ async function processFile(
   };
 
   try {
+    const embeddingService = await createEmbeddingService();
     const content = fs.readFileSync(filePath, "utf-8");
     const data = JSON.parse(content);
 
     if (source === "claude") {
-      await processClaudeExport(data, client, result, options);
+      await processClaudeExport(data, client, embeddingService, result, options);
     } else if (source === "chatgpt") {
-      await processChatGPTExport(data, client, result, options);
+      await processChatGPTExport(data, client, embeddingService, result, options);
     }
 
     logger.info(chalk.green(`✓ Processado: ${path.basename(filePath)}`));
@@ -226,6 +228,7 @@ async function processFile(
 async function processClaudeExport(
   data: ClaudeExport,
   client: QdrantClient,
+  embeddingService: EmbeddingService,
   result: ImportResult,
   options: {
     extractKnowledge: boolean;
@@ -238,10 +241,14 @@ async function processClaudeExport(
 
   for (const conv of conversations) {
     try {
+      // Gerar embeddings para todas as mensagens da conversa em um batch
+      const messageContents = conv.messages.map(msg => msg.content);
+      const messageEmbeddings = await embeddingService.generateBatch(messageContents, "fazai_memory");
+
       // Importar para fazai_memory
       const memoryPoints = conv.messages.map((msg, idx) => ({
         id: generateId(`${conv.id}-${idx}`),
-        vector: Array(1536).fill(0), // Embedding placeholder - seria gerado por OpenAI/etc
+        vector: messageEmbeddings[idx] || [],
         payload: {
           conversation_id: conv.id,
           message_id: `${conv.id}-${idx}`,
@@ -265,14 +272,21 @@ async function processClaudeExport(
 
       // Extrair conhecimento técnico para fazai_kb
       if (options.extractKnowledge) {
-        const kbEntries = extractTechnicalKnowledge(conv.messages, conv.id);
-        if (kbEntries.length > 0) {
+        const kbPayloads = extractTechnicalKnowledge(conv.messages, conv.id);
+        if (kbPayloads.length > 0) {
+          const kbTexts = kbPayloads.map(p => `${p.payload.title}\n${p.payload.summary}`);
+          const kbEmbeddings = await embeddingService.generateBatch(kbTexts, "fazai_kb");
+          const kbPoints = kbPayloads.map((p, idx) => ({
+            ...p,
+            vector: kbEmbeddings[idx] || [],
+          }));
+
           await client.upsert("fazai_kb", {
             wait: true,
-            points: kbEntries,
+            points: kbPoints,
           });
 
-          result.stats.kbEntries += kbEntries.length;
+          result.stats.kbEntries += kbPoints.length;
         }
       }
 
@@ -304,6 +318,7 @@ async function processClaudeExport(
 async function processChatGPTExport(
   data: ChatGPTConversation[],
   client: QdrantClient,
+  embeddingService: EmbeddingService,
   result: ImportResult,
   options: {
     extractKnowledge: boolean;
@@ -325,10 +340,13 @@ async function processChatGPTExport(
           timestamp: new Date(m.message.create_time * 1000).toISOString(),
         }));
 
+      const messageContents = messages.map(msg => msg.content);
+      const messageEmbeddings = await embeddingService.generateBatch(messageContents, "fazai_memory");
+
       // Importar para fazai_memory
       const memoryPoints = messages.map((msg, idx) => ({
         id: generateId(`${conv.id}-${idx}`),
-        vector: Array(1536).fill(0), // Embedding placeholder
+        vector: messageEmbeddings[idx] || [],
         payload: {
           conversation_id: conv.id,
           message_id: `${conv.id}-${idx}`,
@@ -352,7 +370,7 @@ async function processChatGPTExport(
 
       // Extrair conhecimento e aprendizado
       if (options.extractKnowledge) {
-        const kbEntries = extractTechnicalKnowledge(
+        const kbPayloads = extractTechnicalKnowledge(
           messages.map((m) => ({
             role: m.role as "user" | "assistant",
             content: m.content,
@@ -361,13 +379,20 @@ async function processChatGPTExport(
           conv.id
         );
 
-        if (kbEntries.length > 0) {
+        if (kbPayloads.length > 0) {
+          const kbTexts = kbPayloads.map(p => `${p.payload.title}\n${p.payload.summary}`);
+          const kbEmbeddings = await embeddingService.generateBatch(kbTexts, "fazai_kb");
+          const kbPoints = kbPayloads.map((p, idx) => ({
+            ...p,
+            vector: kbEmbeddings[idx] || [],
+          }));
+
           await client.upsert("fazai_kb", {
             wait: true,
-            points: kbEntries,
+            points: kbPoints,
           });
 
-          result.stats.kbEntries += kbEntries.length;
+          result.stats.kbEntries += kbPoints.length;
         }
       }
 
@@ -456,7 +481,6 @@ export function extractTechnicalKnowledge(
 
           knowledgeEntries.push({
             id: generateId(`kb-${conversationId}-${i}`),
-            vector: Array(1536).fill(0),
             payload: {
               slug: `solution-${conversationId}-${i}`,
               title: extractSummary(userContent),
@@ -509,7 +533,6 @@ export function extractLearningPatterns(
       if (hasError && hasSolution) {
         learningEntries.push({
           id: generateId(`learning-${conversationId}-${i}`),
-          vector: Array(1536).fill(0),
           payload: {
             pattern_type: "error_resolution",
             problem_description: extractSummary(userContent),
@@ -527,7 +550,6 @@ export function extractLearningPatterns(
       if (optimizationPatterns.test(userContent + " " + assistantContent)) {
         learningEntries.push({
           id: generateId(`learning-opt-${conversationId}-${i}`),
-          vector: Array(1536).fill(0),
           payload: {
             pattern_type: "optimization",
             problem_description: extractSummary(userContent),

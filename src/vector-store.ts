@@ -54,14 +54,17 @@ export interface VectorValidationResult {
  * - mxbai-embed-large (1024 dim)
  * - nomic-embed-text (768 dim)
  *
- * SOLUÇÃO (Zero Padding):
- * O serviço de embeddings (`src/services/embeddings.ts`) detecta automaticamente
- * se o vetor gerado é menor que 1536 e preenche o restante com ZEROS.
- * Isso garante que o banco Qdrant nunca quebre por incompatibilidade de dimensão,
- * permitindo migração fluida entre Cloud (GPU) e Local (CPU).
+ * ARQUITETURA DE EMBEDDINGS
+ * ----------------------------------------------------------------------------
+ * A dimensão padrão para todas as coleções é 768.
+ * Motivo: Alinhamento com modelos de embedding locais de alta performance
+ * que operam nativamente com esta dimensão (ex: multilingual-e5-base).
+ *
+ * A aplicação prioriza embeddings 100% locais, rodando na CPU via
+ * Transformers.js, sem a necessidade de padding ou chamadas de API externas.
  * ----------------------------------------------------------------------------
  */
-const DEFAULT_VECTOR_DIMENSION = 1536; // Padrão ECOA Unificado (OpenAI compatible)
+const DEFAULT_VECTOR_DIMENSION = 768; // Padrão para modelos locais (e.g., multilingual-e5-base)
 const DEFAULT_DISTANCE: VectorDistance = "Cosine";
 
 /**

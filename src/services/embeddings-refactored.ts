@@ -33,11 +33,12 @@ import {
 } from "./embedding-strategies";
 import { CachedEmbeddingService } from "./cached-embedding-service";
 import { embeddingCache } from "./embedding-cache";
+import { TransformersEmbeddingService } from "./transformers-embedding";
 
 /**
  * Embedding provider types
  */
-export type EmbeddingProvider = "ollama" | "openai";
+export type EmbeddingProvider = "ollama" | "openai" | "transformers.js";
 
 /**
  * Embedding service interface
@@ -231,24 +232,11 @@ class OllamaEmbeddingService implements EmbeddingService {
 
               const rawEmbedding = data.embedding as number[];
 
-              // VALIDAÇÃO ESTRITA DE DIMENSÃO - Proteção contra corrupção de vetores
-              // FazAI usa exclusivamente nomic-embed-text (768 dim) mas faz padding para 1536
-              const EXPECTED_INPUT_DIM = 768; // nomic-embed-text native dimension
-
-              // Validamos se o modelo retornou o que esperamos
-              if (rawEmbedding.length !== EXPECTED_INPUT_DIM && rawEmbedding.length !== 1024) {
-                 // Permitimos 1024 (mxbai) também, mas o ideal é 768
-                 logger.warn(`Unexpected embedding dimension: ${rawEmbedding.length}. Expected 768.`);
-              }
-
-              // PADDING PARA 1536 (OpenAI compatible)
-              if (rawEmbedding.length < this.TARGET_DIMENSION) {
-                  const paddingSize = this.TARGET_DIMENSION - rawEmbedding.length;
-                  const paddedEmbedding = [
-                      ...rawEmbedding,
-                      ...new Array(paddingSize).fill(0)
-                  ];
-                  return paddedEmbedding;
+              // Dimension should be native from the model. No more padding/truncating.
+              if (rawEmbedding.length !== dimension) {
+                logger.warn(
+                  `Ollama model '${model}' returned an unexpected dimension: ${rawEmbedding.length} (expected ${dimension})`
+                );
               }
 
               return rawEmbedding;
@@ -508,8 +496,21 @@ class OpenAIEmbeddingService implements EmbeddingService {
 export async function createEmbeddingService(): Promise<EmbeddingService> {
   let underlyingService: EmbeddingService;
 
-  // Try Ollama first
-  const ollamaBaseUrl = getOllamaEmbedUrl();
+  // 1. Try Transformers.js (CPU-based, local)
+  try {
+    logger.debug("Attempting to initialize Transformers.js embedding service...");
+    underlyingService = new TransformersEmbeddingService();
+    // Test by generating a small embedding
+    await underlyingService.generate("test", "fazai_kb");
+    logger.info("✓ Using Transformers.js for local embeddings (Xenova/multilingual-e5-base, 768 dim)");
+    return new CachedEmbeddingService(underlyingService, embeddingCache);
+  } catch (error: any) {
+    logger.debug(`Transformers.js initialization failed: ${error.message}. Falling back...`);
+  }
+
+  // 2. Try Ollama (local daemon)
+  const ollamaBaseUrl =
+    getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
 
   try {
     logger.debug(`Testing Ollama connection at ${ollamaBaseUrl}...`);
@@ -550,7 +551,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
     logger.debug(`Ollama not available: ${error.message}`);
   }
 
-  // Fallback to OpenAI
+  // 3. Fallback to OpenAI
   const openaiApiKey = getConfigValue("OPENAI_API_KEY");
 
   if (openaiApiKey) {

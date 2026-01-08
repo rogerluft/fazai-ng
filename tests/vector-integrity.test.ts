@@ -13,7 +13,7 @@ describe('Vector Store Integrity (ECOA Standards)', () => {
     'fazai_source'
   ];
 
-  const ECOA_DIMENSION = 1536;
+  const TARGET_DIMENSION = 768; // Nova dimensão padrão para modelos locais
 
   it('should connect to Qdrant', async () => {
     const client = await getQdrantClient();
@@ -38,7 +38,7 @@ describe('Vector Store Integrity (ECOA Standards)', () => {
     }
   });
 
-  it('should enforce LEI 1536 (Dimension Standard)', async () => {
+  it('should enforce Dimension Standard (768 for local models)', async () => {
     const client = await getQdrantClient();
     const result = await client.getCollections();
     
@@ -48,19 +48,17 @@ describe('Vector Store Integrity (ECOA Standards)', () => {
         // @ts-ignore - Qdrant client types might vary
         const size = info.config.params.vectors.size || info.config.params.vectors?.default?.size;
         
-        if (size !== ECOA_DIMENSION) {
-           console.warn(`⚠️ Collection ${col.name} has dimension ${size}, expected ${ECOA_DIMENSION}.`);
-           // We warn instead of fail because local dev might have legacy collections
-           // Real ECOA compliance requires re-creation
+        if (size !== TARGET_DIMENSION) {
+           console.warn(`⚠️ Collection ${col.name} has dimension ${size}, expected ${TARGET_DIMENSION}.`);
         }
-        // expect(size).toBe(ECOA_DIMENSION);
+        expect(size).toBe(TARGET_DIMENSION);
       }
     }
   });
 
-  it('Embedding Service should output 1536 dim vectors (via Zero Padding if needed)', async () => {
+  it('Embedding Service should output vectors with the target dimension', async () => {
     const service = await createEmbeddingService();
-    const embedding = await service.generate("Test ECOA integrity");
-    expect(embedding.length).toBe(ECOA_DIMENSION);
+    const embedding = await service.generate("Test integrity");
+    expect(embedding.length).toBe(TARGET_DIMENSION);
   });
 });
