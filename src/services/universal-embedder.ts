@@ -2,7 +2,7 @@
  * Universal Local Embedder
  *
  * Provides a unified interface for local embedding generation using Ollama.
- * Implements Zero Padding to normalize vectors to 1536 dimensions (OpenAI standard).
+ * Uses native 768 dimensions from nomic-embed-text (no padding needed).
  *
  * Features:
  * - Uses Ollama nomic-embed-text (768 dim) as primary model
@@ -12,9 +12,9 @@
  * - Retry logic for transient failures
  *
  * Architecture:
- * - Primary: nomic-embed-text (768d) → Zero Pad → 1536d
- * - Compatible with OpenAI text-embedding-3-small dimension
- * - Enables collection migration without re-embedding
+ * - Primary: nomic-embed-text (768d native)
+ * - No padding required - better semantic quality
+ * - Compatible with Qdrant HA cluster configuration
  *
  * @module services/universal-embedder
  */
@@ -50,7 +50,7 @@ interface OllamaEmbeddingResponse {
  * console.log(vec1536.length); // 1536
  * ```
  */
-export function padVector(vector: number[], targetDim: number = 1536): number[] {
+export function padVector(vector: number[], targetDim: number = 768): number[] {
   if (vector.length === targetDim) {
     return vector;
   }
