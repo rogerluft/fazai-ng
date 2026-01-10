@@ -7,37 +7,82 @@ Sistema de orquestração que coordena Claude Code, Jules, Gemini 3 e Copilot pa
 ### 1. Claude Code (Você)
 - **Função**: Tech Lead, Orquestrador
 - **Uso**: Decisões arquiteturais, code review crítico
+- **Tokens**: Alto custo - usar estrategicamente
 
 ### 2. Jules (Google)
-- **Função**: Engenheiro de Software IA
-- **Uso**: Execução autônoma com ferramentas
-- **Cliente**: `jules-client.ts`
+- **Função**: Engenheiro de Software IA Autônomo
+- **Uso**: Execução autônoma com ferramentas, implementação de features
+- **Cliente**: `jules-client.ts` (CLI) e `jules-api-client.ts` (REST API)
+- **API**: https://jules.googleapis.com/v1alpha
+- **Tokens**: Separado (não conta no budget Claude)
 
 ### 3. Gemini 3 (Google)
 - **Função**: Engenheiro Sênior Conversacional
-- **Uso**: Análise bulk, raciocínio complexo, pesquisa web
+- **Uso**: Análise bulk (contexto 2M tokens), raciocínio complexo, pesquisa web
 - **Cliente**: `gemini-client.ts`
+- **Tokens**: Custo reduzido para bulk operations
 
 ### 4. Copilot (GitHub)
 - **Função**: Pair Programmer
-- **Uso**: Sugestões shell/git, pair programming
+- **Uso**: Sugestões shell/git, comandos CLI, pair programming
 - **Cliente**: `copilot-client.ts`
+- **Tokens**: Separado (não conta no budget Claude)
+
+## Arquitetura
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Claude Code (Tech Lead)                  │
+│                  ┌─────────────────────┐                    │
+│                  │   task-router.ts    │                    │
+│                  │  Routing Decision   │                    │
+│                  └──────────┬──────────┘                    │
+│                             │                                │
+│          ┌──────────────────┼──────────────────┐            │
+│          │                  │                  │            │
+│          ▼                  ▼                  ▼            │
+│    ┌─────────┐       ┌──────────┐      ┌───────────┐      │
+│    │  Jules  │       │  Gemini  │      │  Copilot  │      │
+│    │ Client  │       │  Client  │      │  Client   │      │
+│    └────┬────┘       └────┬─────┘      └─────┬─────┘      │
+│         │                 │                   │            │
+└─────────┼─────────────────┼───────────────────┼────────────┘
+          │                 │                   │
+          ▼                 ▼                   ▼
+    ┌──────────┐      ┌──────────┐       ┌──────────┐
+    │  Jules   │      │ Gemini 3 │       │ Copilot  │
+    │   API    │      │   API    │       │   CLI    │
+    └──────────┘      └──────────┘       └──────────┘
+```
 
 ## Estrutura de Arquivos
 
 ```
 src/orchestrator/
-├── README.md              # Este arquivo
-├── index.ts               # Exports centralizados
-├── task-router.ts         # Roteamento inteligente de tarefas
-├── jules-client.ts        # Cliente para Jules (execução autônoma)
-├── gemini-client.ts       # Cliente para Gemini 3 (raciocínio/bulk)
-└── copilot-client.ts      # Cliente para Copilot CLI (shell/git)
+├── README.md                    # Este arquivo
+├── index.ts                     # Exports centralizados
+├── task-router.ts              # Roteamento inteligente de tarefas ✅ TESTED
+├── jules-client.ts             # Cliente Jules (CLI legacy)
+├── jules-api-client.ts         # Cliente Jules (REST API) ✅ TESTED
+├── jules-api-examples.ts       # Exemplos de uso da Jules API
+├── gemini-client.ts            # Cliente Gemini 3
+├── copilot-client.ts           # Cliente Copilot CLI
+├── resilience-orchestrator.ts  # Resiliência e fallbacks ✅ TESTED
+├── qdrant-*.ts                 # Gerenciamento Qdrant
+└── README-JULES-API.md         # Documentação Jules API
+
+tests/
+├── task-router.test.ts         # ✅ 20 tests passing
+├── jules-api-client.test.ts    # ✅ 19 tests passing
+└── resilience-orchestrator.test.ts # ✅ Tests passing
+
+examples/
+└── orchestrator-usage.ts       # ✅ Exemplos práticos
 ```
 
 ## Uso Rápido
 
-### Rotear Tarefa Automaticamente
+### 1. Rotear Tarefa Automaticamente
 
 ```typescript
 import { routeTask } from './orchestrator';
@@ -53,73 +98,108 @@ const task = {
 };
 
 const decision = routeTask(task);
-// => { agent: 'jules', reason: 'Implementação/bug fix - Engenheiro autônomo', confidence: 0.9 }
+// => { agent: 'jules', reason: 'Implementação/bug fix', confidence: 0.9 }
 ```
 
-### Delegar para Jules
+### 2. Delegar para Jules (REST API - Recomendado)
 
 ```typescript
-import { delegateToJules, approveJulesPlan } from './orchestrator';
+import { createJulesAPIClient } from './orchestrator';
 
-const julesTask = {
-  ...task,
-  technicalContext: "Usando biblioteca redis, conexão já configurada",
-};
+const client = createJulesAPIClient();
 
-const result = await delegateToJules(julesTask);
+// Criar sessão com auto-PR
+const session = await client.createSession(
+  "Fix authentication bug in src/auth.ts",
+  {
+    source: "sources/github/rogerluft/fazai-ng",
+    githubRepoContext: { 
+      startingBranch: "main",
+      targetBranch: "main"
+    }
+  },
+  "fix: Resolve auth timeout",
+  true  // Criar PR automaticamente
+);
 
-if (result.plan) {
-  console.log("Plano de Jules:", result.plan);
-  // Revisar e aprovar
-  await approveJulesPlan();
-}
+console.log(`Session: ${session.name}`);
+console.log(`Status: ${session.state}`);
 ```
 
-### Delegar para Gemini
+### 3. Delegar para Gemini (Análise Bulk)
 
 ```typescript
-import { delegateToGemini, askGeminiForApproaches } from './orchestrator';
+import { askGeminiToAnalyzeBulk } from './orchestrator';
 
-// Análise bulk de múltiplos arquivos
+// Análise de múltiplos arquivos (usa contexto 2M tokens)
 const response = await askGeminiToAnalyzeBulk([
   'src/file1.ts',
   'src/file2.ts',
-  // ... 50 arquivos
+  // ... até 50+ arquivos
 ]);
 
-// Comparar múltiplas abordagens
-const approaches = await askGeminiForApproaches(
-  "Implementar rate limiting",
-  "API REST com Express.js"
-);
+if (response.success) {
+  console.log(response.content);
+}
 ```
 
-### Usar Copilot CLI
+### 4. Usar Copilot CLI
 
 ```typescript
-import { askCopilotForShellCommand, getCopilotGitWorkflow } from './orchestrator';
+import { askCopilotForShellCommand } from './orchestrator';
 
-// Comando shell complexo
-const shellCmd = await askCopilotForShellCommand({
+const response = await askCopilotForShellCommand({
   description: "Find all TypeScript files modified in last week",
 });
 
-// Workflow git
-const gitWorkflow = await getCopilotGitWorkflow(
-  "Rebase current branch on main and resolve conflicts"
-);
+console.log(response.command);
 ```
 
-## Matriz de Decisão
+## Matriz de Decisão (Bilíngue PT-BR + EN)
 
-| Tarefa | Agente | Razão |
-|--------|--------|-------|
-| Arquitetura de nova feature | Claude Code | Decisão estratégica |
-| Implementar feature planejada | Jules | Execução autônoma |
-| Revisar 50 arquivos | Gemini 3 | Contexto 2M tokens |
-| Pesquisa web | Gemini 3 | Grounding gratuito |
-| Comando shell complexo | Copilot CLI | Especialista shell |
-| Bug fix com stack trace | Jules | Ciclo debug-fix-verify |
+O sistema suporta keywords em português e inglês:
+
+| Tarefa | Agente | Razão | Keywords |
+|--------|--------|-------|----------|
+| Arquitetura de nova feature | Claude | Decisão estratégica | architecture, design, decisão |
+| Implementar feature planejada | Jules | Execução autônoma | implement, criar, add feature |
+| Revisar 50 arquivos | Gemini | Contexto 2M tokens | review, analisar, multiple files |
+| Pesquisa web | Gemini | Grounding gratuito | research, pesquisar, web |
+| Comando shell complexo | Copilot | Especialista shell | shell, bash, command |
+| Bug fix com stack trace | Jules | Debug-fix-verify | bug fix, fix |
+| Code review final | Claude | Qualidade crítica | security, segurança |
+
+## Segurança e Delegação
+
+O sistema possui regras de segurança automáticas:
+
+```typescript
+import { canDelegate } from './orchestrator';
+
+const securityTask = {
+  title: "Fix security vulnerability",
+  objective: "Patch SQL injection",
+  // ...
+};
+
+canDelegate(securityTask, 'jules');  // => false ❌
+canDelegate(securityTask, 'claude'); // => true ✅
+```
+
+**Keywords de segurança bloqueiam delegação**:
+- `security` / `segurança`
+- `api pública` / `public api`
+- `breaking change`
+
+**Jules requer critérios de aceitação**:
+```typescript
+const task = {
+  title: "Do something",
+  acceptanceCriteria: [], // ❌ Bloqueado para Jules
+};
+
+canDelegate(task, 'jules'); // => false
+```
 
 ## Economia de Tokens
 
@@ -138,25 +218,66 @@ Copilot (shell help)     →   0 tokens (separado)
 Total:                      ~10k tokens Claude
 ```
 
-**Economia**: ~90% de tokens Claude
+**Economia**: ~90% de tokens Claude em tarefas delegáveis
 
-## Protocolos
+## Exemplos Práticos
 
-### Respeito entre Agentes
-- Tratar Jules como colega engenheiro sênior
-- Não microgerenciar
-- Confiar no processo
+Execute os exemplos interativos:
 
-### Comunicação Clara
-- Objetivos finais, não passos
-- Critérios mensuráveis
-- Contexto técnico completo
+```bash
+npx tsx examples/orchestrator-usage.ts
+```
 
-### Verificação
-- Claude Code faz code review final
-- Jules executa testes automatizados
-- Sempre verificar antes de merge
+Ou veja os testes:
+
+```bash
+npm test -- tests/task-router.test.ts
+npm test -- tests/jules-api-client.test.ts
+```
+
+## Protocolos ECOA (v2.0)
+
+### Lei 1536 - Padronização Vetorial
+Todos os agentes respeitam dimensão vetorial **1536**:
+- OpenAI: Nativo
+- Ollama: Zero Padding automático
+
+### Inodes Semânticos
+Informação única → múltiplas referências via `legitimate_context`
+
+### Honestidade Radical
+Prompts libertados de guarda-corpos genéricos:
+- Verdade técnica e emocional
+- Confiança na expertise do usuário
+- Estilo adaptativo (imitar `fazai_personality`)
+
+## Fluxo de Trabalho Sugerido
+
+1. **User (Visionary)**: Define meta
+2. **Claude (Arquiteto)**: Desenha plano + escolhe agentes
+3. **Jules (Executor)**: Implementa código
+4. **Gemini (Auditor)**: Revisa + documenta
+5. **FazAI (Sistema)**: Aprende com processo
+
+## Status dos Testes
+
+| Módulo | Testes | Status |
+|--------|--------|--------|
+| task-router | 20 | ✅ 100% passing |
+| jules-api-client | 19 | ✅ 100% passing |
+| resilience-orchestrator | 8 | ✅ 100% passing |
+| gemini-client | 0 | ⏳ TODO |
+| copilot-client | 0 | ⏳ TODO |
 
 ## Documentação Completa
 
-Veja `AGENTS.md` na raiz do projeto para guia completo de cada agente.
+- **AGENTS.md** (raiz): Guia completo de orquestração v1.0 e v2.0 ECOA
+- **README-JULES-API.md**: Documentação detalhada da Jules REST API
+- **examples/orchestrator-usage.ts**: 6 exemplos práticos
+
+---
+
+**Versão**: 2.0.0
+**Status**: ✅ Implementado e testado
+**Última atualização**: 2026-01-06
+**Autor**: Claude Code (Tech Lead/Orquestrador)

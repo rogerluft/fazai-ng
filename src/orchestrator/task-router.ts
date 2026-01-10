@@ -66,13 +66,13 @@ export interface RoutingDecision {
  * @returns {RoutingDecision} A decisão de qual agente deve lidar com a tarefa.
  */
 export function routeTask(task: Task): RoutingDecision {
-  // Análise de keywords para decisão
+  // Análise de keywords para decisão (suporta PT-BR e EN)
   const keywords = {
-    architecture: ['arquitetura', 'design', 'decisão', 'estratégia', 'api pública'],
-    implementation: ['implementar', 'criar', 'adicionar feature', 'bug fix', 'refatorar'],
-    bulkAnalysis: ['revisar', 'analisar', 'changelog', 'documentação completa', 'múltiplos arquivos'],
-    webResearch: ['pesquisar', 'buscar', 'web', 'biblioteca', 'framework'],
-    shellHelp: ['comando', 'shell', 'git', 'bash', 'find', 'awk', 'sed'],
+    architecture: ['arquitetura', 'architecture', 'design', 'decisão', 'decision', 'estratégia', 'strategy', 'api pública', 'public api'],
+    implementation: ['implementar', 'implement', 'criar', 'create', 'adicionar feature', 'add feature', 'bug fix', 'fix', 'refatorar', 'refactor'],
+    bulkAnalysis: ['revisar', 'review', 'analisar', 'analyze', 'analyse', 'changelog', 'documentação completa', 'complete documentation', 'múltiplos arquivos', 'multiple files'],
+    webResearch: ['pesquisar', 'search', 'buscar', 'find information', 'web', 'biblioteca', 'library', 'framework', 'research', 'best practices'],
+    shellHelp: ['comando', 'command', 'shell', 'git', 'bash', 'find', 'awk', 'sed'],
   };
 
   const taskText = `${task.title} ${task.objective}`.toLowerCase();
@@ -156,6 +156,7 @@ ${errors}
 \`\`\`
 *   **Comportamento Atual vs. Esperado:** ${task.context.currentBehavior || 'N/A'} → ${task.context.expectedBehavior || 'N/A'}
 *   **Recursos Externos:** ${task.context.resources?.join(', ') || 'Nenhum'}
+*   **Detalhes Técnicos Adicionais:** ${task.technicalContext || 'Nenhum'}
 
 **Critérios de Aceitação:**
 ${task.acceptanceCriteria.map((c, i) => `${i + 1}.  ${c}`).join('\n')}
