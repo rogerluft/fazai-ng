@@ -1,5 +1,36 @@
 # FazAI Changelog
 
+## [3.15.0] - 2026-01-07
+
+### Feature: Qdrant HA Cluster
+
+Implementacao de alta disponibilidade para o Qdrant com replicacao assincrona.
+
+#### Novos Arquivos
+- `docker/qdrant/config-walker.yaml` - Configuracao do master (walker)
+- - `docker/qdrant/config-papaimach.yaml` - Configuracao da replica (papaimach)
+  - - `scripts/qdrant/setup-cluster.sh` - Script de setup do cluster
+    - - `scripts/qdrant/generate-jwt.sh` - Gerador de tokens JWT
+      - - `docs/QDRANT_HA_CLUSTER.md` - Documentacao completa
+       
+        - #### Arquitetura
+        - - Walker (6333): Master RW - aceita todas as escritas
+          - - Papaimach (6363): Replica - RO replicadas + RW locais (claudio_*)
+            - - Replicacao assincrona via snapshot transfer
+              - - Dimensao vetores: 768 (nomic-embed-text-v1.5)
+               
+                - #### Controle de Acesso (JWT RBAC)
+                - - Tokens JWT com permissoes granulares por collection
+                  - - Profiles: master, claudio, readonly, fazai
+                    - - API Key compartilhada entre nos para validacao
+                     
+                      - #### Notas
+                      - - Requer migracao de dimensao 1536 -> 768 (documentado separadamente)
+                        - - Nao altera install.sh existente
+                          - - Scripts geram comandos mas NAO aplicam automaticamente
+                           
+                            - 
+
 ## [3.14.8] - 2026-01-03
 
 ### 🛡️ Feat: Command Fallback System

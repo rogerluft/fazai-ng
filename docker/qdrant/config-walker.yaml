@@ -1,0 +1,63 @@
+# =============================================================================
+# Qdrant Walker (Master) Configuration
+# =============================================================================
+# Host: walker:6333
+# Role: Master RW - aceita todas as escritas
+# Replication: Source para papaimach (async)
+#
+# IMPORTANTE: Esta configuracao requer:
+#   - QDRANT_API_KEY definida como variavel de ambiente
+#   - Cluster habilitado com p2p na porta 6335
+#   - Dimensao de vetores: 768 (nomic-embed-text-v1.5)
+# =============================================================================
+
+service:
+  host: 0.0.0.0
+    http_port: 6333
+      grpc_port: 6334
+
+          # JWT RBAC - controle de acesso granular por collection
+            # api_key eh usada para assinar/validar tokens JWT
+              api_key: ${QDRANT_API_KEY}
+                jwt_rbac: true
+
+                    # Dashboard habilitado para gerenciamento visual
+                      enable_static_content: true
+
+                      cluster:
+                        enabled: true
+                          p2p:
+                              port: 6335
+                                  # Timeout para operacoes de consenso
+                                      connection_timeout_ms: 20000
+
+                                            consensus:
+                                                # Frequencia de ping entre peers (ms)
+                                                    tick_period_ms: 100
+
+                                                    storage:
+                                                      storage_path: /qdrant/storage
+                                                        snapshots_path: /qdrant/snapshots
+
+                                                            # Otimizacoes de performance
+                                                              performance:
+                                                                  # 0 = auto (usa todos os cores disponiveis)
+                                                                      max_search_threads: 0
+                                                                          # Otimizar para leitura (master recebe mais writes)
+                                                                              max_optimization_threads: 2
+
+                                                                                    # WAL (Write-Ahead Log) para durabilidade
+                                                                                      wal:
+                                                                                          wal_capacity_mb: 64
+                                                                                              wal_segments_ahead: 0
+
+                                                                                              # Colecoes padrao (criadas automaticamente se nao existirem)
+                                                                                              # Dimensao: 768 (nomic-embed-text-v1.5)
+                                                                                              # Distancia: Cosine (normalizado)
+                                                                                              collections:
+                                                                                                default_vector_size: 768
+                                                                                                  default_distance: Cosine
+
+                                                                                                  # Telemetria (pode ser desabilitada em producao)
+                                                                                                  telemetry:
+                                                                                                    disabled: false

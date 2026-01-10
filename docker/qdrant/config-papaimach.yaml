@@ -1,0 +1,56 @@
+# =============================================================================
+# Qdrant Papaimach (Replica) Configuration
+# =============================================================================
+# Host: papaimach:6363
+# Role: Replica - RO nas collections replicadas, RW nas locais (claudio_*)
+# Replication: Target do walker (async)
+#
+# IMPORTANTE: Esta configuracao requer:
+#   - QDRANT_API_KEY definida (mesma do walker para validar JWT)
+#   - Bootstrap via walker:6335 na inicializacao
+#   - JWT tokens com permissoes granulares por collection
+# =============================================================================
+
+service:
+  host: 0.0.0.0
+    http_port: 6333  # interno do container (mapeado para 6363 no host)
+      grpc_port: 6334
+
+          # JWT RBAC obrigatorio - mesma api_key do walker
+            # Tokens JWT sao validados usando esta chave
+              api_key: ${QDRANT_API_KEY}
+                jwt_rbac: true
+
+                    # Dashboard habilitado
+                      enable_static_content: true
+
+                      cluster:
+                        enabled: true
+                          p2p:
+                              port: 6335
+                                  connection_timeout_ms: 20000
+
+                                        consensus:
+                                            tick_period_ms: 100
+
+                                            storage:
+                                              storage_path: /qdrant/storage
+                                                snapshots_path: /qdrant/snapshots
+
+                                                    performance:
+                                                        # Otimizado para leitura (replica recebe menos writes)
+                                                            max_search_threads: 0
+                                                                max_optimization_threads: 1
+
+                                                                      wal:
+                                                                          wal_capacity_mb: 32
+                                                                              wal_segments_ahead: 0
+
+                                                                              # Collections locais (nao replicadas do walker)
+                                                                              # claudio_soul, claudio_sources - RW permitido via JWT
+                                                                              collections:
+                                                                                default_vector_size: 768
+                                                                                  default_distance: Cosine
+
+                                                                                  telemetry:
+                                                                                    disabled: false
