@@ -8,7 +8,8 @@
 script({
   title: "FazAI Skill Seeker",
   description: "Auto-scrape de docs/repos/PDFs para gerar skills quando detectar gaps",
-  model: "anthropic:claude-3-5-sonnet-latest",
+  // Sonnet 4.5 para extração (balanceado). Para tarefas complexas: opus
+  model: "anthropic:claude-sonnet-4-5-20250929",
   temperature: 0.6,
   maxTokens: 8192,
 });

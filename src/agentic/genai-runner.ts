@@ -7,6 +7,7 @@ import { join } from "path";
 import { spawn, ChildProcess } from "child_process";
 import { existsSync } from "fs";
 import { readdir } from "fs/promises";
+import { getConfigValue } from "../config.js";
 
 // Compatível com CJS bundle - usa process.cwd() como fallback
 const PROJECT_ROOT = process.env.FAZAI_PROJECT_ROOT || process.cwd();
@@ -160,11 +161,22 @@ async function executeScript(options: Omit<GenAIRunOptions, "maxRetries">): Prom
     }, timeout);
 
     try {
+      // Injeta variáveis do fazai.conf para o GenAIScript
+      const ollamaBaseUrl = getConfigValue("OLLAMA_BASE_URL") || process.env.OLLAMA_BASE_URL;
+      const anthropicApiKey = getConfigValue("ANTHROPIC_API_KEY") || process.env.ANTHROPIC_API_KEY;
+      const openaiApiKey = getConfigValue("OPENAI_API_KEY") || process.env.OPENAI_API_KEY;
+      const googleApiKey = getConfigValue("GEMINI_API_KEY") || process.env.GOOGLE_API_KEY;
+
       proc = spawn("npx", args, {
         cwd: PROJECT_ROOT,
         env: {
           ...process.env,
           GENAISCRIPT_DEFAULT_MODEL: model || process.env.GENAISCRIPT_DEFAULT_MODEL,
+          // Injeta config do fazai.conf
+          OLLAMA_BASE_URL: ollamaBaseUrl,
+          ANTHROPIC_API_KEY: anthropicApiKey,
+          OPENAI_API_KEY: openaiApiKey,
+          GOOGLE_API_KEY: googleApiKey,
           // Força cores no output
           FORCE_COLOR: "1",
         },

@@ -91,7 +91,7 @@ Retorne APENAS o JSON, sem texto adicional.`;
  * Extrai skills de conteúdo usando LLM
  */
 export async function extractSkillsFromContent(content, metadata = {}) {
-  const { source = "unknown", type = "url", topic = "general", model = "anthropic:claude-3-5-sonnet-latest" } = metadata;
+  const { source = "unknown", type = "url", topic = "general", model = "anthropic:claude-sonnet-4-5-20250929" } = metadata;
 
   // Trunca conteúdo se muito longo (limite do modelo)
   const maxContentLength = 100000; // ~25k tokens
@@ -364,7 +364,7 @@ export function exportSkillsAsScript(skills, metadata = {}) {
 script({
   title: "Skills: ${topic}",
   description: "Auto-generated skills from ${source}",
-  model: "anthropic:claude-3-5-sonnet-latest",
+  model: "anthropic:claude-sonnet-4-5-20250929",
 });
 `;
 

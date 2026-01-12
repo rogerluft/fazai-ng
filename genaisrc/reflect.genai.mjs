@@ -7,7 +7,8 @@
  */
 
 const mode = env.vars.mode || "reflect";
-const model = mode === "plan" ? (env.vars.model_local || "ollama:llama3") : "anthropic:claude-3-5-sonnet-latest";
+// Reflect: usa Sonnet 4.5 (balanced). Plan: usa modelo local (economia)
+const model = mode === "plan" ? (env.vars.model_local || "ollama:llama3") : "anthropic:claude-sonnet-4-5-20250929";
 
 script({
   title: `FazAI Reasoning (${mode})`,

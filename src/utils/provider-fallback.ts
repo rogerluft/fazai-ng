@@ -153,26 +153,35 @@ export function getEquivalentModel(
   const originalLower = originalModel.toLowerCase();
 
   // Model mapping heuristics
+  // Updated for Claude 4.x family (Opus 4.5, Sonnet 4.5) + Gemini 2.x
   const mappings: Record<string, Partial<Record<ProviderName, string>>> = {
-    // Large models
-    "gpt-4": {
-      anthropic: "claude-3-5-sonnet-latest",
-      openrouter: "anthropic/claude-3.5-sonnet",
-      google: "gemini-1.5-pro-latest",
+    // Premium/Flagship models (deep reasoning)
+    opus: {
+      openai: "gpt-4o",
+      openrouter: "anthropic/claude-opus-4.5",
+      google: "gemini-2.5-pro",
       ollama: "llama3.2:latest",
       llama: "phi3-mini",
     },
+    "gpt-4": {
+      anthropic: "claude-opus-4-5-20251101",
+      openrouter: "anthropic/claude-opus-4.5",
+      google: "gemini-2.5-pro",
+      ollama: "llama3.2:latest",
+      llama: "phi3-mini",
+    },
+    // Balanced models (fast + capable)
     sonnet: {
       openai: "gpt-4o",
-      openrouter: "anthropic/claude-3.5-sonnet",
-      google: "gemini-1.5-pro-latest",
+      openrouter: "anthropic/claude-sonnet-4.5",
+      google: "gemini-2.5-flash",
       ollama: "llama3.2:latest",
       llama: "phi3-mini",
     },
     "gemini": {
       openai: "gpt-4o",
-      anthropic: "claude-3-5-sonnet-latest",
-      openrouter: "google/gemini-pro-1.5",
+      anthropic: "claude-sonnet-4-5-20250929",
+      openrouter: "google/gemini-2.5-pro",
       ollama: "llama3.2:latest",
       llama: "phi3-mini",
     },
@@ -180,21 +189,21 @@ export function getEquivalentModel(
     "gpt-4o-mini": {
       anthropic: "claude-3-5-haiku-latest",
       openrouter: "anthropic/claude-3.5-haiku",
-      google: "gemini-1.5-flash-latest",
+      google: "gemini-2.5-flash-lite",
       ollama: "llama3.2:latest",
       llama: "phi3-mini",
     },
     haiku: {
       openai: "gpt-4o-mini",
       openrouter: "anthropic/claude-3.5-haiku",
-      google: "gemini-1.5-flash-latest",
+      google: "gemini-2.5-flash-lite",
       ollama: "llama3.2:latest",
       llama: "phi3-mini",
     },
     flash: {
       openai: "gpt-4o-mini",
       anthropic: "claude-3-5-haiku-latest",
-      openrouter: "google/gemini-flash-1.5",
+      openrouter: "google/gemini-2.5-flash",
       ollama: "llama3.2:latest",
       llama: "phi3-mini",
     },

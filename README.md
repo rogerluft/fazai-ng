@@ -282,17 +282,17 @@ MODELS_OLLAMA=llama3.2,qwen2.5,mistral
 OPENROUTER_API_KEY=sk-or-v1-xxxxx
 MODELS_OPENROUTER=qwen/qwen3-coder:free,google/gemini-2.0-flash-exp:free
 
-# --- Anthropic Claude ---
+# --- Anthropic Claude (4.5 Family) ---
 ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-MODELS_ANTHROPIC=claude-3-5-sonnet-latest,claude-3-haiku-20240307
+MODELS_ANTHROPIC=claude-opus-4-5-20251101,claude-sonnet-4-5-20250929,claude-3-5-haiku-latest
 
 # --- OpenAI ---
 OPENAI_API_KEY=sk-xxxxx
 MODELS_OPENAI=gpt-4o,gpt-4o-mini
 
-# --- Google Gemini ---
+# --- Google Gemini (2.x Family) ---
 GOOGLE_API_KEY=xxxxx
-MODELS_GOOGLE=gemini-2.0-flash-exp
+MODELS_GOOGLE=gemini-2.5-pro,gemini-2.5-flash,gemini-2.5-flash-lite
 
 # --- Vector Store (Qdrant) ---
 VECTOR_PROVIDER=qdrant

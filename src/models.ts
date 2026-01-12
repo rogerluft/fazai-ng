@@ -189,16 +189,22 @@ function getBuiltInModels(): Model[] {
   );
 
   // Anthropic Claude (optional, requires API key)
+  // Hierarchy: Opus 4.5 (most capable) → Sonnet 4.5 → Haiku 4.5 (fast)
   models.push(
     {
-      name: "claude-3-5-sonnet-latest",
+      name: "claude-opus-4-5-20251101",
       provider: "anthropic",
-      description: "Claude 3.5 Sonnet (most capable)",
+      description: "Claude Opus 4.5 (most capable, deep reasoning)",
     },
     {
-      name: "claude-3-haiku-20240307",
+      name: "claude-sonnet-4-5-20250929",
       provider: "anthropic",
-      description: "Claude 3 Haiku (fast & efficient)",
+      description: "Claude Sonnet 4.5 (balanced, fast)",
+    },
+    {
+      name: "claude-3-5-haiku-latest",
+      provider: "anthropic",
+      description: "Claude 3.5 Haiku (fastest, efficient)",
     }
   );
 

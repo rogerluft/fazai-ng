@@ -1,5 +1,85 @@
 # FazAI Changelog
 
+## [3.16.0] - 2026-01-11
+
+### 🚀 Feature: Claude Opus 4.5 Migration + Gemini 2.x
+
+Migração completa para os modelos Claude 4.5 family mantendo flexibilidade multi-provider.
+
+#### Modelos Atualizados
+
+**Anthropic Claude 4.5 Family:**
+| Tier | Modelo Antigo | Modelo Novo |
+|------|---------------|-------------|
+| Premium | claude-3-5-sonnet-latest | claude-opus-4-5-20251101 |
+| Balanced | claude-3-5-sonnet-latest | claude-sonnet-4-5-20250929 |
+| Efficient | claude-3-haiku-20240307 | claude-3-5-haiku-latest |
+
+**Google Gemini 2.x Family:**
+| Modelo Antigo | Modelo Novo |
+|---------------|-------------|
+| gemini-1.5-pro | gemini-2.5-pro |
+| gemini-1.5-flash | gemini-2.5-flash |
+| - | gemini-2.5-flash-lite (novo) |
+
+#### Arquivos Modificados
+
+- `src/models.ts` - Built-in models atualizados
+- `src/utils/provider-fallback.ts` - Mapeamentos de equivalência
+- `genaisrc/genaiscript.config.mjs` - Aliases (opus, sonnet, haiku, gemini)
+- `genaisrc/reflect.genai.mjs` - Modelo de reflexão
+- `genaisrc/skill-seeker.genai.mjs` - Skill seeker
+- `genaisrc/tools/skill-extractor.mjs` - Extrator de skills
+- `fazai.conf.example` - Documentação de configuração
+- `README.md` - Exemplos de configuração
+
+#### Novos Aliases GenAIScript
+
+```javascript
+// Premium (deep reasoning)
+"opus": "anthropic:claude-opus-4-5-20251101"
+"premium": "anthropic:claude-opus-4-5-20251101"
+
+// Balanced (fast + capable)
+"sonnet": "anthropic:claude-sonnet-4-5-20250929"
+"fast": "anthropic:claude-sonnet-4-5-20250929"
+"smart": "anthropic:claude-sonnet-4-5-20250929"
+
+// Efficient (quick tasks)
+"haiku": "anthropic:claude-3-5-haiku-latest"
+"small": "anthropic:claude-3-5-haiku-latest"
+
+// Gemini alternatives
+"gemini": "google:gemini-2.5-pro"
+"gemini-fast": "google:gemini-2.5-flash"
+```
+
+#### Teste de Migração
+
+Novo módulo de testes: `genaisrc/model-migration-test.genai.mjs`
+- Valida configuração de aliases
+- Verifica mapeamentos de fallback
+- Testa conexão Qdrant
+- Gera relatório de migração
+
+#### Fix: GenAI Runner Environment Injection
+
+O `src/agentic/genai-runner.ts` agora injeta variáveis do `fazai.conf` antes de spawnar o GenAIScript:
+- `OLLAMA_BASE_URL` - Servidor Ollama remoto (ex: 192.168.0.101:11434)
+- `ANTHROPIC_API_KEY` - Para modelos Claude 4.5
+- `OPENAI_API_KEY` - Para fallback OpenAI
+- `GOOGLE_API_KEY` - Para modelos Gemini
+
+Isso resolve o problema onde `npx genaiscript` não carregava o config do FazAI.
+
+#### Compatibilidade
+
+- Modelos antigos (Claude 3.x) ainda suportados via config
+- Fallback chain mantida: local → openrouter → anthropic → openai → google
+- GenAIScript continua priorizando modelos locais (ollama:phi3)
+
+---
+
 ## [3.15.0] - 2026-01-07
 
 ### Feature: Qdrant HA Cluster

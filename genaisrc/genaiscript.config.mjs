@@ -4,20 +4,34 @@
  */
 
 export default {
-  // Modelo padrão - usar cloud para velocidade
-  model: "anthropic:claude-3-5-sonnet-latest",
+  // Modelo padrão - Sonnet 4.5 (balanceado, rápido)
+  // Opus 4.5 disponível via alias "opus" para tarefas complexas
+  model: "anthropic:claude-sonnet-4-5-20250929",
 
   // Aliases para modelos
+  // Hierarquia: local → cloud-balanced → cloud-premium
   modelAliases: {
-    // Modelos locais via Ollama
+    // Modelos locais via Ollama (PRIORIDADE para economia)
     "local": "ollama:phi3",
     "local-large": "ollama:llama3.2",
     "local-embed": "ollama:nomic-embed-text",
 
-    // Modelos cloud rápidos
-    "fast": "anthropic:claude-3-5-sonnet-latest",
-    "smart": "anthropic:claude-3-5-sonnet-latest",
-    "small": "anthropic:claude-3-haiku-20240307",
+    // Premium cloud - máxima capacidade (usar com parcimônia)
+    "opus": "anthropic:claude-opus-4-5-20251101",
+    "premium": "anthropic:claude-opus-4-5-20251101",
+
+    // Balanced cloud - rápido + capaz (default para cloud)
+    "sonnet": "anthropic:claude-sonnet-4-5-20250929",
+    "fast": "anthropic:claude-sonnet-4-5-20250929",
+    "smart": "anthropic:claude-sonnet-4-5-20250929",
+
+    // Efficient cloud - custo otimizado
+    "small": "anthropic:claude-3-5-haiku-latest",
+    "haiku": "anthropic:claude-3-5-haiku-latest",
+
+    // Gemini alternatives
+    "gemini": "google:gemini-2.5-pro",
+    "gemini-fast": "google:gemini-2.5-flash",
 
     // Modelos de fallback
     "fallback": "openai:gpt-4o-mini",
