@@ -24,7 +24,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configurações
-FAZAI_VERSION="3.10.0"
+FAZAI_VERSION="3.10.1"
 INSTALL_DIR="/opt/fazai"
 BIN_DIR="/usr/local/bin"
 REPO_URL="https://github.com/rogerluft/fazai-ng"

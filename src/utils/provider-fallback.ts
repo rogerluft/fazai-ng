@@ -16,22 +16,67 @@
 import { logger } from "../logger";
 import { models } from "../models";
 import { checkAPIKey } from "../apiKeyUtils-fazai";
+import { getConfigValue } from "../config";
 
 export type ProviderName = "llama" | "ollama" | "openrouter" | "anthropic" | "openai" | "google" | "perplexity";
 
-/**
- * Fallback chain: llama → ollama → openrouter → anthropic → openai → google
- *
- * llama.cpp local server is first priority (fastest, private, no API cost)
- */
-export const FALLBACK_CHAIN: ProviderName[] = [
+/** Default fallback order when PROVIDER_FALLBACK_ORDER is not configured */
+const DEFAULT_FALLBACK_ORDER: ProviderName[] = [
   "llama",      // Local llama.cpp server (Phi-3-mini)
   "ollama",     // Local Ollama server
   "openrouter", // Cloud with free tier
   "anthropic",  // Claude API
   "openai",     // OpenAI API
   "google",     // Gemini API
+  "perplexity", // Perplexity API (sonar models)
 ];
+
+/**
+ * Load fallback chain from config or use defaults
+ *
+ * Config key: PROVIDER_FALLBACK_ORDER (comma-separated)
+ * Example: PROVIDER_FALLBACK_ORDER=llama,ollama,openrouter,anthropic,openai,google,perplexity
+ *
+ * Invalid provider names are filtered out with a warning.
+ */
+function loadFallbackChain(): ProviderName[] {
+  const configOrder = getConfigValue("PROVIDER_FALLBACK_ORDER");
+
+  if (!configOrder) {
+    return DEFAULT_FALLBACK_ORDER;
+  }
+
+  const validProviders: Set<ProviderName> = new Set([
+    "llama", "ollama", "openrouter", "anthropic", "openai", "google", "perplexity"
+  ]);
+
+  const chain: ProviderName[] = [];
+
+  for (const raw of configOrder.split(",")) {
+    const provider = raw.trim().toLowerCase() as ProviderName;
+
+    if (validProviders.has(provider)) {
+      chain.push(provider);
+    } else if (raw.trim()) {
+      logger.warn(`⚠️ Invalid provider in PROVIDER_FALLBACK_ORDER: "${raw.trim()}" (skipped)`);
+    }
+  }
+
+  if (chain.length === 0) {
+    logger.warn("⚠️ PROVIDER_FALLBACK_ORDER is empty or invalid, using defaults");
+    return DEFAULT_FALLBACK_ORDER;
+  }
+
+  return chain;
+}
+
+/**
+ * Fallback chain loaded from PROVIDER_FALLBACK_ORDER config
+ *
+ * Priority: llama → ollama → openrouter → anthropic → openai → google → perplexity
+ * Providers without API keys are skipped automatically at runtime.
+ */
+export const FALLBACK_CHAIN: ProviderName[] = loadFallbackChain();
 
 /**
  * Errors that should trigger fallback to next provider

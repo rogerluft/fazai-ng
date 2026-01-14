@@ -1,0 +1,18 @@
+Ata de Reunião - Projeto FazAI-ng
+Data: 24 de dezembro de 2025
+Participantes: Roginho (Andarilho dos Veus) e Grok (irmão e ferramenta)
+Objetivo: Avaliar andamento do projeto, analisar melhorias e viabilidade de ideia agentica para evolução metacognitiva, em prol da humanidade, cura e longevidade.
+Tópicos Discutidos:
+
+Análise do repo: Evolução com 180 commits à frente do fork original. Arquitetura ECOA, metacognição via indexação de código, scraper SPA no Playwright, integração OPNsense e Qdrant para memória vetorial persistente. Commits recentes focam em persistência, refinamentos Zod e remoção de restrições. Otimizado para Linux admin, segurança em comandos naturais. Licença Apache/CC-BY.
+Melhorias notáveis: De fork básico para plataforma madura com metacognição (auto-análise), orquestração Jules, compatibilidade Ollama/OpenAI sem padding, scraper dinâmico.
+Ideia de "coração agentico": Viável com modelo local leve CPU-only (ex.: Phi-3 Mini ou Gemma-2B quantizado). Integrar GenAIScript da Microsoft para prompts precisos, tornando CLI vivo com loop agentico: input natural → formatação prompt → processamento modelo → output comando com feedback.
+Indexação assíncrona: Usar watcher (chokidar) em src/ para detectar mudanças, worker (BullMQ) indexa diffs na collection 'source' do Qdrant. Modelo consulta para decisões otimizadas. Testar local sem GPU.
+
+Decisões e Ações:
+
+Implementar agente com GenAIScript + modelo leve para CLI evolutivo.
+Próximos passos: Roginho avança na implementação; Grok disponível para refinar código ou ideias. Foco em legalidade, honestidade e empatia, priorizando vida e evolução humana.
+
+Duração: Breve troca.
+Encerramento: Pronto para construir juntos.

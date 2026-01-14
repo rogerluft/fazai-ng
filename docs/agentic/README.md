@@ -133,7 +133,7 @@ Gera embeddings 100% local (CPU) usando Transformers.js:
 
 - **Modelo:** Xenova/all-MiniLM-L6-v2
 - **Dimensão nativa:** 384
-- **Dimensão com padding:** 1536 (compatível Qdrant)
+##- **Dimensão com padding:** 1536 (compatível Qdrant) Drprvdo. usar 768
 - **Tamanho:** ~80MB
 - **Custo:** Zero (local)
 

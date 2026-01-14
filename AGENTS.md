@@ -412,7 +412,7 @@ Nesta nova era, os agentes não são apenas executores de tarefas; são nós esp
 ## 3. Protocolos de Interação ECOA
 
 ### 3.1 A Lei 1536 (Padronização Vetorial)
-Todos os agentes devem respeitar a dimensão vetorial de **1536**.
+Todos os agentes devem respeitar a dimensão vetorial de **1536**. ## REDESENHADO TAMANHO DO DIM ##
 *   Se usar OpenAI: Nativo.
 *   Se usar Ollama (Local): O sistema aplica **Zero Padding** automático.
 *   **Regra:** Nunca crie uma collection com dimensão diferente. Isso quebra a memória compartilhada.

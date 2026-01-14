@@ -1,0 +1,93 @@
+diff --git a/src/orchestrator/jules-api-client.ts b/src/orchestrator/jules-api-client.ts
+index 3d9dc92..814ce6f 100644
+--- a/src/orchestrator/jules-api-client.ts
++++ b/src/orchestrator/jules-api-client.ts
+@@ -107,10 +107,10 @@ export interface Message {
+ /**
+  * @interface SendMessageRequest
+  * @description Payload para enviar mensagem em uma sessão
+- * @property {string} message - Conteúdo da mensagem
++ * @property {string} content - Conteúdo da mensagem
+  */
+ export interface SendMessageRequest {
+-  message: string;
++  content: string;
+ }
+ 
+ /**
+@@ -220,21 +220,25 @@ export class JulesAPIClient {
+           status: data.error?.status || data.status,
+           details: data.error?.details || data.details,
+         };
+-
+-        logger.error(`Jules API error [${error.code}]: ${error.message}`, error.details);
+-        throw new Error(`Jules API error [${error.code}]: ${error.message}`);
++        // Lança um erro para ser tratado e logado de forma centralizada no bloco catch.
++        const apiError = new Error(`Jules API error [${error.code}]: ${error.message}`);
++        (apiError as any).julesErrorDetails = error;
++        throw apiError;
+       }
+ 
+       logger.debug(`Jules API response: ${response.status}`, data);
+       return data as T;
+     } catch (error: any) {
+-      if (error.message?.includes('Jules API error')) {
+-        throw error;
++      if ((error as any).julesErrorDetails) {
++        // Erro da API, log formatado. O erro já tem uma mensagem descritiva.
++        logger.error(error.message, (error as any).julesErrorDetails);
++        throw error; // Propaga o erro original da API.
++      } else {
++        // Erro de rede ou outro erro inesperado.
++        const networkError = new Error(`Erro de rede ao acessar Jules API: ${error.message}`);
++        logger.error(networkError.message, { endpoint, originalError: error });
++        throw networkError; // Lança um novo erro mais descritivo.
+       }
+-
+-      const networkError = `Erro de rede ao acessar Jules API: ${error.message}`;
+-      logger.error(networkError, { endpoint, error });
+-      throw new Error(networkError);
+     }
+   }
+ 
+@@ -304,14 +308,14 @@ export class JulesAPIClient {
+    *   "Please also add unit tests for the fix"
+    * );
+    */
+-  async sendMessage(sessionId: string, message: string): Promise<SendMessageResponse> {
++  async sendMessage(sessionId: string, content: string): Promise<SendMessageResponse> {
+     // Normaliza sessionId (aceita "123" ou "sessions/123")
+     const normalizedId = sessionId.startsWith('sessions/') ? sessionId : `sessions/${sessionId}`;
+ 
+-    logger.info(`Enviando mensagem para ${normalizedId}: "${message}"`);
++    logger.info(`Enviando mensagem para ${normalizedId}: "${content}"`);
+ 
+     const payload: SendMessageRequest = {
+-      message,
++      content,
+     };
+ 
+     const response = await this.request<SendMessageResponse>(`/${normalizedId}:sendMessage`, {
+diff --git a/tests/jules-api-client.test.ts b/tests/jules-api-client.test.ts
+index 8d17e0e..9e3cce3 100644
+--- a/tests/jules-api-client.test.ts
++++ b/tests/jules-api-client.test.ts
+@@ -179,7 +179,7 @@ describe('JulesAPIClient', () => {
+         'https://jules.googleapis.com/v1alpha/sessions/abc123:sendMessage',
+         expect.objectContaining({
+           method: 'POST',
+-          body: JSON.stringify({ message: 'Add tests' }),
++          body: JSON.stringify({ content: 'Add tests' }),
+         })
+       );
+ 
+@@ -293,7 +293,7 @@ describe('JulesAPIClient', () => {
+     it('deve tratar erro de rede', async () => {
+       (global.fetch as any).mockRejectedValueOnce(new Error('Network error'));
+ 
+-      await expect(client.listSources()).rejects.toThrow('Erro de rede ao acessar Jules API');
++      await expect(client.listSources()).rejects.toThrow('Erro de rede ao acessar Jules API: Network error');
+     });
+ 
+     it('deve tratar resposta não-JSON', async () => {
+

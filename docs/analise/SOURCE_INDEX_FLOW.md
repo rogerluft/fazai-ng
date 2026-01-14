@@ -346,7 +346,7 @@ Isso permite indexação incremental na próxima execução.
 ```yaml
 name: fazai_source
 description: "ECOA Metacognition: Índice do próprio código-fonte"
-dimension: 1536
+dimension: 768
 distance: Cosine
 
 payload_schema:

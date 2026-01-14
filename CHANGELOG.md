@@ -1,5 +1,39 @@
 # FazAI Changelog
 
+## [3.16.1] - 2026-01-14
+
+### 🐛 Bugfix: PROVIDER_FALLBACK_ORDER Configurável
+
+Corrige bug onde o fallback chain estava hardcoded e não incluía Perplexity.
+
+#### Problema Resolvido
+
+- `FALLBACK_CHAIN` estava hardcoded em `provider-fallback.ts`
+- Perplexity tinha API key e modelos configurados mas **nunca era usado** no fallback
+- Documentação do FAZAI_FOCO_AGENICO especificava 9 níveis mas código tinha apenas 6
+
+#### Solução Implementada
+
+**Novo parâmetro em `/etc/fazai/fazai.conf`:**
+```bash
+# Provider fallback order for LLM inference
+# Comma-separated, providers without API key are skipped automatically
+PROVIDER_FALLBACK_ORDER=llama,ollama,openrouter,anthropic,openai,google,perplexity
+```
+
+**Comportamento:**
+- Se `PROVIDER_FALLBACK_ORDER` não existe: usa default com todos os 7 providers
+- Providers inválidos são ignorados com warning
+- Providers sem API key são pulados automaticamente em runtime
+
+#### Arquivos Modificados
+
+- `src/utils/provider-fallback.ts` - Lê ordem do config, função `loadFallbackChain()`
+- `/etc/fazai/fazai.conf` - Novo parâmetro `PROVIDER_FALLBACK_ORDER`
+- `docs/analise/FALLBACK_ORDER_BUG.md` - Documentação do bug e solução
+
+---
+
 ## [3.16.0] - 2026-01-11
 
 ### 🚀 Feature: Claude Opus 4.5 Migration + Gemini 2.x
