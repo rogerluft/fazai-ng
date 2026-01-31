@@ -1,0 +1,11 @@
+{
+  "name": "Sua Documentação",
+  "navigation": {
+    "groups": [
+      {
+        "group": "Get Started",
+        "pages": ["introduction"]
+      }
+    ]
+  }
+}
