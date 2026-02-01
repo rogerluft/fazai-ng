@@ -19,8 +19,8 @@ export const COLLECTIONS = {
   source: "fazai_source",              // Código fonte indexado
 };
 
-// Dimensão padrão (compatível com ECOA)
-const VECTOR_DIMENSION = 1536;
+// Dimensão padrão (nomic-embed-text nativo)
+const VECTOR_DIMENSION = 768;
 
 /**
  * Verifica se collection existe e cria se necessário

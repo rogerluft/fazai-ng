@@ -124,11 +124,15 @@ export class LlamaProvider extends BaseProvider {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), this.timeout * 10); // Timeout maior para geração
 
+        // Obter modelo do config (MODELS_LLAMA) ou usar default
+        const modelName = this.getAvailableModels()[0] || "phi3:latest";
+
         const response = await fetch(`${this.baseUrl}/v1/chat/completions`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           signal: controller.signal,
           body: JSON.stringify({
+            model: modelName, // REQUIRED pelo Ollama OpenAI-compatible API
             messages: messages.map((m) => ({ role: m.role, content: m.content })),
             temperature: finalTemperature,
             max_tokens: finalMaxTokens,
@@ -139,7 +143,9 @@ export class LlamaProvider extends BaseProvider {
         clearTimeout(timeoutId);
 
         if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          // Capturar body do erro para diagnóstico
+          const errorBody = await response.text().catch(() => "");
+          throw new Error(`HTTP ${response.status}: ${response.statusText}${errorBody ? ` - ${errorBody}` : ""}`);
         }
 
         if (stream && response.body) {

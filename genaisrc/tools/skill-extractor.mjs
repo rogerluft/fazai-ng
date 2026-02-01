@@ -199,14 +199,14 @@ async function checkSkillDuplication(skillName, embedding) {
  */
 async function generateSkillEmbedding(skillText) {
   // TODO: Integrar com createEmbeddingService do FazAI
-  // Por enquanto, retorna vetor mock (1536 dims)
+  // Por enquanto, retorna vetor mock (768 dims)
 
   // Simulação: hash simples do texto para vetor pseudo-aleatório mas determinístico
   const hash = skillText.split("").reduce((acc, char) => {
     return ((acc << 5) - acc) + char.charCodeAt(0);
   }, 0);
 
-  const vector = new Array(1536).fill(0).map((_, i) => {
+  const vector = new Array(768).fill(0).map((_, i) => {
     return Math.sin(hash * (i + 1)) * 0.5 + 0.5;
   });
 

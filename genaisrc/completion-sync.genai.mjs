@@ -182,13 +182,13 @@ defTool(
         const embedData = await embedRes.json();
 
         if (embedData.embedding) {
-          // Zero-pad to 1536 dimensions (ECOA standard)
+          // Truncate to 768 dimensions (nomic-embed-text native)
           const vector = embedData.embedding;
-          while (vector.length < 1536) vector.push(0);
+          // nomic-embed-text já produz 768d nativo - sem padding necessário
 
           points.push({
             id: pointId++,
-            vector: vector.slice(0, 1536),
+            vector: vector.slice(0, 768),
             payload: {
               type: "cli_command",
               command: cmd,

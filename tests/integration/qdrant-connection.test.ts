@@ -39,21 +39,21 @@ describe('Qdrant Connection Tests (REAL)', () => {
   it('deve criar collection de teste', async () => {
     await client.createCollection(TEST_COLLECTION, {
       vectors: {
-        size: 1536,
+        size: 768,
         distance: 'Cosine',
       },
     });
 
     const info = await client.getCollection(TEST_COLLECTION);
     expect(info.status).toBe('green');
-    expect(info.config?.params.vectors?.size).toBe(1536);
+    expect(info.config?.params.vectors?.size).toBe(768);
     expect(info.config?.params.vectors?.distance).toBe('Cosine');
   });
 
   it('deve inserir ponto no Qdrant', async () => {
     const testPoint = {
       id: TEST_POINT_ID,
-      vector: Array(1536).fill(0.1),
+      vector: Array(768).fill(0.1),
       payload: {
         test: true,
         message: 'Integration test point',
@@ -77,7 +77,7 @@ describe('Qdrant Connection Tests (REAL)', () => {
   });
 
   it('deve fazer busca vetorial', async () => {
-    const searchVector = Array(1536).fill(0.1);
+    const searchVector = Array(768).fill(0.1);
 
     const searchResult = await client.search(TEST_COLLECTION, {
       vector: searchVector,

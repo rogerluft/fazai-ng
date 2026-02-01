@@ -242,7 +242,7 @@ defTool(
 
 /**
  * Tool: Embeddings 100% locais com Transformers.js
- * Usa modelo all-MiniLM-L6-v2 (384 dims, padded para 1536)
+ * Usa nomic-embed-text (768 dims nativo) via Ollama
  */
 defTool(
   "local_embed",

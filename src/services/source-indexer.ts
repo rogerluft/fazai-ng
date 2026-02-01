@@ -18,7 +18,7 @@ import { semanticChunk, ChunkingConfig } from "./embedding-strategies";
  * - JSDoc extraction as separate high-priority chunks
  * - Intelligent chunking with context overlap
  * - Metadata extraction (functions, classes, imports)
- * - ECOA compliant (1536 dim, semantic inodes)
+ * - Lei 768 compliant (768 dim, semantic inodes)
  */
 
 interface FileState {
@@ -191,7 +191,7 @@ export async function runSourceIndexer(options: IndexerOptions = {}): Promise<vo
           points: [
             {
               id: semanticId, // UUID format for Qdrant compatibility
-              vector: embedding, // 1536 dim (padded if needed by service)
+              vector: embedding, // 768 dim nativo (nomic-embed-text)
               payload: {
                 semantic_id: semanticId,
                 path: relativePath,

@@ -2,7 +2,7 @@
  * Qdrant Collections Migration Script
  *
  * Migrates existing collections to new optimized schemas:
- * - Native dimensions (768/1024 vs 1536 with zero padding)
+ * - Native 768 dimensions (nomic-embed-text, no zero padding)
  * - Proper distance metrics (Dot for personality/learning, Cosine for memory/kb)
  * - Collection-specific embedding models
  * - Semantic chunking (no hard truncation)

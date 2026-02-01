@@ -36,7 +36,7 @@ function generateMockEmbedding(text) {
     return ((acc << 5) - acc) + char.charCodeAt(0);
   }, 0);
 
-  return new Array(1536).fill(0).map((_, i) => {
+  return new Array(768).fill(0).map((_, i) => {
     return Math.sin(hash * (i + 1)) * 0.5 + 0.5;
   });
 }

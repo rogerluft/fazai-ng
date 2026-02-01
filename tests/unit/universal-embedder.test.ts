@@ -15,37 +15,37 @@ import {
 
 describe("Universal Local Embedder (Unit Tests)", () => {
   describe("padVector", () => {
-    it("should pad 768d vector to 1536d with zeros", () => {
-      const vec768 = new Array(768).fill(0.5);
-      const vec1536 = padVector(vec768, 1536);
+    it("should pad smaller vector to 768d with zeros (Lei 768)", () => {
+      const vec384 = new Array(384).fill(0.5);
+      const vec768 = padVector(vec384, 768);
 
-      expect(vec1536).toHaveLength(1536);
-      expect(vec1536.slice(0, 768)).toEqual(vec768);
-      expect(vec1536.slice(768)).toEqual(new Array(768).fill(0));
+      expect(vec768).toHaveLength(768);
+      expect(vec768.slice(0, 384)).toEqual(vec384);
+      expect(vec768.slice(384)).toEqual(new Array(384).fill(0));
     });
 
     it("should return same vector if already target dimension", () => {
-      const vec1536 = new Array(1536).fill(0.5);
-      const result = padVector(vec1536, 1536);
+      const vec768 = new Array(768).fill(0.5);
+      const result = padVector(vec768, 768);
 
-      expect(result).toHaveLength(1536);
-      expect(result).toEqual(vec1536);
+      expect(result).toHaveLength(768);
+      expect(result).toEqual(vec768);
     });
 
     it("should truncate vector if larger than target", () => {
       const vec2048 = new Array(2048).fill(0.5);
-      const vec1536 = padVector(vec2048, 1536);
+      const vec768 = padVector(vec2048, 768);
 
-      expect(vec1536).toHaveLength(1536);
-      expect(vec1536).toEqual(vec2048.slice(0, 1536));
+      expect(vec768).toHaveLength(768);
+      expect(vec768).toEqual(vec2048.slice(0, 768));
     });
 
     it("should handle empty vector", () => {
       const empty: number[] = [];
-      const vec1536 = padVector(empty, 1536);
+      const vec768 = padVector(empty, 768);
 
-      expect(vec1536).toHaveLength(1536);
-      expect(vec1536).toEqual(new Array(1536).fill(0));
+      expect(vec768).toHaveLength(768);
+      expect(vec768).toEqual(new Array(768).fill(0));
     });
 
     it("should preserve semantic information in padding", () => {
@@ -76,7 +76,7 @@ describe("Universal Local Embedder (Unit Tests)", () => {
         "http://localhost:11434",
         "nomic-embed-text",
         768,
-        1536
+        768
       );
     });
 
@@ -85,7 +85,7 @@ describe("Universal Local Embedder (Unit Tests)", () => {
 
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
-      expect(info.targetDimension).toBe(1536);
+      expect(info.targetDimension).toBe(768);
       // Embedder usa servidor local (OLLAMA_EMBED_URL)
       expect(info.ollamaUrl).toBe("http://localhost:11434");
     });
@@ -96,7 +96,7 @@ describe("Universal Local Embedder (Unit Tests)", () => {
 
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
-      expect(info.targetDimension).toBe(1536);
+      expect(info.targetDimension).toBe(768);
       // Default usa getOllamaEmbedUrl() que retorna localhost:11434
       expect(info.ollamaUrl).toBe("http://localhost:11434");
     });
@@ -128,10 +128,10 @@ describe("Universal Local Embedder (Unit Tests)", () => {
       // One dissimilar vector
       const vec3 = new Array(768).fill(0.1);
 
-      // Pad all to 1536
-      const padded1 = padVector(vec1, 1536);
-      const padded2 = padVector(vec2, 1536);
-      const padded3 = padVector(vec3, 1536);
+      // Pad all to 768
+      const padded1 = padVector(vec1, 768);
+      const padded2 = padVector(vec2, 768);
+      const padded3 = padVector(vec3, 768);
 
       // Cosine similarity function (simplified)
       const cosineSimilarity = (a: number[], b: number[]): number => {
@@ -150,7 +150,7 @@ describe("Universal Local Embedder (Unit Tests)", () => {
 
     it("should not introduce bias in magnitude", () => {
       const vec = new Array(768).fill(0.5);
-      const padded = padVector(vec, 1536);
+      const padded = padVector(vec, 768);
 
       // Calculate magnitude (L2 norm)
       const magnitude = (v: number[]): number => {

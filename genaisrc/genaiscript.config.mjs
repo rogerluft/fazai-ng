@@ -106,7 +106,7 @@ export default {
     embeddings: {
       provider: "ollama",
       model: "nomic-embed-text",
-      dimension: 1536, // Padronizado via zero-padding
+      dimension: 768, // nomic-embed-text native (Lei 768)
     },
   },
 };

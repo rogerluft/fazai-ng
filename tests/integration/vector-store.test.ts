@@ -78,7 +78,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
     await ensureCollectionDeleted(collectionName);
 
     await client.createCollection(collectionName, {
-      vectors: { size: 1536, distance: 'Cosine' },
+      vectors: { size: 768, distance: 'Cosine' },
     });
 
     // Inserir ponto de teste - usar vetores não-nulos e UUID válido
@@ -86,7 +86,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
       wait: true,
       points: [{
         id: TEST_IDS.personality,
-        vector: Array(1536).fill(0).map((_, i) => Math.sin(i) * 0.1),
+        vector: Array(768).fill(0).map((_, i) => Math.sin(i) * 0.1),
         payload: {
           admin_name: 'Test Admin',
           expertise_areas: ['linux', 'networking'],
@@ -110,7 +110,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
     await ensureCollectionDeleted(collectionName);
 
     await client.createCollection(collectionName, {
-      vectors: { size: 1536, distance: 'Cosine' },
+      vectors: { size: 768, distance: 'Cosine' },
     });
 
     // Inserir mensagem de teste com UUID válido
@@ -118,7 +118,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
       wait: true,
       points: [{
         id: TEST_IDS.memory,
-        vector: Array(1536).fill(0).map((_, i) => Math.cos(i) * 0.1),
+        vector: Array(768).fill(0).map((_, i) => Math.cos(i) * 0.1),
         payload: {
           conversation_id: 'conv-123',
           message_id: 'msg-456',
@@ -143,7 +143,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
     await ensureCollectionDeleted(collectionName);
 
     await client.createCollection(collectionName, {
-      vectors: { size: 1536, distance: 'Cosine' },
+      vectors: { size: 768, distance: 'Cosine' },
     });
 
     // Inserir padrão de aprendizado com UUID válido
@@ -151,7 +151,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
       wait: true,
       points: [{
         id: TEST_IDS.learning,
-        vector: Array(1536).fill(0).map((_, i) => Math.sin(i * 0.5) * 0.1),
+        vector: Array(768).fill(0).map((_, i) => Math.sin(i * 0.5) * 0.1),
         payload: {
           pattern_type: 'error_resolution',
           problem_description: 'Nginx retornando 502',
@@ -174,7 +174,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
     await ensureCollectionDeleted(collectionName);
 
     await client.createCollection(collectionName, {
-      vectors: { size: 1536, distance: 'Cosine' },
+      vectors: { size: 768, distance: 'Cosine' },
     });
 
     // Inserir solução técnica com UUID válido
@@ -182,7 +182,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
       wait: true,
       points: [{
         id: TEST_IDS.kb,
-        vector: Array(1536).fill(0).map((_, i) => Math.cos(i * 0.3) * 0.1),
+        vector: Array(768).fill(0).map((_, i) => Math.cos(i * 0.3) * 0.1),
         payload: {
           slug: 'nginx-load-balancer',
           title: 'Configurar Nginx como Load Balancer',
@@ -211,7 +211,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
     await ensureCollectionDeleted(collectionName);
 
     await client.createCollection(collectionName, {
-      vectors: { size: 1536, distance: 'Cosine' },
+      vectors: { size: 768, distance: 'Cosine' },
     });
 
     // Inserir regra operacional com UUID válido
@@ -219,7 +219,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
       wait: true,
       points: [{
         id: TEST_IDS.inference,
-        vector: Array(1536).fill(0).map((_, i) => Math.sin(i * 0.7) * 0.1),
+        vector: Array(768).fill(0).map((_, i) => Math.sin(i * 0.7) * 0.1),
         payload: {
           rule_type: 'security',
           rule_name: 'Bloquear rm -rf em produção',
@@ -240,7 +240,7 @@ describe('Vector Store - FazAI Collections (REAL)', () => {
   it('deve fazer busca vetorial em fazai_kb', async () => {
     const collectionName = `${TEST_PREFIX}fazai_kb`;
     // Usar vetor similar ao que foi inserido
-    const searchVector = Array(1536).fill(0).map((_, i) => Math.cos(i * 0.3) * 0.1);
+    const searchVector = Array(768).fill(0).map((_, i) => Math.cos(i * 0.3) * 0.1);
 
     const results = await client.search(collectionName, {
       vector: searchVector,

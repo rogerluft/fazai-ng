@@ -2,12 +2,12 @@
 
 ## Overview
 
-The Universal Local Embedder provides a unified interface for generating text embeddings using Ollama's local models with automatic dimension normalization via Zero Padding.
+The Universal Local Embedder provides a unified interface for generating text embeddings using Ollama's local models with native 768-dimensional vectors (Lei 768).
 
 ## Features
 
 - **Local Execution**: Uses Ollama (no API costs)
-- **Zero Padding**: Normalizes 768d vectors to 1536d (OpenAI standard)
+- **Native 768d**: Uses nomic-embed-text native dimension (no padding needed)
 - **Batch Processing**: Efficient multi-text embedding generation
 - **Retry Logic**: Automatic retry on transient failures
 - **Type Safety**: Full TypeScript support with strict typing
@@ -19,11 +19,7 @@ Input Text
     ↓
 Ollama API (nomic-embed-text)
     ↓
-Raw Embedding (768 dimensions)
-    ↓
-Zero Padding
-    ↓
-Universal Embedding (1536 dimensions)
+Native Embedding (768 dimensions - Lei 768)
 ```
 
 ## Installation

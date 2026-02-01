@@ -192,7 +192,7 @@ describe("Embedding Strategies", () => {
 
       expect(strategy.collection).toBe("fazai_personality");
       expect(strategy.model).toBe("nomic-embed-text");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(200);
@@ -202,8 +202,8 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("memory");
 
       expect(strategy.collection).toBe("fazai_memory");
-      expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(800);
@@ -213,8 +213,8 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("kb");
 
       expect(strategy.collection).toBe("fazai_kb");
-      expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(600);
@@ -224,8 +224,8 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("learning");
 
       expect(strategy.collection).toBe("fazai_learning");
-      expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(400);
@@ -379,13 +379,13 @@ describe("Embedding Strategies", () => {
         ok: true,
         json: async () => ({
           models: [
-            { name: "mxbai-embed-large:latest" },
+            { name: "nomic-embed-text:latest" },
             { name: "nomic-embed-text:latest" },
           ],
         }),
       });
 
-      const result = await isModelAvailable("mxbai-embed-large");
+      const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(true);
       // Embeddings usam OLLAMA_EMBED_URL (servidor local)
@@ -399,11 +399,11 @@ describe("Embedding Strategies", () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          models: [{ name: "mxbai-embed-large" }],
+          models: [{ name: "nomic-embed-text" }],
         }),
       });
 
-      const result = await isModelAvailable("mxbai-embed-large");
+      const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(true);
     });
@@ -416,7 +416,7 @@ describe("Embedding Strategies", () => {
         }),
       });
 
-      const result = await isModelAvailable("mxbai-embed-large");
+      const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(false);
     });
@@ -426,7 +426,7 @@ describe("Embedding Strategies", () => {
         ok: false,
       });
 
-      const result = await isModelAvailable("mxbai-embed-large");
+      const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(false);
     });
@@ -438,7 +438,7 @@ describe("Embedding Strategies", () => {
         });
       });
 
-      const result = await isModelAvailable("mxbai-embed-large");
+      const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(false);
     });
@@ -449,7 +449,7 @@ describe("Embedding Strategies", () => {
         json: async () => ({ models: [] }),
       });
 
-      await isModelAvailable("mxbai-embed-large", "http://localhost:11434");
+      await isModelAvailable("nomic-embed-text", "http://localhost:11434");
 
       expect(fetch).toHaveBeenCalledWith(
         "http://localhost:11434/api/tags",
@@ -463,7 +463,7 @@ describe("Embedding Strategies", () => {
         json: async () => ({}), // No models array
       });
 
-      const result = await isModelAvailable("mxbai-embed-large");
+      const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(false);
     });
@@ -482,13 +482,13 @@ describe("Embedding Strategies", () => {
       global.fetch = vi.fn().mockResolvedValue({
         ok: true,
         json: async () => ({
-          models: [{ name: "mxbai-embed-large:latest" }],
+          models: [{ name: "nomic-embed-text:latest" }],
         }),
       });
 
       const result = await getFallbackModel("nomic-embed-text");
 
-      expect(result).toBe("mxbai-embed-large");
+      expect(result).toBe("nomic-embed-text");
     });
 
     it("should skip preferred model in fallback list", async () => {
@@ -496,13 +496,13 @@ describe("Embedding Strategies", () => {
         ok: true,
         json: async () => ({
           models: [
-            { name: "mxbai-embed-large:latest" },
+            { name: "nomic-embed-text:latest" },
             { name: "nomic-embed-text:latest" },
           ],
         }),
       });
 
-      const result = await getFallbackModel("mxbai-embed-large");
+      const result = await getFallbackModel("nomic-embed-text");
 
       expect(result).toBe("nomic-embed-text");
     });
@@ -572,6 +572,8 @@ describe("Embedding Strategies", () => {
     });
 
     it("should have valid model dimensions", () => {
+      // Lei 768: nomic-embed-text nativo = 768d
+      // OpenAI fallback = 1536d (mantido para compatibilidade)
       const validDimensions = [0, 768, 1024, 1536];
 
       Object.values(EMBEDDING_STRATEGIES).forEach((strategy) => {

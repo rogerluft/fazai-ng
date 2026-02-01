@@ -57,7 +57,7 @@ fazai skill-seeker help
 /opt/fazai/data/skill-seeker-registry.json
 
 # Qdrant collection
-fazai_kb (1536 dim, Cosine distance)
+fazai_kb (768 dim, Cosine distance)
 ```
 
 ## Architecture
@@ -69,7 +69,7 @@ Extract Text (pdf-parse / fs.readFile)
     ↓
 Semantic Chunking (~1000 tokens, 100 char overlap)
     ↓
-Generate Embeddings (UniversalLocalEmbedder - 1536 dim)
+Generate Embeddings (UniversalLocalEmbedder - 768 dim)
     ↓
 Store in Qdrant (fazai_kb collection)
     ↓
@@ -81,7 +81,7 @@ Update Registry (hash-based tracking)
 - **Real-time Monitoring**: Watches `/etc/fazai/ingest` for new/changed files
 - **Multi-format Support**: PDF, Markdown, Text
 - **Semantic Chunking**: Paragraph-based with context overlap
-- **ECOA Compliant**: 1536-dimensional vectors (Lei 1536)
+- **Lei 768 Compliant**: 768-dimensional vectors (nomic-embed-text native)
 - **Duplicate Detection**: Hash-based tracking prevents re-processing
 - **Error Recovery**: Automatic retry and graceful degradation
 - **Statistics Tracking**: Files processed, chunks indexed, errors

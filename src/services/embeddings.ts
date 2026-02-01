@@ -2,8 +2,8 @@
  * Embeddings Service Module
  *
  * Provides text embedding generation with multiple provider support.
- * Primary: Ollama nomic-embed-text (768 dim, 8192 context, local, free)
- * Fallback: OpenAI text-embedding-3-small (1536 dim, cloud, paid)
+ * Primary: Ollama nomic-embed-text (768 dim nativo, 8192 context, local, free)
+ * Fallback: OpenAI text-embedding-3-small (1536 dim nativo, cloud, paid)
  *
  * Features:
  * - Automatic provider selection and fallback
@@ -135,7 +135,7 @@ class OllamaEmbeddingService implements EmbeddingService {
                 // NON-RETRYABLE ERROR: Context Length Exceeded
                 if (response.status === 500 && errorText.includes("context length")) {
                    logger.warn(`⚠️  Ollama context exceeded for text ${i+1}. Using zero vector.`);
-                   return new Array(1536).fill(0); // Return zero vector to break loop
+                   return new Array(768).fill(0); // Return zero vector to break loop
                 }
 
                 throw new Error(
@@ -151,10 +151,8 @@ class OllamaEmbeddingService implements EmbeddingService {
 
               const rawEmbedding = data.embedding as number[];
 
-              // ECOA Logic: Validação ESTRITA de dimensões
-              // FazAI usa exclusivamente nomic-embed-text (768 dim) → Zero Pad → 1536 dim
+              // Validação de dimensão nativa (768d)
               const EXPECTED_DIM = 768;   // nomic-embed-text native dimension
-              const TARGET_DIM = 1536;    // ECOA/OpenAI standard (padded)
 
               // BLOQUEIO DE SEGURANÇA: Rejeitar dimensões inesperadas
               if (rawEmbedding.length !== EXPECTED_DIM) {
@@ -165,9 +163,8 @@ class OllamaEmbeddingService implements EmbeddingService {
                 );
               }
 
-              // Zero Padding: 768 → 1536
-              logger.debug(`Zero-padding vector from ${EXPECTED_DIM} to ${TARGET_DIM}`);
-              return [...rawEmbedding, ...new Array(TARGET_DIM - EXPECTED_DIM).fill(0)];
+              // Return native 768d vector (no padding)
+              return rawEmbedding;
             } catch (error: any) {
               clearTimeout(timeoutId);
               // Pass through the zero vector if we caught it above (it's not an error anymore)
@@ -192,7 +189,7 @@ class OllamaEmbeddingService implements EmbeddingService {
       } catch (error: any) {
         logger.error(`Failed to generate embedding for text ${i + 1}: ${error.message}`);
         // Return zero vector as fallback
-        embeddings.push(new Array(1536).fill(0));
+        embeddings.push(new Array(768).fill(0));
       }
     }
 
@@ -203,7 +200,7 @@ class OllamaEmbeddingService implements EmbeddingService {
     return {
       provider: "ollama" as const,
       model: this.model,
-      dimension: 1536, // Reporta a dimensão padronizada (com padding)
+      dimension: 768, // Native dimension (nomic-embed-text)
       isLocal: true,
     };
   }
@@ -213,7 +210,7 @@ class OllamaEmbeddingService implements EmbeddingService {
  * OpenAI Embedding Service
  *
  * Uses OpenAI API for embedding generation.
- * Model: text-embedding-3-small (1536 dimensions)
+ * Model: text-embedding-3-small (1536 dim nativo - mantido para OpenAI)
  * Paid, cloud, requires API key.
  */
 class OpenAIEmbeddingService implements EmbeddingService {
@@ -381,13 +378,13 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
 
           // Prefer nomic-embed-text (8192 context) over mxbai-embed-large (512 context)
           if (modelNames.some((name: string) => name === preferredOllamaModel || name.startsWith(preferredOllamaModel))) {
-            logger.info(`✓ Using Ollama for embeddings at ${ollamaEmbedUrl} (${preferredOllamaModel}, 1536 dim [padded])`);
+            logger.info(`✓ Using Ollama for embeddings at ${ollamaEmbedUrl} (${preferredOllamaModel}, 768 dim nativo)`);
             return new OllamaEmbeddingService(ollamaEmbedUrl, preferredOllamaModel, 768);
           }
 
           // Fallback to mxbai-embed-large if nomic not available
           if (modelNames.some((name: string) => name === fallbackOllamaModel || name.startsWith(fallbackOllamaModel))) {
-            logger.info(`✓ Using Ollama for embeddings at ${ollamaEmbedUrl} (${fallbackOllamaModel}, 1536 dim [padded])`);
+            logger.info(`✓ Using Ollama for embeddings at ${ollamaEmbedUrl} (${fallbackOllamaModel}, 1024 dim nativo)`);
             logger.warn(`⚠️  mxbai-embed-large has only 512 token context - consider installing nomic-embed-text`);
             return new OllamaEmbeddingService(ollamaEmbedUrl, fallbackOllamaModel, 1024);
           }
@@ -435,7 +432,7 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
  *
  * Useful for validating Qdrant collection dimension before inserting.
  *
- * @returns Embedding dimension (1024 for Ollama, 1536 for OpenAI)
+ * @returns Embedding dimension (768 for nomic-embed-text, 1024 for mxbai, 1536 for OpenAI)
  */
 export async function getEmbeddingDimension(): Promise<number> {
   const service = await createEmbeddingService();

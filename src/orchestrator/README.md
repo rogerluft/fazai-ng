@@ -237,10 +237,10 @@ npm test -- tests/jules-api-client.test.ts
 
 ## Protocolos ECOA (v2.0)
 
-### Lei 1536 - Padronização Vetorial
-Todos os agentes respeitam dimensão vetorial **1536**:
-- OpenAI: Nativo
-- Ollama: Zero Padding automático
+### Lei 768 - Padronização Vetorial
+Todos os agentes respeitam dimensão vetorial **768** (nomic-embed-text native):
+- Ollama nomic-embed-text: 768d nativo (primário)
+- OpenAI text-embedding-3-small: 1536d nativo (fallback)
 
 ### Inodes Semânticos
 Informação única → múltiplas referências via `legitimate_context`

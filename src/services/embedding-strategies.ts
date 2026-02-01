@@ -5,7 +5,7 @@
  * eliminating zero-padding and optimizing for content type.
  *
  * Key Improvements:
- * - Native dimensions (1024 for Ollama, 1536 for OpenAI)
+ * - Native dimensions (768 for nomic-embed-text, 1024 for mxbai, 1536 for OpenAI)
  * - Semantic chunking (no hard truncation)
  * - Model selection by content type
  * - Preprocessing pipelines
@@ -22,7 +22,7 @@ import { logger } from "../logger";
 export type EmbeddingModel =
   | "mxbai-embed-large"  // 1024 dim - Best for long context
   | "nomic-embed-text"   // 768 dim - Best for short text
-  | "text-embedding-3-small"; // 1536 dim - OpenAI fallback
+  | "text-embedding-3-small"; // 1536 dim nativo - OpenAI fallback
 
 /**
  * Collection types
@@ -187,7 +187,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   personality: {
     collection: "fazai_personality",
     model: "nomic-embed-text",
-    dimension: 1536, // Padded to 1536
+    dimension: 768, // Native nomic-embed-text
     chunking: CHUNKING_STRATEGIES.personality,
     distanceMetric: "Dot", // Better for sparse trait vectors
     preprocess: PREPROCESSING_FUNCTIONS.personality,
@@ -195,8 +195,8 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   memory: {
     collection: "fazai_memory",
-    model: "mxbai-embed-large",
-    dimension: 1536, // Padded to 1536
+    model: "nomic-embed-text",
+    dimension: 768, // Native nomic-embed-text
     chunking: CHUNKING_STRATEGIES.memory,
     distanceMetric: "Cosine", // Good for conversational similarity
     preprocess: PREPROCESSING_FUNCTIONS.memory,
@@ -204,8 +204,8 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   learning: {
     collection: "fazai_learning",
-    model: "mxbai-embed-large",
-    dimension: 1536, // Padded to 1536
+    model: "nomic-embed-text",
+    dimension: 768, // Native nomic-embed-text
     chunking: CHUNKING_STRATEGIES.learning,
     distanceMetric: "Dot", // Commands are more literal (magnitude matters)
     preprocess: PREPROCESSING_FUNCTIONS.learning,
@@ -214,8 +214,8 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   kb: {
     collection: "fazai_kb",
-    model: "mxbai-embed-large",
-    dimension: 1536, // Padded to 1536
+    model: "nomic-embed-text",
+    dimension: 768, // Native nomic-embed-text
     chunking: CHUNKING_STRATEGIES.kb,
     distanceMetric: "Cosine", // Dense technical docs need direction match
     preprocess: PREPROCESSING_FUNCTIONS.kb,

@@ -11,7 +11,7 @@
  */
 
 import { QdrantClient } from "@qdrant/js-client-rest";
-import { getConfigValue } from "../config";
+import { getConfigValue, getQdrantUrl } from "../config";
 import { logger } from "../logger";
 import { CircuitBreaker, CircuitState } from "../resilience/circuit-breaker";
 
@@ -127,7 +127,7 @@ class QdrantConnectionPool {
     this.metrics.reconnectionAttempts++;
     logger.debug("Attempting to initialize Qdrant connection...");
 
-    const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
+    const url = getQdrantUrl();
     const apiKey = getConfigValue("QDRANT_API_KEY");
 
     this.client = new QdrantClient({

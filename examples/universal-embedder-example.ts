@@ -104,9 +104,10 @@ async function example4_zeroPadding() {
   console.log(`Original vector: ${smallVector.length}d`);
   console.log(`Values: all 0.5`);
 
-  // Pad to 1536 dimensions
-  const paddedVector = padVector(smallVector, 1536);
-  console.log(`\nPadded vector: ${paddedVector.length}d`);
+  // Lei 768: Demonstrate padding smaller vector to 768d
+  const smallerVector = new Array(384).fill(0.3);
+  const paddedVector = padVector(smallerVector, 768);
+  console.log(`\nPadded vector: ${paddedVector.length}d (from 384d)`);
 
   const nonZeroCount = paddedVector.filter(v => v !== 0).length;
   const zeroCount = paddedVector.filter(v => v === 0).length;
@@ -141,11 +142,11 @@ async function example5_qdrantIntegration() {
       // Collection doesn't exist, proceed
     }
 
-    // Create collection with 1536 dimensions
+    // Create collection with 768 dimensions (Lei 768: nomic-embed-text native)
     console.log(`Creating collection "${collectionName}"...`);
     await qdrant.createCollection(collectionName, {
       vectors: {
-        size: 1536,
+        size: 768,
         distance: "Cosine"
       }
     });
@@ -202,12 +203,12 @@ async function example5_qdrantIntegration() {
 async function example6_customConfiguration() {
   console.log("\n=== Example 6: Custom Configuration ===\n");
 
-  // Custom Ollama URL
+  // Custom Ollama URL - Lei 768: native 768d, no padding needed
   const customEmbedder = new UniversalLocalEmbedder(
     "http://localhost:11434",  // Custom Ollama URL
     "nomic-embed-text",        // Model name
     768,                       // Native dimension
-    1536                       // Target dimension
+    768                        // Target dimension (Lei 768: same as native)
   );
 
   const info = customEmbedder.getInfo();

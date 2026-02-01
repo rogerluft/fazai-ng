@@ -110,7 +110,7 @@ export async function getCollectionSize(name: string): Promise<CollectionSize> {
     // Calculate estimated size
     const vectorDimension = typeof collection.config?.params?.vectors === "object" && "size" in collection.config.params.vectors
       ? collection.config.params.vectors.size
-      : 1536; // Default dimension
+      : 768; // Default dimension (nomic-embed-text native)
 
     const pointsCount = collection.points_count || 0;
     const vectorsCount = collection.vectors_count || 0;
@@ -290,13 +290,13 @@ export async function getAllMetrics(): Promise<MetricsReport> {
  * Estimate storage needs for a given number of points
  *
  * @param pointsCount - Number of points
- * @param vectorDimension - Vector dimension (default: 1536)
+ * @param vectorDimension - Vector dimension (default: 768 - Lei 768)
  * @param avgPayloadSizeKB - Average payload size in KB (default: 1)
  * @returns Estimated storage in MB
  */
 export function estimateStorageNeeds(
   pointsCount: number,
-  vectorDimension: number = 1536,
+  vectorDimension: number = 768,
   avgPayloadSizeKB: number = 1
 ): number {
   const vectorSizeBytes = vectorDimension * 4; // 4 bytes per float32

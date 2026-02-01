@@ -8,7 +8,7 @@
  * - Automatic fallback handling
  *
  * Key Changes from Original:
- * - ✅ Updated: Zero padding enforced (768/1024 → 1536) for cross-compatibility
+ * - ✅ Updated: Native 768 dimensions (nomic-embed-text) - Lei 768
  * - ✅ Added: Collection-specific strategies
  * - ✅ Added: Semantic chunking
  * - ✅ Added: Model availability checking
@@ -79,13 +79,13 @@ export interface EmbeddingService {
 /**
  * Ollama Embedding Service - Refactored
  *
- * Uses zero padding to enforce 1536 dimensions for compatibility.
+ * Uses native 768 dimensions (nomic-embed-text) without padding.
  * Model selection based on collection type.
  */
 class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private modelCache: Map<CollectionType, EmbeddingModel>;
-  private readonly TARGET_DIMENSION = 1536;
+  private readonly TARGET_DIMENSION = 768;
 
   constructor(baseUrl: string = getOllamaEmbedUrl()) {
     this.baseUrl = baseUrl;
@@ -304,8 +304,8 @@ class OllamaEmbeddingService implements EmbeddingService {
     // Return info for default model (will vary by collection at runtime)
     return {
       provider: "ollama" as const,
-      model: "nomic-embed-text (dynamic + padding)",
-      dimension: 1536, // Standardized dimension
+      model: "nomic-embed-text (768 dim nativo)",
+      dimension: 768, // Lei 768 - nomic-embed-text native
       isLocal: true,
     };
   }
@@ -489,7 +489,7 @@ class OpenAIEmbeddingService implements EmbeddingService {
  *
  * Priority:
  * 1. Ollama (local, free, native dimensions)
- * 2. OpenAI (cloud, paid, 1536 dim)
+ * 2. OpenAI (cloud, paid, 1536 dim nativo)
  *
  * @returns EmbeddingService instance wrapped with a caching layer.
  */
@@ -589,6 +589,6 @@ export async function getEmbeddingDimension(
     return 0;
   }
 
-  // Enforce 1536 for all collections
-  return 1536;
+  // Lei 768 - native dimension for nomic-embed-text
+  return 768;
 }

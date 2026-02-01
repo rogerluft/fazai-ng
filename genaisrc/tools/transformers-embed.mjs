@@ -7,7 +7,7 @@
  * Features:
  * - 100% local, sem API
  * - Caching de modelo (lazy loading)
- * - Padding para compatibilidade com Qdrant (1536 dims)
+ * - Padding para compatibilidade com Qdrant (768 dims)
  * - Zero custo
  */
 
@@ -21,7 +21,7 @@ let modelLoadPromise = null;
 // Configuração
 const MODEL_NAME = "Xenova/all-MiniLM-L6-v2";  // 384 dims, leve
 const NATIVE_DIM = 384;
-const TARGET_DIM = 1536;  // Compatível com Qdrant/OpenAI
+const TARGET_DIM = 768;  // nomic-embed-text native (Lei 768)
 
 /**
  * Obtém o embedder local (lazy loading com cache)
@@ -69,7 +69,7 @@ export async function getLocalEmbedder() {
 /**
  * Gera embedding para um texto
  * @param {string} text - Texto para gerar embedding
- * @returns {Promise<number[]>} Vetor de embedding (1536 dims com padding)
+ * @returns {Promise<number[]>} Vetor de embedding (768 dims com padding)
  */
 export async function embed(text) {
   if (!text || typeof text !== "string") {
@@ -87,7 +87,7 @@ export async function embed(text) {
   // Extrai array do tensor
   const rawVector = Array.from(output.data);
 
-  // Padding para compatibilidade com Qdrant (1536 dims)
+  // Padding para compatibilidade com Qdrant (768 dims)
   if (rawVector.length < TARGET_DIM) {
     const padding = new Array(TARGET_DIM - rawVector.length).fill(0);
     return [...rawVector, ...padding];

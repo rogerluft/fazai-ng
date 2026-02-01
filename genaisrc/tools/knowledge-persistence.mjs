@@ -204,7 +204,7 @@ export async function updateKnowledgeVersion(collection, knowledgeId, newContent
   // Arquiva versão antiga
   const archivedPoint = {
     id: `${knowledgeId}_v${oldVersion}`,
-    vector: previous[0].vector || new Array(1536).fill(0),
+    vector: previous[0].vector || new Array(768).fill(0),
     payload: {
       ...oldPayload,
       status: "archived",
@@ -315,7 +315,7 @@ export async function promoteKnowledge(collection, knowledgeId) {
 
   const updatedPoint = {
     id: knowledgeId,
-    vector: existing[0].vector || new Array(1536).fill(0),
+    vector: existing[0].vector || new Array(768).fill(0),
     payload: {
       ...payload,
       status: "active",

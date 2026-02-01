@@ -12,38 +12,38 @@ import { estimateStorageNeeds } from "../src/orchestrator/qdrant-metrics";
 
 describe("Qdrant Metrics", () => {
   describe("estimateStorageNeeds", () => {
-    it("should calculate storage for standard 1536D vectors", () => {
+    it("should calculate storage for standard 768D vectors", () => {
       const pointsCount = 1000;
       const storage = estimateStorageNeeds(pointsCount);
 
-      // Expected: 1000 points * (1536 * 4 bytes + 1KB payload) * 1.2 overhead
-      // = 1000 * (6144 + 1024) * 1.2 = 8601.6 KB ≈ 8.40 MB
-      expect(storage).toBeGreaterThan(8);
-      expect(storage).toBeLessThan(10);
+      // Expected: 1000 points * (768 * 4 bytes + 1KB payload) * 1.2 overhead
+      // = 1000 * (3072 + 1024) * 1.2 = 4915.2 KB ≈ 4.69 MB (Lei 768)
+      expect(storage).toBeGreaterThan(4);
+      expect(storage).toBeLessThan(6);
     });
 
     it("should handle different vector dimensions", () => {
       const pointsCount = 1000;
       const storage384 = estimateStorageNeeds(pointsCount, 384);
-      const storage1536 = estimateStorageNeeds(pointsCount, 1536);
+      const storage768 = estimateStorageNeeds(pointsCount, 768);
 
       // Larger dimensions should use more storage
-      expect(storage1536).toBeGreaterThan(storage384);
+      expect(storage768).toBeGreaterThan(storage384);
     });
 
     it("should handle large datasets", () => {
       const pointsCount = 100000; // 100k points
       const storage = estimateStorageNeeds(pointsCount);
 
-      // Should be around 840 MB for 100k points
-      expect(storage).toBeGreaterThan(800);
-      expect(storage).toBeLessThan(1000);
+      // Should be around 469 MB for 100k points (Lei 768: 768d vectors)
+      expect(storage).toBeGreaterThan(400);
+      expect(storage).toBeLessThan(550);
     });
 
     it("should account for payload size", () => {
       const pointsCount = 1000;
-      const storage1KB = estimateStorageNeeds(pointsCount, 1536, 1);
-      const storage10KB = estimateStorageNeeds(pointsCount, 1536, 10);
+      const storage1KB = estimateStorageNeeds(pointsCount, 768, 1);
+      const storage10KB = estimateStorageNeeds(pointsCount, 768, 10);
 
       // Larger payloads should use more storage
       expect(storage10KB).toBeGreaterThan(storage1KB);

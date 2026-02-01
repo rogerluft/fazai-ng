@@ -41,6 +41,7 @@ _fazai() {
         'samba:Gerencia compartilhamentos Samba (list, add, del, etc)'
         'completion:Print available CLI completions'
         'cleaner:Semantic file cleaner (archive orphan/deprecated files)'
+        'skill-seeker:skill-seeker command'
     )
 
     # Load models dynamically (cached)

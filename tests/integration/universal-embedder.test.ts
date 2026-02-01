@@ -48,7 +48,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
   });
 
   describe("generateUniversalEmbedding", () => {
-    it("should generate 1536d embedding for simple text", async () => {
+    it("should generate 768d embedding for simple text", async () => {
       if (!ollamaAvailable) {
         console.log("Skipping test: Ollama not available");
         return;
@@ -58,7 +58,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
 
       expect(embedding).toBeDefined();
       expect(Array.isArray(embedding)).toBe(true);
-      expect(embedding.length).toBe(1536);
+      expect(embedding.length).toBe(768);
       expect(embedding.every((v) => typeof v === "number")).toBe(true);
     });
 
@@ -72,8 +72,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       const embedding2 = await generateUniversalEmbedding("Natural language");
 
       expect(embedding1).not.toEqual(embedding2);
-      expect(embedding1.length).toBe(1536);
-      expect(embedding2.length).toBe(1536);
+      expect(embedding1.length).toBe(768);
+      expect(embedding2.length).toBe(768);
     });
 
     it("should generate similar embeddings for similar texts", async () => {
@@ -112,7 +112,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       const embedding = await generateUniversalEmbedding(longText);
 
       expect(embedding).toBeDefined();
-      expect(embedding.length).toBe(1536);
+      expect(embedding.length).toBe(768);
     });
   });
 
@@ -132,7 +132,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       const embedding = await embedder.embed("Test text");
 
       expect(embedding).toBeDefined();
-      expect(embedding.length).toBe(1536);
+      expect(embedding.length).toBe(768);
     });
 
     it("should embed batch of texts", async () => {
@@ -151,7 +151,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
 
       expect(embeddings).toBeDefined();
       expect(embeddings.length).toBe(3);
-      expect(embeddings.every((emb) => emb.length === 1536)).toBe(true);
+      expect(embeddings.every((emb) => emb.length === 768)).toBe(true);
 
       // Each embedding should be different
       expect(embeddings[0]).not.toEqual(embeddings[1]);
@@ -174,7 +174,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
 
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
-      expect(info.targetDimension).toBe(1536);
+      expect(info.targetDimension).toBe(768);
       // Embeddings usam servidor local (OLLAMA_EMBED_URL)
       expect(info.ollamaUrl).toBe("http://localhost:11434");
     });
@@ -189,7 +189,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       const embedding = await embedder.embed(specialText);
 
       expect(embedding).toBeDefined();
-      expect(embedding.length).toBe(1536);
+      expect(embedding.length).toBe(768);
     });
 
     it("should handle code snippets", async () => {
@@ -206,7 +206,7 @@ function hello(name: string): string {
       const embedding = await embedder.embed(codeText);
 
       expect(embedding).toBeDefined();
-      expect(embedding.length).toBe(1536);
+      expect(embedding.length).toBe(768);
     });
   });
 

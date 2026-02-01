@@ -90,7 +90,7 @@ describe("vector-store", () => {
   });
 
   describe("resolveDimension", () => {
-    it("should return 1536 as default dimension", async () => {
+    it("should return 768 as default dimension", async () => {
       getConfigValue.mockReturnValue(undefined);
 
       const { validateVectorCollections } = await import("../src/vector-store");
@@ -103,7 +103,7 @@ describe("vector-store", () => {
 
       const result = await validateVectorCollections({});
 
-      expect(result.dimension).toBe(1536);
+      expect(result.dimension).toBe(768);
     });
 
     it("should use explicitly provided dimension", async () => {
@@ -172,7 +172,7 @@ describe("vector-store", () => {
 
       const result = await validateVectorCollections({});
 
-      expect(result.dimension).toBe(1536);
+      expect(result.dimension).toBe(768);
     });
   });
 
@@ -704,7 +704,7 @@ describe("vector-store", () => {
           result: {
             config: {
               params: {
-                size: 1536,
+                size: 768,
                 distance: "Cosine",
               },
             },
@@ -731,7 +731,7 @@ describe("vector-store", () => {
           result: {
             config: {
               params: {
-                size: 1536,
+                size: 768,
                 distance: "Cosine",
               },
             },
@@ -760,7 +760,7 @@ describe("vector-store", () => {
           result: {
             config: {
               params: {
-                size: 768, // Different from expected 1536
+                size: 1536, // Different from expected 768 (Lei 768)
                 distance: "Cosine",
               },
             },
@@ -783,7 +783,7 @@ describe("vector-store", () => {
           result: {
             config: {
               params: {
-                size: 1536,
+                size: 768,
                 distance: "Euclid", // Different from expected Cosine
               },
             },

@@ -1,5 +1,72 @@
 # FazAI Changelog
 
+## [3.17.0] - 2026-02-01
+
+### 🚀 BREAKING CHANGE: Lei 768 - Migração Vetorial Nativa
+
+Migração completa de 1536d (zero-padded) para 768d (nomic-embed-text nativo).
+
+#### Por que Lei 768?
+
+- **nomic-embed-text** gera nativamente vetores de 768 dimensões
+- Zero-padding para 1536d desperdiçava ~50% do armazenamento
+- Qdrant agora usa dimensão nativa = melhor performance + menor storage
+
+#### BREAKING CHANGE
+
+**Collections Qdrant precisam ser recriadas:**
+```bash
+# Script para recriar collections
+QDRANT_URL="http://127.0.0.1:6333"
+DIM=768
+collections=(fazai_source fazai_memory fazai_kb fazai_learning fazai_inference fazai_personality fazai_semantic_cache)
+for col in "${collections[@]}"; do
+  curl -s -X DELETE "$QDRANT_URL/collections/$col" > /dev/null
+  curl -s -X PUT "$QDRANT_URL/collections/$col" \
+    -H "Content-Type: application/json" \
+    -d "{\"vectors\":{\"size\":$DIM,\"distance\":\"Cosine\"}}" > /dev/null
+done
+
+# Reindexar
+fazai index
+```
+
+#### Arquivos Modificados
+
+**genaisrc/ (GenAIScript):**
+- `genaiscript.config.mjs` - dimension: 768
+- `completion-sync.genai.mjs` - Remove zero-padding
+- `threat-intel.genai.mjs` - Remove padding loops
+- `skill-seeker.genai.mjs` - Array(768)
+- `tools/transformers-embed.mjs` - TARGET_DIM = 768
+- `tools/skill-extractor.mjs` - Array(768)
+- `tools/knowledge-persistence.mjs` - Array(768)
+
+**src/services/ (TypeScript):**
+- `embeddings.ts` - Logs dimensão nativa
+- `embeddings-refactored.ts` - dimension: 768
+- `universal-embedder.ts` - JSDoc 768d
+- `embedding-strategies.ts` - Descrições atualizadas
+- `skill-seeker.ts` - Lei 768 compliant
+- `source-indexer.ts` - 768 dim nativo
+- `personality-ingestor.ts` - 768d (Lei 768)
+
+**src/agentic/:**
+- `execution-composer.ts` - 768 dims
+- `block-storage/qdrant-backend.ts` - 768 dim nativo
+
+**Fix crítico (IPv6):**
+- `src/config.ts` - getQdrantUrl() usa 127.0.0.1 (não localhost)
+- `src/database/qdrant-pool.ts` - Usa getQdrantUrl() centralizado
+
+**Documentação:**
+- `AGENTS.md` - Lei 768 (Padronização Vetorial)
+- `docs/SKILL_SEEKER.md` - 768-dimensional vectors
+- `docs/universal-embedder.md` - Arquitetura atualizada
+- `.claude/skills/fazai-agentic-developer/SKILL.md` - 768 dimensions
+
+---
+
 ## [3.16.1] - 2026-01-14
 
 ### 🐛 Bugfix: PROVIDER_FALLBACK_ORDER Configurável

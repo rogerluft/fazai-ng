@@ -39,7 +39,7 @@ describe('Conversation Importer (REAL)', () => {
       }
 
       await client.createCollection(testCollection, {
-        vectors: { size: 1536, distance: 'Cosine' },
+        vectors: { size: 768, distance: 'Cosine' },  // Lei 768: nomic-embed-text native
       });
     }
   });

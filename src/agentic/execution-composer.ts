@@ -51,7 +51,7 @@ export interface ExecutionBlock {
   /** Intent em linguagem natural (para busca semântica) */
   intent: string;
 
-  /** Embedding do intent (1536 dims, ECOA) */
+  /** Embedding do intent (768 dims, Lei 768) */
   intent_embedding?: number[];
 
   /** Passos atômicos deste bloco */

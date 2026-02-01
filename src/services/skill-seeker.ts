@@ -8,12 +8,12 @@
  * - Real-time file monitoring with chokidar
  * - Multi-format support: PDF, Markdown, TXT
  * - Semantic chunking with overlap
- * - ECOA compliant (1536 dim vectors via UniversalLocalEmbedder)
+ * - Lei 768 compliant (768 dim vectors via UniversalLocalEmbedder)
  * - Duplicate detection via hash-based tracking
  * - Automatic retry on transient failures
  *
  * Architecture:
- * - Uses UniversalLocalEmbedder (Lei 1536) for embeddings
+ * - Uses UniversalLocalEmbedder (Lei 768) for embeddings
  * - Stores in fazai_kb collection with semantic IDs
  * - Maintains processed files registry to avoid re-processing
  *
@@ -229,7 +229,7 @@ export class SkillSeekerService {
         logger.info(`Creating collection: ${COLLECTION_NAME}`);
         await qdrant.createCollection(COLLECTION_NAME, {
           vectors: {
-            size: 1536, // Lei 1536 (ECOA standard)
+            size: 768, // Native dimension (nomic-embed-text)
             distance: "Cosine",
           },
         });

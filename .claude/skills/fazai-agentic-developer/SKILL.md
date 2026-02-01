@@ -225,8 +225,8 @@ fazai-ng/
 
 ### Key Patterns
 
-**ECOA (Semantic Deduplication):**
-- All embeddings normalized to 1536 dimensions
+**Lei 768 (Semantic Deduplication):**
+- All embeddings use 768 dimensions (nomic-embed-text native)
 - Fusion scoring with weights
 
 **Circuit Breaker (Qdrant):**

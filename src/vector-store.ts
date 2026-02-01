@@ -45,10 +45,10 @@ export interface VectorValidationResult {
 }
 
 /**
- * PADRÃO VETORIAL ECOA (LEI 1536)
+ * PADRÃO VETORIAL ECOA (LEI 768)
  * ----------------------------------------------------------------------------
- * Definimos 1536 como a dimensão padrão para TODAS as collections.
- * Motivo: Compatibilidade nativa com o modelo `text-embedding-3-small` (OpenAI).
+ * Definimos 768 como a dimensão padrão para TODAS as collections.
+ * Motivo: Dimensão nativa do modelo `nomic-embed-text` (Ollama, local, gratuito).
  *
  * E se eu usar um modelo local (Ollama) com dimensões menores?
  * - mxbai-embed-large (1024 dim)

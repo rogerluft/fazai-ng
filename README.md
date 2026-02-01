@@ -524,3 +524,34 @@ FazAI executa comandos reais no seu sistema. Sempre:
 **[Changelog](CHANGELOG.md) · [Issues](https://github.com/rogerluft/fazai-ng/issues) · [Discussions](https://github.com/rogerluft/fazai-ng/discussions)**
 
 </div>
+
+## 📚 Comandos Disponíveis
+
+### Document Auto-Indexer (SkillSeeker)
+
+Monitora `/etc/fazai/ingest` para novos arquivos e indexa automaticamente no Qdrant.
+
+```bash
+# Iniciar monitoramento
+fazai skill-seeker start
+
+# Verificar status
+fazai skill-seeker status
+
+# Ver estatísticas detalhadas
+fazai skill-seeker stats
+
+# Processar arquivo específico
+fazai skill-seeker process /path/to/document.pdf
+
+# Parar serviço
+fazai skill-seeker stop
+
+# Ver ajuda
+fazai skill-seeker help
+```
+
+**Formatos suportados:** PDF, Markdown (.md), Texto (.txt)
+
+**Localização:** `/etc/fazai/ingest/`
+**Collection:** `fazai_kb` (Qdrant)

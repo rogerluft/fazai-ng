@@ -330,9 +330,8 @@ defTool(
     const embData = await response.json();
     const vector = embData.embedding;
 
-    // Pad to 1536 if needed
-    while (vector.length < 1536) vector.push(0);
-    if (vector.length > 1536) vector.length = 1536;
+    // Ensure 768 dimensions (nomic-embed-text native)
+    if (vector.length > 768) vector.length = 768;
 
     const point = {
       id: Date.now(),
@@ -390,9 +389,8 @@ defTool(
     const embData = await response.json();
     const vector = embData.embedding;
 
-    // Pad to 1536
-    while (vector.length < 1536) vector.push(0);
-    if (vector.length > 1536) vector.length = 1536;
+    // Ensure 768 dimensions (nomic-embed-text native)
+    if (vector.length > 768) vector.length = 768;
 
     const results = await qdrantSearch(collectionName, vector, limit);
     return JSON.stringify(results, null, 2);

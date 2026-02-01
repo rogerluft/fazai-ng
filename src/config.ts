@@ -247,13 +247,14 @@ export function getOllamaEmbedUrl(): string {
 
 /**
  * Get Qdrant URL from config or environment
- * Priority: QDRANT_URL from config > env > default (localhost:6333)
+ * Priority: QDRANT_URL from config > env > default
+ * Note: Uses 127.0.0.1 instead of localhost to avoid IPv6 resolution issues
  */
 export function getQdrantUrl(): string {
   return (
     getConfigValue("QDRANT_URL") ||
     process.env.QDRANT_URL ||
-    "http://localhost:6333"
+    "http://127.0.0.1:6333"
   );
 }
 

@@ -2,13 +2,13 @@
  * Personality Ingestor Service
  *
  * Processa os dados exportados do Claude (conversations, memories, projects, users)
- * e injeta na collection fazai_personality do Qdrant com embeddings 1536d.
+ * e injeta na collection fazai_personality do Qdrant com embeddings 768d (Lei 768).
  *
  * Features:
  * - Chunking semântico de conversations (pares Q/A)
  * - Payloads específicos por tipo de dado (dialogue, fact, technical_context, social_context)
  * - Metadados de ingestão (version, timestamp)
- * - Embeddings via UniversalLocalEmbedder (1536 dimensions)
+ * - Embeddings via UniversalLocalEmbedder (768 dimensions - Lei 768)
  * - Progress tracking para grandes volumes
  *
  * @module services/personality-ingestor

@@ -9,7 +9,7 @@ SkillSeeker is an automatic knowledge ingestion service for FazAI. It monitors t
 - **Real-time Monitoring**: Uses `chokidar` to watch for file changes
 - **Multi-format Support**: PDF, Markdown (.md), and plain text (.txt)
 - **Semantic Chunking**: Intelligently splits documents into chunks with context overlap
-- **ECOA Compliant**: Uses 1536-dimensional vectors (Lei 1536)
+- **Lei 768 Compliant**: Uses 768-dimensional vectors (nomic-embed-text native)
 - **Duplicate Detection**: Hash-based tracking prevents re-processing unchanged files
 - **Automatic Retry**: Handles transient failures gracefully
 - **Registry Tracking**: Maintains a registry of processed files
@@ -120,7 +120,7 @@ The service automatically creates the `fazai_kb` collection if it doesn't exist:
 
 ```typescript
 Collection: fazai_kb
-Vector Size: 1536 (Lei 1536 / ECOA standard)
+Vector Size: 768 (Lei 768 / nomic-embed-text native)
 Distance Metric: Cosine
 ```
 

@@ -13,7 +13,7 @@
  *
  * Requirements:
  * - Qdrant rodando (localhost:6333 ou configurado em fazai.conf)
- * - Collection fazai_personality criada (1536 dimensions)
+ * - Collection fazai_personality criada (768 dimensions - Lei 768)
  * - Embedding service configurado (Ollama ou OpenAI)
  */
 
@@ -35,7 +35,7 @@ async function validateCollection(): Promise<void> {
   if (!collection) {
     logger.error("❌ Collection 'fazai_personality' not found");
     logger.info("Create it with:");
-    logger.info("  fazai qdrant create-collection fazai_personality --dimension 1536");
+    logger.info("  fazai qdrant create-collection fazai_personality --dimension 768");
     process.exit(1);
   }
 
@@ -51,8 +51,8 @@ async function validateCollection(): Promise<void> {
         ? vectorConfig.size
         : undefined;
 
-    if (dimension && dimension !== 1536) {
-      logger.warn(`⚠️  Collection has dimension ${dimension}, expected 1536`);
+    if (dimension && dimension !== 768) {
+      logger.warn(`⚠️  Collection has dimension ${dimension}, expected 768`);
       logger.warn("This may cause issues. Consider recreating the collection.");
     } else {
       logger.info("✓ Collection validation passed");

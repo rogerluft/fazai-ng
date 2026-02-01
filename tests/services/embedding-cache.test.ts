@@ -99,7 +99,7 @@ describe("EmbeddingCache", () => {
     it("deve retornar embedding para cache hit", () => {
       const text = "hello world";
       const model = "text-embedding-3-small";
-      const vector = Array(1536).fill(0.5);
+      const vector = Array(768).fill(0.5);
 
       // Set
       cache.set(text, model, vector);
@@ -117,8 +117,8 @@ describe("EmbeddingCache", () => {
 
     it("deve distinguir entre modelos diferentes", () => {
       const text = "same text";
-      const vector1 = Array(1536).fill(0.1);
-      const vector2 = Array(1536).fill(0.9);
+      const vector1 = Array(768).fill(0.1);
+      const vector2 = Array(768).fill(0.9);
 
       cache.set(text, "model-a", vector1);
       cache.set(text, "model-b", vector2);
@@ -133,8 +133,8 @@ describe("EmbeddingCache", () => {
 
     it("deve distinguir entre textos diferentes", () => {
       const model = "text-embedding-3-small";
-      const vector1 = Array(1536).fill(0.2);
-      const vector2 = Array(1536).fill(0.8);
+      const vector1 = Array(768).fill(0.2);
+      const vector2 = Array(768).fill(0.8);
 
       cache.set("text one", model, vector1);
       cache.set("text two", model, vector2);

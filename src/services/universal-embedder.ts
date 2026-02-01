@@ -6,7 +6,7 @@
  *
  * Features:
  * - Uses Ollama nomic-embed-text (768 dim) as primary model
- * - Automatic Zero Padding to 1536 dimensions
+ * - Native 768 dimensions (no padding required)
  * - Batch processing support
  * - Configurable Ollama endpoint
  * - Retry logic for transient failures
@@ -40,14 +40,14 @@ interface OllamaEmbeddingResponse {
  * truncation and maintains cosine similarity properties.
  *
  * @param vector Input vector
- * @param targetDim Target dimension (default: 1536)
+ * @param targetDim Target dimension (default: 768 - Lei 768)
  * @returns Padded or truncated vector
  *
  * @example
  * ```typescript
  * const vec768 = new Array(768).fill(0.5);
- * const vec1536 = padVector(vec768, 1536);
- * console.log(vec1536.length); // 1536
+ * const vecFinal = padVector(vec768, 768);
+ * console.log(vecFinal.length); // 768 (no padding needed)
  * ```
  */
 export function padVector(vector: number[], targetDim: number = 768): number[] {
@@ -79,12 +79,12 @@ export function padVector(vector: number[], targetDim: number = 768): number[] {
  *
  * @param text Input text to embed
  * @param ollamaUrl Ollama server URL (from config or default: http://localhost:11434)
- * @returns 1536-dimensional embedding vector
+ * @returns 768-dimensional embedding vector (nomic-embed-text native)
  *
  * @example
  * ```typescript
  * const embedding = await generateUniversalEmbedding("Hello world");
- * console.log(embedding.length); // 1536
+ * console.log(embedding.length); // 768
  * ```
  */
 export async function generateUniversalEmbedding(
@@ -127,14 +127,14 @@ export class UniversalLocalEmbedder {
    * @param ollamaUrl Ollama server URL (from config or default: http://localhost:11434)
    * @param model Ollama model name (default: nomic-embed-text)
    * @param nativeDimension Native model dimension (default: 768)
-   * @param targetDimension Target dimension after padding (default: 1536)
+   * @param targetDimension Target dimension (default: 768 - Lei 768)
    * @param useCache Enable embedding cache (default: true)
    */
   constructor(
     ollamaUrl: string = getOllamaEmbedUrl(),
     model: string = "nomic-embed-text",
     nativeDimension: number = 768,
-    targetDimension: number = 1536,
+    targetDimension: number = 768,
     useCache: boolean = true
   ) {
     this.ollamaUrl = ollamaUrl;
@@ -215,7 +215,7 @@ export class UniversalLocalEmbedder {
           const embedding = data.embedding;
 
           // VALIDAÇÃO ESTRITA DE DIMENSÃO - Proteção contra corrupção de vetores
-          // FazAI usa exclusivamente nomic-embed-text (768 dim) → Zero Pad → 1536 dim
+          // FazAI usa exclusivamente nomic-embed-text (768 dim nativo - Lei 768)
           if (embedding.length !== this.nativeDimension) {
             throw new Error(
               `DIMENSION MISMATCH! Expected ${this.nativeDimension} (nomic-embed-text), got ${embedding.length}.\n` +
@@ -243,7 +243,7 @@ export class UniversalLocalEmbedder {
    * P0-3: Usa cache LRU para evitar re-embeddings de textos já processados.
    *
    * @param text Input text
-   * @returns 1536-dimensional embedding vector
+   * @returns 768-dimensional embedding vector (Lei 768)
    *
    * @example
    * ```typescript
@@ -294,7 +294,7 @@ export class UniversalLocalEmbedder {
    * imediatamente, só textos novos são enviados para Ollama).
    *
    * @param texts Array of input texts
-   * @returns Array of 1536-dimensional embedding vectors
+   * @returns Array of 768-dimensional embedding vectors (Lei 768)
    *
    * @example
    * ```typescript

@@ -411,11 +411,11 @@ Nesta nova era, os agentes não são apenas executores de tarefas; são nós esp
 
 ## 3. Protocolos de Interação ECOA
 
-### 3.1 A Lei 1536 (Padronização Vetorial)
-Todos os agentes devem respeitar a dimensão vetorial de **1536**. ## REDESENHADO TAMANHO DO DIM ##
-*   Se usar OpenAI: Nativo.
-*   Se usar Ollama (Local): O sistema aplica **Zero Padding** automático.
-*   **Regra:** Nunca crie uma collection com dimensão diferente. Isso quebra a memória compartilhada.
+### 3.1 A Lei 768 (Padronização Vetorial)
+Todos os agentes devem respeitar a dimensão vetorial de **768** (nomic-embed-text native).
+*   Se usar Ollama (Local): 768d nativo com nomic-embed-text (primário)
+*   Se usar OpenAI: 1536d nativo (fallback)
+*   **Regra:** Collections locais usam 768d. Nunca misture dimensões na mesma collection.
 
 ### 3.2 Inodes Semânticos (Não Duplique, Referencie)
 A informação existe uma única vez (o Inode).
