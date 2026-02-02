@@ -553,61 +553,85 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         showDashboard(dashboardData);
       } else if (line === "/api") {
         // Menu de APIs
-        const items: MenuItem[] = [
-          {
-            label: "Cloudflare",
-            value: "cloudflare",
-            icon: "☁️",
-            description: "Gerenciar zonas, DNS e Workers",
-          },
-          {
-            label: "SpamExperts",
-            value: "spamexperts",
-            icon: "📧",
-            description: "Gerenciar proteção de email",
-          },
-          {
-            label: "OPNsense",
-            value: "opnsense",
-            icon: "🔥",
-            description: "Gerenciar firewall e VPN",
-          },
-        ];
+        // BUGFIX: Pausa readline antes de usar inquirer para evitar conflito de terminal
+        rl.pause();
+        try {
+          const items: MenuItem[] = [
+            {
+              label: "Cloudflare",
+              value: "cloudflare",
+              icon: "☁️",
+              description: "Gerenciar zonas, DNS e Workers",
+            },
+            {
+              label: "SpamExperts",
+              value: "spamexperts",
+              icon: "📧",
+              description: "Gerenciar proteção de email",
+            },
+            {
+              label: "OPNsense",
+              value: "opnsense",
+              icon: "🔥",
+              description: "Gerenciar firewall e VPN",
+            },
+          ];
 
-        const choice = await showMenu("Gerenciar APIs Externas", items);
+          const choice = await showMenu("Gerenciar APIs Externas", items);
 
-        if (choice === "cloudflare") {
-          const cfUI = new CloudflareUI();
-          await cfUI.showMainMenu();
-        } else if (choice === "spamexperts") {
-          const spamUI = new SpamExpertsUI();
-          await spamUI.showMainMenu();
-        } else if (choice === "opnsense") {
-          try {
-            const opsUI = new OPNsenseUI();
-            await opsUI.showMainMenu();
-          } catch (error: any) {
-            logger.error(chalk.red(`\n❌ ${error.message}`));
+          if (choice === "cloudflare") {
+            const cfUI = new CloudflareUI();
+            await cfUI.showMainMenu();
+          } else if (choice === "spamexperts") {
+            const spamUI = new SpamExpertsUI();
+            await spamUI.showMainMenu();
+          } else if (choice === "opnsense") {
+            try {
+              const opsUI = new OPNsenseUI();
+              await opsUI.showMainMenu();
+            } catch (error: any) {
+              logger.error(chalk.red(`\n❌ ${error.message}`));
+            }
           }
+        } finally {
+          rl.resume();
         }
       } else if (line === "/cloudflare" || line === "/cf") {
         // Cloudflare UI
-        const cfUI = new CloudflareUI();
-        await cfUI.showMainMenu();
+        // BUGFIX: Pausa readline antes de usar inquirer
+        rl.pause();
+        try {
+          const cfUI = new CloudflareUI();
+          await cfUI.showMainMenu();
+        } finally {
+          rl.resume();
+        }
       } else if (line === "/spamexperts" || line === "/spam") {
         // SpamExperts UI
-        const spamUI = new SpamExpertsUI();
-        await spamUI.showMainMenu();
+        // BUGFIX: Pausa readline antes de usar inquirer
+        rl.pause();
+        try {
+          const spamUI = new SpamExpertsUI();
+          await spamUI.showMainMenu();
+        } finally {
+          rl.resume();
+        }
       } else if (line === "/opnsense" || line === "/ops") {
         // OPNsense UI
+        // BUGFIX: Pausa readline antes de usar inquirer
+        rl.pause();
         try {
           const opsUI = new OPNsenseUI();
           await opsUI.showMainMenu();
         } catch (error: any) {
           logger.error(chalk.red(`\n❌ ${error.message}`));
+        } finally {
+          rl.resume();
         }
       } else if (line === "/samba" || line.startsWith("/samba ")) {
         // Samba UI - Gerenciador de compartilhamentos
+        // BUGFIX: Pausa readline antes de usar inquirer
+        rl.pause();
         try {
           const { SambaUI } = await import("./commands/samba/samba-ui");
           const sambaUI = new SambaUI();
@@ -619,6 +643,8 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
           }
         } catch (error: any) {
           logger.error(chalk.red(`\n❌ ${error.message}`));
+        } finally {
+          rl.resume();
         }
       } else if (line === "/history") {
         if (!historyBuffer.length) {

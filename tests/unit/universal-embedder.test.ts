@@ -97,8 +97,8 @@ describe("Universal Local Embedder (Unit Tests)", () => {
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(768);
-      // Default usa getOllamaEmbedUrl() que retorna localhost:11434
-      expect(info.ollamaUrl).toBe("http://localhost:11434");
+      // Default usa getOllamaEmbedUrl() que lê de fazai.conf
+      expect(info.ollamaUrl).toMatch(/^http:\/\/.*:11434$/);
     });
 
     it("should handle empty batch", async () => {

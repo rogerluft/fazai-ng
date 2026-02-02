@@ -6,106 +6,60 @@
     "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "1",
     "NODE_ENV": "development",
     "ANTHROPIC_SMALL_FAST_MODEL": "claude-3-5-haiku-20241022",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8000",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "20000",
     "DISABLE_COST_WARNINGS": "1",
     "USE_BUILTIN_RIPGREP": "1"
   },
   "includeCoAuthoredBy": true,
   "permissions": {
     "allow": [
-      "Bash",
-      "Edit",
-      "MultiEdit",
-      "Write",
-      "Bash(npm:*)",
-      "Bash(yarn:*)",
-      "Bash(npx:*)",
-      "Bash(node:*)",
-      "Bash(git:*)",
-      "Read(**/*.json)",
-      "Read(**/*.js)",
-      "Read(**/*.ts)",
-      "Read(**/*.py)",
-      "Edit(**/*.js)",
-      "Edit(**/*.ts)",
-      "Edit(**/*.py)",
-      "Edit(**/*.json)",
-      "Write(**/*.js)",
-      "Write(**/*.ts)",
-      "Write(**/*.py)"
+      "Bash", "Edit", "MultiEdit", "Write",
+      "Bash(npm:*)", "Bash(yarn:*)", "Bash(npx:*)", "Bash(node:*)", "Bash(git:*)",
+      "Read(**/*.json)", "Read(**/*.js)", "Read(**/*.ts)", "Read(**/*.py)",
+      "Edit(**/*.js)", "Edit(**/*.ts)", "Edit(**/*.py)", "Edit(**/*.json)",
+      "Write(**/*.js)", "Write(**/*.ts)", "Write(**/*.py)"
     ],
-    "deny": [
-      "Bash(rm -rf:*)",
-      "Read(./.env*)"
-    ],
+    "deny": ["Bash(rm -rf:*)", "Read(./.env*)", "Bash(sudo:*)"],
     "defaultMode": "bypassPermissions"
   },
-  "model": "claude-3-5-sonnet-20241022",
+  "model": "claude-4-5-sonnet-20251022",
   "hooks": {
     "PreToolUse": [
       {
         "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "jq -r '.tool_input.command' >> ~/.claude/bash-command-log.txt 2>/dev/null || true"
-          }
-        ]
+        "hooks": [{"type": "command", "command": "jq -r '.tool_input.command' >> ~/.claude/bash-command-log.txt 2>/dev/null || true"}]
       },
       {
         "matcher": "Write",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FILE=$(echo $STDIN_JSON | jq -r '.tool_input.file_path // \"\"'); case \"$FILE\" in *.js|*.jsx|*.ts|*.tsx) CONTENT=$(echo $STDIN_JSON | jq -r '.tool_input.content // \"\"'); echo \"$CONTENT\" | grep -q 'console.log' && echo 'Warning: console.log found' >&2 ;; esac; exit 0"
-          }
-        ]
+        "hooks": [{
+          "type": "command",
+          "command": "FILE=$(echo $STDIN_JSON | jq -r '.tool_input.file_path // \"\"'); case \"$FILE\" in *.js|*.jsx|*.ts|*.tsx) CONTENT=$(echo $STDIN_JSON | jq -r '.tool_input.content // \"\"'); echo \"$CONTENT\" | grep -q 'console.log' && echo 'Warning: console.log found' >&2 ;; esac; exit 0"
+        }]
       }
     ],
     "PostToolUse": [
       {
         "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FILE=$(echo $STDIN_JSON | jq -r '.tool_input.file_path // \"\"'); case \"$FILE\" in *.js|*.jsx|*.ts|*.tsx) npx prettier --write \"$FILE\" 2>/dev/null || true ;; esac",
-            "timeout": 30
-          }
-        ]
+        "hooks": [{
+          "type": "command",
+          "command": "FILE=$(echo $STDIN_JSON | jq -r '.tool_input.file_path // \"\"'); case \"$FILE\" in *.js|*.jsx|*.ts|*.tsx) npx prettier --write \"$FILE\" 2>/dev/null || true ;; esac",
+          "timeout": 30
+        }]
       },
       {
         "matcher": "Write|Edit|MultiEdit",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "FILE=$(echo $STDIN_JSON | jq -r '.tool_input.file_path // \"\"'); case \"$FILE\" in *.ts|*.tsx) npx tsc --noEmit 2>&1 || echo 'TypeScript check done' ;; esac",
-            "timeout": 30
-          }
-        ]
+        "hooks": [{
+          "type": "command",
+          "command": "FILE=$(echo $STDIN_JSON | jq -r '.tool_input.file_path // \"\"'); case \"$FILE\" in *.ts|*.tsx) npx tsc --noEmit 2>&1 || echo 'TypeScript check done' ;; esac",
+          "timeout": 30
+        }]
       }
     ],
     "Notification": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo \"$(date)\" >> ~/.claude/notifications.log"
-          }
-        ]
-      }
+      {"matcher": "", "hooks": [{"type": "command", "command": "echo \"$(date)\" >> ~/.claude/notifications.log"}]}
     ],
     "Stop": [
-      {
-        "matcher": "",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo 'Session ended'",
-            "timeout": 5
-          }
-        ]
-      }
+      {"matcher": "", "hooks": [{"type": "command", "command": "echo 'Session ended'", "timeout": 5}]}
     ]
   }
 }

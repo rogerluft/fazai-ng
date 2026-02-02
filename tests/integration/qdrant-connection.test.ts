@@ -11,7 +11,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { randomUUID } from 'crypto';
 
-const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
+const QDRANT_URL = process.env.QDRANT_URL || 'http://127.0.0.1:6333';
 const TEST_COLLECTION = 'fazai_test_connection';
 // Qdrant requer UUIDs ou inteiros para IDs de pontos
 const TEST_POINT_ID = randomUUID();

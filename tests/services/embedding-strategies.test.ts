@@ -388,9 +388,9 @@ describe("Embedding Strategies", () => {
       const result = await isModelAvailable("nomic-embed-text");
 
       expect(result).toBe(true);
-      // Embeddings usam OLLAMA_EMBED_URL (servidor local)
+      // Embeddings usam OLLAMA_EMBED_URL (lido de fazai.conf)
       expect(fetch).toHaveBeenCalledWith(
-        "http://localhost:11434/api/tags",
+        expect.stringMatching(/^http:\/\/.*:11434\/api\/tags$/),
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
     });
@@ -486,7 +486,8 @@ describe("Embedding Strategies", () => {
         }),
       });
 
-      const result = await getFallbackModel("nomic-embed-text");
+      // Preferred é OpenAI, fallback para nomic-embed-text
+      const result = await getFallbackModel("text-embedding-3-small");
 
       expect(result).toBe("nomic-embed-text");
     });
@@ -496,15 +497,16 @@ describe("Embedding Strategies", () => {
         ok: true,
         json: async () => ({
           models: [
-            { name: "nomic-embed-text:latest" },
+            { name: "mxbai-embed-large:latest" },
             { name: "nomic-embed-text:latest" },
           ],
         }),
       });
 
+      // Preferred é nomic, mas ele está no fallback list então deve pular e retornar mxbai
       const result = await getFallbackModel("nomic-embed-text");
 
-      expect(result).toBe("nomic-embed-text");
+      expect(result).toBe("mxbai-embed-large");
     });
 
     it("should return null when no fallback available", async () => {

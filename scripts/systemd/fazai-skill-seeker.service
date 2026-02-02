@@ -48,9 +48,10 @@ WorkingDirectory=/opt/fazai
 # Comando de Execucao
 # -------------------------------------------------------------------------
 # Executa o skill-seeker compilado
-ExecStart=/usr/local/bin/fazai skill-seeker start
+ExecStart=/usr/bin/node /opt/fazai/dist/skill-seeker.js
 
 # Verifica se o arquivo existe antes de iniciar
+ExecStartPre=/usr/bin/test -f /opt/fazai/dist/skill-seeker.js
 
 # Cria diretorios necessarios se nao existirem
 ExecStartPre=/usr/bin/mkdir -p /etc/fazai/ingest /etc/fazai/ingest/processed /etc/fazai/ingest/failed
@@ -91,8 +92,10 @@ Environment=QDRANT_COLLECTION=fazai_kb
 Environment=EMBEDDING_MODEL=nomic-embed-text
 
 # URL do Ollama para CHAT
+Environment=OLLAMA_URL=http://localhost:11434
 
 # URL do Ollama para EMBEDDINGS (nomic-embed-text)
+Environment=OLLAMA_EMBED_URL=http://localhost:11434
 
 # Nivel de log
 Environment=LOG_LEVEL=info
@@ -100,9 +103,7 @@ Environment=LOG_LEVEL=info
 # -------------------------------------------------------------------------
 # Arquivos de Ambiente Adicionais
 # -------------------------------------------------------------------------
-EnvironmentFile=-/etc/fazai/fazai.conf
-# TODO: Future enhancement - scan network for available Ollama instances
-# Could auto-discover Ollama servers on LAN and fallback if localhost unavailable
+EnvironmentFile=-/etc/fazai/fazai.env
 
 # -------------------------------------------------------------------------
 # Recursos e Limites

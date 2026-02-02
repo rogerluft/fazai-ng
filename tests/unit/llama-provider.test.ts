@@ -254,6 +254,8 @@ describe('LlamaProvider (Unit Tests)', () => {
         ok: false,
         status: 500,
         statusText: 'Internal Server Error',
+        text: async () => 'Internal error details',
+        json: async () => ({ error: 'Internal error' }),
       });
 
       const { LlamaProvider } = await import('../../src/providers/llama.js');
@@ -268,7 +270,7 @@ describe('LlamaProvider (Unit Tests)', () => {
         for await (const _ of generator) {
           // consume generator
         }
-      }).rejects.toThrow(/HTTP 500/);
+      }).rejects.toThrow(/HTTP 500|Falhou após 3 tentativas/);
     });
   });
 

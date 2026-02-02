@@ -137,7 +137,7 @@ export async function backupCollection(
     const vectorsCount = collectionInfo.vectors_count || 0;
 
     // Determine vector dimension
-    let vectorDimension = 1536; // Default
+    let vectorDimension = 768; // Default (nomic-embed-text native)
     if (
       typeof collectionInfo.config?.params?.vectors === "object" &&
       "size" in collectionInfo.config.params.vectors

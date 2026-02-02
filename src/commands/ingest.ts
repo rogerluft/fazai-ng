@@ -271,7 +271,7 @@ async function showStatus(): Promise<void> {
 
     if (!exists) {
       console.log(chalk.yellow("⚠️  Collection não existe"));
-      console.log(chalk.gray("\nCrie com: fazai qdrant create-collection fazai_personality --dimension 1536"));
+      console.log(chalk.gray("\nCrie com: fazai qdrant create-collection fazai_personality --dimension 768"));
       return;
     }
 

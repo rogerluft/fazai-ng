@@ -92,7 +92,6 @@ Usage:
   fazai agent <command>                              # Executa agentes GenAIScript (loop, reflect, etc)
   fazai dashboard <command>                          # Gerencia REST API Dashboard (start, stop, status)
   fazai samba <command>                              # Gerencia compartilhamentos Samba (list, add, del, etc)
-  fazai skill-seeker <start|stop|status>        # Document auto-indexer (ingest monitoring)
 
 Options:
   --dry-run                Simulate commands without executing
@@ -175,7 +174,7 @@ async function main() {
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
     "config", "search", "inference", "agent", "ingest",
-    "dashboard", "samba", "completion", "cleaner", "skill-seeker"
+    "dashboard", "samba", "completion", "cleaner"
   ];
 
   const firstArg = inputs[0];
@@ -286,15 +285,6 @@ async function main() {
   }
 
   // Cleaner command - Faxineiro Semântico
-
-  // SkillSeeker command - Document auto-indexer
-  if (inputs[0] === "skill-seeker") {
-    const { handleSkillSeekerCommand } = await import("./commands/skill-seeker");
-    const subcommand = inputs.slice(1)[0] || "help";
-    const args = inputs.slice(2);
-    await handleSkillSeekerCommand(subcommand, args);
-    process.exit(0);
-  }
   if (inputs[0] === "cleaner") {
     const { handleCleanerCommand } = await import("./commands/cleaner");
     await handleCleanerCommand(inputs.slice(1));

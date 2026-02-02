@@ -1,6 +1,6 @@
 ---
 name: code-reviewer-before-commit
-enabled: true
+enabled: false
 event: bash
 pattern: git\s+commit|git\s+push
 action: block

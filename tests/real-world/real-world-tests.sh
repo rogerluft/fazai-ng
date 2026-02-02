@@ -1,5 +1,5 @@
 #!/bin/bash
-LOG=tests/real-world-exec.log
+LOG=tests/real-world.log
 mkdir -p tests
 echo "=== TESTES $(date) ===" > $LOG
 PASS=0

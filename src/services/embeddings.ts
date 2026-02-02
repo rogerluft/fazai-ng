@@ -135,7 +135,7 @@ class OllamaEmbeddingService implements EmbeddingService {
                 // NON-RETRYABLE ERROR: Context Length Exceeded
                 if (response.status === 500 && errorText.includes("context length")) {
                    logger.warn(`⚠️  Ollama context exceeded for text ${i+1}. Using zero vector.`);
-                   return new Array(768).fill(0); // Return zero vector to break loop
+                   return new Array(this.dimension).fill(0); // Return zero vector to break loop
                 }
 
                 throw new Error(
@@ -188,8 +188,8 @@ class OllamaEmbeddingService implements EmbeddingService {
         }
       } catch (error: any) {
         logger.error(`Failed to generate embedding for text ${i + 1}: ${error.message}`);
-        // Return zero vector as fallback
-        embeddings.push(new Array(768).fill(0));
+        // Return zero vector as fallback (768 dimensions for nomic-embed-text)
+        embeddings.push(new Array(this.dimension).fill(0));
       }
     }
 

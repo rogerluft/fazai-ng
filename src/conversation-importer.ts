@@ -10,9 +10,9 @@ import path from "path";
 import { createHash } from "crypto";
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { logger } from "./logger";
-import { getConfigValue } from "./config";
 import chalk from "chalk";
 import { createEmbeddingService, EmbeddingService } from "./services/embeddings-refactored";
+import { getQdrantClient as getQdrantClientFromPool } from "./database/qdrant-pool";
 
 // ==============================================================================
 // Tipos
@@ -66,18 +66,9 @@ type ChatGPTConversation = {
 };
 
 // ==============================================================================
-// Cliente Qdrant
+// Cliente Qdrant (usa pool singleton)
 // ==============================================================================
-
-function getQdrantClient(): QdrantClient {
-  const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
-  const apiKey = getConfigValue("QDRANT_API_KEY");
-
-  return new QdrantClient({
-    url,
-    apiKey: apiKey || undefined,
-  });
-}
+// REMOVIDO: agora usa getQdrantClientFromPool() do qdrant-pool.ts
 
 // ==============================================================================
 // Importação Principal
@@ -90,6 +81,7 @@ export async function importConversations(
     recursive?: boolean;
     extractKnowledge?: boolean;
     extractLearning?: boolean;
+    collectionPrefix?: string;
   } = {}
 ): Promise<ImportResult> {
   const result: ImportResult = {
@@ -107,20 +99,26 @@ export async function importConversations(
     recursive = false,
     extractKnowledge = true,
     extractLearning = true,
+    collectionPrefix = "",
   } = options;
+
+  // Collection names com prefix opcional
+  const MEMORY_COLLECTION = `${collectionPrefix}fazai_memory`;
+  const KB_COLLECTION = `${collectionPrefix}fazai_kb`;
+  const LEARNING_COLLECTION = `${collectionPrefix}fazai_learning`;
 
   logger.info(chalk.cyan(`\n🔄 Importando conversas de ${source}...`));
   logger.info(chalk.gray(`Arquivo: ${filePath}`));
 
-  const client = getQdrantClient();
+  const client = await getQdrantClientFromPool();
 
   // Verificar se collections existem
   try {
     const collections = await client.getCollections();
     const collectionNames = collections.collections.map((c) => c.name);
 
-    if (!collectionNames.includes("fazai_memory")) {
-      throw new Error("Collection 'fazai_memory' não existe. Execute: fazai vector validate");
+    if (!collectionNames.includes(MEMORY_COLLECTION)) {
+      throw new Error(`Collection '${MEMORY_COLLECTION}' não existe. Execute: fazai vector validate`);
     }
 
     logger.info(chalk.green("✓ Collections Qdrant verificadas"));
@@ -153,6 +151,10 @@ export async function importConversations(
       const fileResult = await processFile(fullPath, source, client, {
         extractKnowledge,
         extractLearning,
+      }, {
+        memory: MEMORY_COLLECTION,
+        kb: KB_COLLECTION,
+        learning: LEARNING_COLLECTION,
       });
 
       result.imported += fileResult.imported;
@@ -166,6 +168,10 @@ export async function importConversations(
     const fileResult = await processFile(filePath, source, client, {
       extractKnowledge,
       extractLearning,
+    }, {
+      memory: MEMORY_COLLECTION,
+      kb: KB_COLLECTION,
+      learning: LEARNING_COLLECTION,
     });
 
     result.imported = fileResult.imported;
@@ -188,6 +194,11 @@ async function processFile(
   options: {
     extractKnowledge: boolean;
     extractLearning: boolean;
+  },
+  collections: {
+    memory: string;
+    kb: string;
+    learning: string;
   }
 ): Promise<ImportResult> {
   const result: ImportResult = {
@@ -207,9 +218,9 @@ async function processFile(
     const data = JSON.parse(content);
 
     if (source === "claude") {
-      await processClaudeExport(data, client, embeddingService, result, options);
+      await processClaudeExport(data, client, embeddingService, result, options, collections);
     } else if (source === "chatgpt") {
-      await processChatGPTExport(data, client, embeddingService, result, options);
+      await processChatGPTExport(data, client, embeddingService, result, options, collections);
     }
 
     logger.info(chalk.green(`✓ Processado: ${path.basename(filePath)}`));
@@ -233,6 +244,11 @@ async function processClaudeExport(
   options: {
     extractKnowledge: boolean;
     extractLearning: boolean;
+  },
+  collections: {
+    memory: string;
+    kb: string;
+    learning: string;
   }
 ): Promise<void> {
   const conversations = data.conversations || [];
@@ -243,7 +259,7 @@ async function processClaudeExport(
     try {
       // Gerar embeddings para todas as mensagens da conversa em um batch
       const messageContents = conv.messages.map(msg => msg.content);
-      const messageEmbeddings = await embeddingService.generateBatch(messageContents, "fazai_memory");
+      const messageEmbeddings = await embeddingService.generateBatch(messageContents, collections.memory);
 
       // Importar para fazai_memory
       const memoryPoints = conv.messages.map((msg, idx) => ({
@@ -262,7 +278,7 @@ async function processClaudeExport(
       }));
 
       if (memoryPoints.length > 0) {
-        await client.upsert("fazai_memory", {
+        await client.upsert(collections.memory, {
           wait: true,
           points: memoryPoints,
         });
@@ -275,13 +291,13 @@ async function processClaudeExport(
         const kbPayloads = extractTechnicalKnowledge(conv.messages, conv.id);
         if (kbPayloads.length > 0) {
           const kbTexts = kbPayloads.map(p => `${p.payload.title}\n${p.payload.summary}`);
-          const kbEmbeddings = await embeddingService.generateBatch(kbTexts, "fazai_kb");
+          const kbEmbeddings = await embeddingService.generateBatch(kbTexts, collections.kb);
           const kbPoints = kbPayloads.map((p, idx) => ({
             ...p,
             vector: kbEmbeddings[idx] || [],
           }));
 
-          await client.upsert("fazai_kb", {
+          await client.upsert(collections.kb, {
             wait: true,
             points: kbPoints,
           });
@@ -294,7 +310,7 @@ async function processClaudeExport(
       if (options.extractLearning) {
         const learningEntries = extractLearningPatterns(conv.messages, conv.id);
         if (learningEntries.length > 0) {
-          await client.upsert("fazai_learning", {
+          await client.upsert(collections.learning, {
             wait: true,
             points: learningEntries,
           });
@@ -323,6 +339,11 @@ async function processChatGPTExport(
   options: {
     extractKnowledge: boolean;
     extractLearning: boolean;
+  },
+  collections: {
+    memory: string;
+    kb: string;
+    learning: string;
   }
 ): Promise<void> {
   const conversations = Array.isArray(data) ? data : [data];
@@ -341,7 +362,7 @@ async function processChatGPTExport(
         }));
 
       const messageContents = messages.map(msg => msg.content);
-      const messageEmbeddings = await embeddingService.generateBatch(messageContents, "fazai_memory");
+      const messageEmbeddings = await embeddingService.generateBatch(messageContents, collections.memory);
 
       // Importar para fazai_memory
       const memoryPoints = messages.map((msg, idx) => ({
@@ -360,7 +381,7 @@ async function processChatGPTExport(
       }));
 
       if (memoryPoints.length > 0) {
-        await client.upsert("fazai_memory", {
+        await client.upsert(collections.memory, {
           wait: true,
           points: memoryPoints,
         });
@@ -381,13 +402,13 @@ async function processChatGPTExport(
 
         if (kbPayloads.length > 0) {
           const kbTexts = kbPayloads.map(p => `${p.payload.title}\n${p.payload.summary}`);
-          const kbEmbeddings = await embeddingService.generateBatch(kbTexts, "fazai_kb");
+          const kbEmbeddings = await embeddingService.generateBatch(kbTexts, collections.kb);
           const kbPoints = kbPayloads.map((p, idx) => ({
             ...p,
             vector: kbEmbeddings[idx] || [],
           }));
 
-          await client.upsert("fazai_kb", {
+          await client.upsert(collections.kb, {
             wait: true,
             points: kbPoints,
           });
@@ -407,7 +428,7 @@ async function processChatGPTExport(
         );
 
         if (learningEntries.length > 0) {
-          await client.upsert("fazai_learning", {
+          await client.upsert(collections.learning, {
             wait: true,
             points: learningEntries,
           });

@@ -745,7 +745,7 @@ IMPORTANTE: Responda APENAS com um objeto JSON válido no formato:
   const response = await withRetry(
     async () => {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout (same as llama)
 
       try {
         const res = await fetch(`${baseUrl}/api/generate`, {
@@ -871,12 +871,12 @@ IMPORTANTE: Responda APENAS com um objeto JSON válido no formato:
 {"commands": [{"explain": "...", "command": "...", "riskLevel": "low|medium|high|critical", "requiresConfirmation": true|false}]}`;
 
   // llama.cpp server uses OpenAI-compatible API
-  // Fail-fast: 20 segundos. Se não responder, vai pro fallback chain
-  // Phi-3 em CPU é muito lento (~2.6 tok/s), não vale esperar muito
+  // Fail-fast: 60 segundos. Se não responder, vai pro fallback chain
+  // Phi-3 em CPU é muito lento (~2.6 tok/s), não vale esperar 5 minutos
   const openai = new OpenAI({
     baseURL: `${baseUrl}/v1`,
     apiKey: "not-needed", // llama.cpp server doesn't require API key
-    timeout: 20000, // 20 segundos - fail-fast para ir pro fallback
+    timeout: 60000, // 60 segundos - fail-fast para ir pro fallback
     maxRetries: 0, // Sem retries - deixa fallback chain cuidar
   });
 

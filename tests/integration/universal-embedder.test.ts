@@ -175,8 +175,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       expect(info.model).toBe("nomic-embed-text");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(768);
-      // Embeddings usam servidor local (OLLAMA_EMBED_URL)
-      expect(info.ollamaUrl).toBe("http://localhost:11434");
+      // Embeddings usam servidor local (OLLAMA_EMBED_URL de fazai.conf)
+      expect(info.ollamaUrl).toMatch(/^http:\/\/.*:11434$/);
     });
 
     it("should handle special characters", async () => {
@@ -210,27 +210,31 @@ function hello(name: string): string {
     });
   });
 
-  describe("Zero Padding Verification", () => {
-    it("should verify zero padding preserves cosine similarity", async () => {
+  describe("Native 768d Verification", () => {
+    it("should verify embeddings are native 768d without padding", async () => {
       if (!ollamaAvailable) {
         console.log("Skipping test: Ollama not available");
         return;
       }
 
-      // Generate two similar embeddings
+      // Generate two embeddings
       const emb1 = await generateUniversalEmbedding("artificial intelligence");
       const emb2 = await generateUniversalEmbedding("machine learning");
 
-      // Verify they have zeros in the padded region
-      const paddedRegion1 = emb1.slice(768);
-      const paddedRegion2 = emb2.slice(768);
+      // Verify exact 768 dimensions (native, not padded)
+      expect(emb1.length).toBe(768);
+      expect(emb2.length).toBe(768);
 
-      // Should have many zeros (allowing for some rounding errors)
-      const countZeros = (arr: number[]) =>
-        arr.filter((v) => Math.abs(v) < 0.0001).length;
+      // Verify no padding region exists (não há elementos após 768)
+      expect(emb1.slice(768).length).toBe(0);
+      expect(emb2.slice(768).length).toBe(0);
 
-      expect(countZeros(paddedRegion1)).toBeGreaterThan(700); // Most should be zero
-      expect(countZeros(paddedRegion2)).toBeGreaterThan(700);
+      // Verify embeddings have meaningful values (not all zeros)
+      const countNonZeros = (arr: number[]) =>
+        arr.filter((v) => Math.abs(v) > 0.0001).length;
+
+      expect(countNonZeros(emb1)).toBeGreaterThan(700); // Most should be non-zero
+      expect(countNonZeros(emb2)).toBeGreaterThan(700);
     });
   });
 

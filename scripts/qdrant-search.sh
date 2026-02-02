@@ -29,8 +29,8 @@ if [ "$RAW_EMBED" = "null" ] || [ -z "$RAW_EMBED" ]; then
   exit 1
 fi
 
-# Pad to 1536 dimensions (ECOA standard)
-EMBED=$(echo "$RAW_EMBED" | jq -c '. + [range(768;1536) | 0]')
+# Use native 768 dimensions (nomic-embed-text)
+EMBED=$(echo "$RAW_EMBED" | jq -c '.')
 
 # Buscar no Qdrant
 curl -s -X POST "$QDRANT_URL/collections/fazai_$COLLECTION/points/search" \

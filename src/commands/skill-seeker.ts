@@ -159,7 +159,7 @@ async function statsCommand(seeker: ReturnType<typeof getSkillSeeker>): Promise<
   console.log(`   Watching:        ${chalk.gray(stats.watchedDirectory)}`);
   console.log(`   Formats:         ${chalk.gray("PDF, Markdown, Text")}`);
   console.log(`   Collection:      ${chalk.gray("fazai_kb")}`);
-  console.log(`   Vector Dim:      ${chalk.gray("1536 (Lei 1536)")}`);
+  console.log(`   Vector Dim:      ${chalk.gray("768 (native)")}`);
   console.log();
 
   // Last activity
@@ -251,7 +251,7 @@ function showHelp(): void {
   console.log(chalk.cyan("Configuration:"));
   console.log(chalk.gray("  Ingest Dir:  /etc/fazai/ingest"));
   console.log(chalk.gray("  Collection:  fazai_kb (Qdrant)"));
-  console.log(chalk.gray("  Vector Dim:  1536 (Lei 1536)"));
+  console.log(chalk.gray("  Vector Dim:  768 (native)"));
   console.log(chalk.gray("  Registry:    /opt/fazai/data/skill-seeker-registry.json"));
   console.log();
 }

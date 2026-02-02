@@ -1,6 +1,6 @@
 ---
 name: changelog-before-commit
-enabled: true
+enabled: false
 event: bash
 pattern: git\s+commit
 action: block

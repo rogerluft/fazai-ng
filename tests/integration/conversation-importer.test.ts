@@ -14,7 +14,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
+const QDRANT_URL = process.env.QDRANT_URL || 'http://127.0.0.1:6333';
 const TEST_PREFIX = 'fazai_test_';
 const TEST_DIR = path.join(os.tmpdir(), 'fazai-importer-tests');
 
@@ -93,9 +93,14 @@ describe('Conversation Importer (REAL)', () => {
     const result = await importConversations(testFile, 'claude', {
       extractKnowledge: true,
       extractLearning: true,
+      collectionPrefix: TEST_PREFIX,
     });
 
     // Validar resultado
+    console.log('RESULT:', JSON.stringify(result, null, 2));
+    if (result.errors.length > 0) {
+      console.log('ERRORS:', result.errors);
+    }
     expect(result.imported).toBe(1);
     expect(result.skipped).toBe(0);
     expect(result.errors).toHaveLength(0);
@@ -137,6 +142,7 @@ describe('Conversation Importer (REAL)', () => {
     const result = await importConversations(testFile, 'chatgpt', {
       extractKnowledge: true,
       extractLearning: false,
+      collectionPrefix: TEST_PREFIX,
     });
 
     // Validar resultado
@@ -176,6 +182,7 @@ describe('Conversation Importer (REAL)', () => {
     const result = await importConversations(testFile, 'claude', {
       extractKnowledge: true,
       extractLearning: true,
+      collectionPrefix: TEST_PREFIX,
     });
 
     // Deve ter extraído comandos técnicos
@@ -221,6 +228,7 @@ describe('Conversation Importer (REAL)', () => {
       recursive: true,
       extractKnowledge: false,
       extractLearning: false,
+      collectionPrefix: TEST_PREFIX,
     });
 
     expect(result.imported).toBe(3);
@@ -228,9 +236,9 @@ describe('Conversation Importer (REAL)', () => {
   });
 
   it('deve validar que dados foram inseridos no Qdrant', async () => {
-    // NOTA: importConversations escreve na collection real 'fazai_memory', não na de teste
+    // NOTA: importConversations agora usa collectionPrefix, então dados estão em fazai_test_*
     // Este teste valida que os dados dos testes anteriores foram inseridos corretamente
-    const collectionName = 'fazai_memory';
+    const collectionName = `${TEST_PREFIX}fazai_memory`;
 
     // Scroll para pegar todos os pontos
     const scrollResult = await client.scroll(collectionName, {
