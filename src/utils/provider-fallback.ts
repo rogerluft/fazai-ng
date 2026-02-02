@@ -118,6 +118,11 @@ export function shouldFallbackToNextProvider(error: FallbackError): boolean {
     return true;
   }
 
+  // Authentication errors (invalid API key, expired token, etc.)
+  if (error.status === 401 || error.status === 403) {
+    return true;
+  }
+
   // Rate limiting (try next provider instead of waiting)
   if (error.status === 429) {
     return true;

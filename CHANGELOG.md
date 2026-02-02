@@ -1,6 +1,110 @@
 # FazAI Changelog
 
 ## [3.17.0] - 2026-02-01
+## [3.17.1] - 2026-02-02
+
+### 🐛 Bugfix: `fazai ask` Command Provider Selection
+
+Corrige bug crítico onde o comando `fazai ask` não respeitava `PROVIDER_FALLBACK_ORDER` ao selecionar o modelo padrão.
+
+#### Problema Identificado
+
+**Comportamento incorreto:**
+```bash
+fazai ask "qual a capital da bolivia?"
+# ❌ Sempre usava models[0] (primeiro modelo do array)
+# ❌ Ignorava PROVIDER_FALLBACK_ORDER completamente
+# Resultado: usava llama mesmo quando anthropic/ollama deveriam ter prioridade
+```
+
+**Causa raiz:**
+- `src/commands/ask.ts` linha 47 usava `models[0]` hardcoded
+- Array `models[]` é carregado na ordem do código, não na ordem de fallback
+- Primeira entrada no código era `MODELS_LLAMA`, então sempre selecionava llama
+
+#### Solução Implementada
+
+**1. Nova função `getFirstAvailableModel()`**
+- Consulta `PROVIDER_FALLBACK_ORDER` do fazai.conf
+- Verifica cada provider na ordem configurada
+- Valida API key antes de selecionar provider cloud
+- Pula automaticamente providers sem modelos ou sem API key
+
+**2. Suporte a fallback para erros de autenticação**
+- `shouldFallbackToNextProvider()` agora trata erros 401/403
+- Sistema faz fallback automático quando API key é inválida
+- Anteriormente só tratava erros de rede/rate limit
+
+**Comportamento correto:**
+```bash
+fazai ask "qual a capital da bolivia?"
+# ✅ Tenta anthropic (primeiro em PROVIDER_FALLBACK_ORDER)
+# ⚠️ Se falhar (401/403): faz fallback automático
+# ✅ Usa ollama (segundo na ordem)
+# Logs transparentes de cada etapa
+```
+
+#### Arquivos Modificados
+
+**src/commands/ask.ts (+43 linhas):**
+- Import `FALLBACK_CHAIN` e `ProviderName`
+- Função `getFirstAvailableModel()`: lógica de seleção inteligente
+- Substitui `models[0]` por `getFirstAvailableModel()` (linha 81)
+- Validação de API key para cloud providers
+- Debug logs para transparência
+
+**src/utils/provider-fallback.ts (+5 linhas):**
+- `shouldFallbackToNextProvider()`: suporte a status 401/403
+- Comentário explicativo sobre authentication errors
+- Permite fallback quando API key inválida/expirada
+
+#### Configurações Relacionadas (fazai.conf)
+
+**Corrigidas durante investigação:**
+```bash
+# URL corrigida (estava apontando para Ollama em vez de llama-server)
+LLAMA_SERVER_URL=http://localhost:11430  # era: 11434
+
+# Modelos Anthropic atualizados (2026)
+MODELS_ANTHROPIC=claude-opus-4-5,claude-sonnet-4-5,claude-haiku-4
+
+# API keys adicionadas
+GOOGLE_API_KEY=AIzaSy...
+ANTHROPIC_API_KEY=  # vazio = fallback direto para ollama
+```
+
+#### Impacto
+
+**Antes:**
+- ❌ Sempre usava llama (ignorando configuração)
+- ❌ Fallback manual necessário
+- ❌ Experiência inconsistente
+
+**Depois:**
+- ✅ Respeita `PROVIDER_FALLBACK_ORDER` rigorosamente
+- ✅ Fallback automático em erros 401/403/429/503/504
+- ✅ Seleção inteligente do primeiro provider funcional
+- ✅ Logs transparentes de todo o processo
+
+#### Teste Validado
+
+```bash
+$ fazai ask "qual a capital do brasil?"
+🤔 Fazendo pergunta...
+Modelo: qwen3:8b (ollama)  # ✅ Seleção automática correta
+Resposta: Brasília  # ✅ Funcionando perfeitamente
+```
+
+#### Embeddings 768d
+
+Durante a investigação, verificado que a migração para 768 dimensões (Lei 768) está correta:
+- ✅ `nomic-embed-text` gera nativamente vetores 768d
+- ✅ Sem zero-padding desnecessário
+- ✅ Collections Qdrant configuradas com dimensão 768
+- ✅ Validação rigorosa de dimensões no código
+
+---
+
 
 ### 🚀 BREAKING CHANGE: Lei 768 - Migração Vetorial Nativa
 

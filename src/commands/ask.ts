@@ -1,9 +1,9 @@
-
 import chalk from "chalk";
-import { models } from "../models";
+import { models, getDefaultModel } from "../models";
 import { checkAPIKey, getAndSetAPIKey } from "../apiKeyUtils-fazai";
 import { askAI } from "../askAI";
 import { logger } from "../logger";
+import { FALLBACK_CHAIN, type ProviderName } from "../utils/provider-fallback";
 
 async function checkAndSetAPIKey(selectedModel: (typeof models)[number]) {
   const provider = selectedModel.provider;
@@ -12,6 +12,41 @@ async function checkAndSetAPIKey(selectedModel: (typeof models)[number]) {
   if (!apiKeyPresent) {
     await getAndSetAPIKey(provider);
   }
+}
+
+/**
+ * Get the first available model from fallback chain
+ *
+ * Uses FALLBACK_CHAIN to find the first provider that has:
+ * 1. At least one configured model
+ * 2. API key (for cloud providers) or is local (llama/ollama)
+ *
+ * This ensures the default model is always from a working provider.
+ */
+function getFirstAvailableModel(): (typeof models)[number] {
+  // Try each provider in fallback chain order
+  for (const provider of FALLBACK_CHAIN as ProviderName[]) {
+    // Check if provider has models configured
+    const providerModels = models.filter((m) => m.provider === provider);
+
+    if (providerModels.length > 0) {
+      // Local providers don't need API key
+      if (provider === "llama" || provider === "ollama") {
+        logger.debug(`Using default model from ${provider}: ${providerModels[0].name}`);
+        return providerModels[0];
+      }
+
+      // Cloud providers need API key
+      if (checkAPIKey(provider)) {
+        logger.debug(`Using default model from ${provider}: ${providerModels[0].name}`);
+        return providerModels[0];
+      }
+    }
+  }
+
+  // Fallback: if no provider in fallback chain has models, use first model overall
+  logger.warn("⚠️  No provider from fallback chain available, using first configured model");
+  return models[0];
 }
 
 function showAskHelp(): void {
@@ -43,8 +78,8 @@ export async function handleAskCommand(inputs: string[]): Promise<void> {
     // Model specified, question is everything except first (ask) and last (model)
     questionParts = inputs.slice(0, -1);
   } else {
-    // No model, use default and question is everything except first (ask)
-    selectedModel = models[0];
+    // No model specified, use first available model from fallback chain
+    selectedModel = getFirstAvailableModel();
     questionParts = inputs;
   }
 
