@@ -68,6 +68,48 @@ Responda APENAS com JSON válido neste formato:
   "executionPlan": "Primeiro verifica ferramentas, depois instala faltantes, então executa a tarefa principal"
 }`;
 
+const PARTIAL_DECOMPOSER_PROMPT = `Você é um especialista em administração Linux. Sua tarefa é completar a decomposição de uma instrução complexa em subtarefas.
+Parte da tarefa já foi resolvida usando blocos de execução conhecidos.
+
+BLOCOS JÁ CONHECIDOS (Não altere estes):
+{{KNOWN_BLOCKS}}
+
+INTENTS QUE AINDA PRECISAM DE DECOMPOSIÇÃO:
+{{MISSING_INTENTS}}
+
+INSTRUÇÕES:
+1. Analise o que já temos e o que falta para completar a TAREFA ORIGINAL.
+2. Gere novas subtarefas APENAS para os intents faltantes.
+3. Garanta que as novas subtarefas se integrem corretamente aos blocos já conhecidos via "dependencies".
+4. Use IDs sequenciais para as novas subtarefas (ex: se o último bloco conhecido é task-2, as novas devem ser task-3, task-4...).
+5. Para cada nova subtarefa, gere:
+   - id: ID único (ex: task-3)
+   - description: Descrição clara
+   - command: Comando Linux específico
+   - dependencies: Array de IDs de subtarefas que devem executar ANTES
+   - estimatedComplexity: 1-10
+   - requiresInstallation: boolean
+   - installCommand: comando de instalação (se necessário)
+   - verificationCommand: comando para verificar sucesso
+
+TAREFA ORIGINAL:
+{{TASK}}
+
+Responda APENAS com JSON válido neste formato:
+{
+  "new_subtasks": [
+    {
+      "id": "task-3",
+      "description": "Descrição da nova tarefa",
+      "command": "comando --aqui",
+      "dependencies": ["task-1"],
+      "estimatedComplexity": 3,
+      "requiresInstallation": false
+    }
+  ],
+  "executionPlan": "Breve explicação de como o plano foi completado"
+}`;
+
 /**
  * Converte ExecutionBlock para SubTask
  */
@@ -133,6 +175,10 @@ export async function decomposeTask(
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // 🧩 ECOA: Tenta compor de blocos existentes ANTES de chamar LLM
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  let isPartial = false;
+  let knownSubtasks: SubTask[] = [];
+  let currentPrompt = DECOMPOSER_PROMPT.replace("{{TASK}}", task);
+
   try {
     const context = await detectSystemContext();
     const composition = await composeExecution(task, context);
@@ -154,22 +200,26 @@ export async function decomposeTask(
 
     if (composition.coverage > 0.5) {
       logger.info(chalk.yellow(
-        `📦 ${Math.round(composition.coverage * 100)}% composto, LLM só para: ` +
-        composition.missing_intents.join(", ")
+        `📦 ${Math.round(composition.coverage * 100)}% composto, usando decomposição parcial`
       ));
-      // Por enquanto, continua com LLM completo
-      // TODO: Implementar decomposição parcial
+      logger.info(chalk.gray(`   Faltam intents: ${composition.missing_intents.join(", ")}`));
+
+      isPartial = true;
+      knownSubtasks = composition.matched_blocks.map((block, i) => blockToSubTask(block, i));
+
+      currentPrompt = PARTIAL_DECOMPOSER_PROMPT
+        .replace("{{TASK}}", task)
+        .replace("{{KNOWN_BLOCKS}}", JSON.stringify(knownSubtasks, null, 2))
+        .replace("{{MISSING_INTENTS}}", composition.missing_intents.join(", "));
     }
   } catch (error) {
-    logger.debug(`Composição falhou, usando LLM: ${error}`);
+    logger.debug(`Composição falhou, usando LLM completo: ${error}`);
   }
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  const prompt = DECOMPOSER_PROMPT.replace("{{TASK}}", task);
-
   // Usar askAI para streaming da resposta
   let fullResponse = "";
-  const stream = askAI("", prompt, model, provider, false);
+  const stream = askAI("", currentPrompt, model, provider, false);
 
   logger.debug("Iniciando streaming do modelo...");
   let chunkCount = 0;
@@ -255,10 +305,21 @@ export async function decomposeTask(
 
     const parsed = JSON.parse(jsonStr);
 
+    let subtasks: SubTask[] = [];
+    let executionPlan = parsed.executionPlan || "Execução sequencial baseada em dependências";
+
+    if (isPartial) {
+      const newTasks = parsed.new_subtasks || parsed.subtasks || [];
+      subtasks = [...knownSubtasks, ...newTasks];
+      logger.debug(`Mesclados ${knownSubtasks.length} blocos conhecidos com ${newTasks.length} novos`);
+    } else {
+      subtasks = parsed.subtasks || [];
+    }
+
     const result: DecomposedTask = {
       originalTask: task,
-      subtasks: parsed.subtasks || [],
-      executionPlan: parsed.executionPlan || "Execução sequencial baseada em dependências"
+      subtasks,
+      executionPlan
     };
 
     logger.info(chalk.green(`✅ Tarefa decomposta em ${result.subtasks.length} subtarefas`));
