@@ -32,6 +32,16 @@ function PersonalityContent() {
     },
   });
 
+  const updateTraitMutation = useMutation({
+    mutationFn: api.updateTrait,
+    onSuccess: () => {
+      refetch();
+    },
+    onError: (error) => {
+      setError(String(error));
+    },
+  });
+
   const removeTraitMutation = useMutation({
     mutationFn: api.removeTrait,
     onSuccess: () => {
@@ -74,9 +84,7 @@ function PersonalityContent() {
               traits={traits}
               onAddTrait={(trait) => addTraitMutation.mutate(trait)}
               onRemoveTrait={(name) => removeTraitMutation.mutate(name)}
-              onUpdateTrait={(_trait) => {
-                // TODO: Implement update
-              }}
+              onUpdateTrait={(trait) => updateTraitMutation.mutate(trait)}
             />
           </CardContent>
         </Card>
