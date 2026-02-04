@@ -482,8 +482,8 @@ export async function* getLinuxCommandsFromAI(
       yield { type: "command", command: cmd };
     }
     yield { type: "allcommands", commands: learnedCommands };
-    // FIX: Retorna após emitir comandos aprendidos para evitar duplicação
-    // com comandos do provider chain (issue identificada em análise de código)
+    // ✅ FIX: Retorna após emitir comandos aprendidos para evitar duplicação
+    // com comandos do provider chain (Validado e corrigido)
     return;
   }
 

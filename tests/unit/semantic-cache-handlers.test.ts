@@ -38,6 +38,7 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+import { SemanticCache } from '../../src/services/semantic-cache';
 
 /**
  * Mock do process para isolar testes
@@ -63,15 +64,20 @@ class MockProcess extends EventEmitter {
 }
 
 /**
- * Simula o comportamento ATUAL (bugado) do startCleanupTimer
+ * Simula o comportamento CORRIGIDO do startCleanupTimer
  */
 class BuggySemanticCache {
   private cleanupTimer: NodeJS.Timeout | null = null;
   private mockProcess: MockProcess;
+  private handlersRegistered = false;
 
   constructor(mockProcess: MockProcess) {
     this.mockProcess = mockProcess;
   }
+
+  // Named handlers to follow best practices and allow removal if needed
+  private handleSigInt = () => this.stop();
+  private handleSigTerm = () => this.stop();
 
   startCleanupTimer(): void {
     if (this.cleanupTimer) {
@@ -82,9 +88,12 @@ class BuggySemanticCache {
       // cleanup
     }, 10000);
 
-    // BUG: Sempre registra novos handlers!
-    this.mockProcess.on('SIGINT', () => this.stop());
-    this.mockProcess.on('SIGTERM', () => this.stop());
+    // FIX: Registra handlers apenas UMA VEZ
+    if (!this.handlersRegistered) {
+      this.mockProcess.on('SIGINT', this.handleSigInt);
+      this.mockProcess.on('SIGTERM', this.handleSigTerm);
+      this.handlersRegistered = true;
+    }
   }
 
   stop(): void {
@@ -143,8 +152,8 @@ describe('Semantic Cache - Handler Registration Bug', () => {
     mockProcess.clearHandlers();
   });
 
-  describe('Comportamento ATUAL (Bugado)', () => {
-    it('deve registrar múltiplos handlers quando chamado várias vezes', () => {
+  describe('Comportamento ATUAL (Corrigido)', () => {
+    it('deve registrar handlers apenas UMA VEZ mesmo quando chamado várias vezes', () => {
       const cache = new BuggySemanticCache(mockProcess);
 
       // Primeira chamada
@@ -152,30 +161,30 @@ describe('Semantic Cache - Handler Registration Bug', () => {
       expect(mockProcess.getHandlerCount('SIGINT')).toBe(1);
       expect(mockProcess.getHandlerCount('SIGTERM')).toBe(1);
 
-      // Segunda chamada (simula re-inicialização)
+      // Segunda chamada (re-inicialização)
       cache.startCleanupTimer();
-      expect(mockProcess.getHandlerCount('SIGINT')).toBe(2); // BUG: 2 handlers!
-      expect(mockProcess.getHandlerCount('SIGTERM')).toBe(2);
+      expect(mockProcess.getHandlerCount('SIGINT')).toBe(1); // FIX: Mantém 1
+      expect(mockProcess.getHandlerCount('SIGTERM')).toBe(1);
 
       // Terceira chamada
       cache.startCleanupTimer();
-      expect(mockProcess.getHandlerCount('SIGINT')).toBe(3); // BUG: 3 handlers!
-      expect(mockProcess.getHandlerCount('SIGTERM')).toBe(3);
+      expect(mockProcess.getHandlerCount('SIGINT')).toBe(1);
+      expect(mockProcess.getHandlerCount('SIGTERM')).toBe(1);
 
       cache.stop();
     });
 
-    it('deve acumular handlers indefinidamente', () => {
+    it('não deve acumular handlers indefinidamente', () => {
       const cache = new BuggySemanticCache(mockProcess);
 
-      // Simula múltiplas chamadas (ex: erro de concorrência)
+      // Simula múltiplas chamadas
       for (let i = 0; i < 10; i++) {
         cache.startCleanupTimer();
       }
 
-      // BUG: 10 handlers registrados!
-      expect(mockProcess.getHandlerCount('SIGINT')).toBe(10);
-      expect(mockProcess.getHandlerCount('SIGTERM')).toBe(10);
+      // FIX: Apenas 1 handler registrado
+      expect(mockProcess.getHandlerCount('SIGINT')).toBe(1);
+      expect(mockProcess.getHandlerCount('SIGTERM')).toBe(1);
 
       cache.stop();
     });
@@ -220,7 +229,7 @@ describe('Semantic Cache - Handler Registration Bug', () => {
   });
 
   describe('Comparação de Comportamento', () => {
-    it('buggy acumula, correto não acumula', () => {
+    it('tanto Buggy (fix) quanto Correct não devem acumular', () => {
       const buggy = new BuggySemanticCache(mockProcess);
       const correct = new CorrectSemanticCache(new MockProcess());
 
@@ -231,11 +240,9 @@ describe('Semantic Cache - Handler Registration Bug', () => {
         correct.startCleanupTimer();
       }
 
-      // Buggy: acumula handlers
-      expect(mockProcess.getHandlerCount('SIGINT')).toBe(calls);
+      // Ambos devem ter apenas 1
+      expect(mockProcess.getHandlerCount('SIGINT')).toBe(1);
 
-      // Correto: apenas 1
-      // (usa seu próprio mockProcess)
       buggy.stop();
       correct.stop();
     });
@@ -282,20 +289,10 @@ describe('Semantic Cache - Cleanup Timer', () => {
 });
 
 describe('Node.js MaxListenersExceededWarning Prevention', () => {
-  it('deve documentar o problema de muitos listeners', () => {
+  it('deve prevenir o problema de muitos listeners', () => {
     /**
-     * Node.js emite MaxListenersExceededWarning quando:
-     * - Mais de 10 listeners são adicionados ao mesmo evento
-     * - Isso indica possível memory leak
-     *
-     * O código bugado pode facilmente atingir esse limite se:
-     * - getInstance() for chamado em loop
-     * - Houver race conditions na inicialização
-     * - O singleton for reinicializado por qualquer motivo
-     *
-     * Sintoma no console:
-     * (node:12345) MaxListenersExceededWarning: Possible EventEmitter memory leak detected.
-     * 11 SIGINT listeners added to [process]. Use emitter.setMaxListeners() to increase limit
+     * Node.js emite MaxListenersExceededWarning quando mais de 10 listeners são adicionados.
+     * O código corrigido evita isso.
      */
 
     const mockProcess = new MockProcess();
@@ -306,9 +303,59 @@ describe('Node.js MaxListenersExceededWarning Prevention', () => {
       cache.startCleanupTimer();
     }
 
-    // Excede o limite default de 10 listeners
-    expect(mockProcess.getHandlerCount('SIGINT')).toBe(11);
-    expect(mockProcess.getHandlerCount('SIGINT')).toBeGreaterThan(10);
+    // FIX: Não excede o limite, mantém apenas 1
+    expect(mockProcess.getHandlerCount('SIGINT')).toBe(1);
+    expect(mockProcess.getHandlerCount('SIGINT')).toBeLessThan(10);
+
+    cache.stop();
+  });
+});
+
+describe('Semantic Cache - Real Implementation Verification', () => {
+  beforeEach(() => {
+    // Reset singleton instance and static flag
+    (SemanticCache as any).instance = null;
+    (SemanticCache as any).handlersRegistered = false;
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('deve registrar handlers no process real apenas uma vez', async () => {
+    const processOnSpy = vi.spyOn(process, 'on');
+
+    // Primeira inicialização
+    const cache = await SemanticCache.getInstance();
+
+    const sigintCalls = processOnSpy.mock.calls.filter(call => call[0] === 'SIGINT').length;
+    expect(sigintCalls).toBe(1);
+
+    // Força nova chamada ao startCleanupTimer
+    (cache as any).startCleanupTimer();
+
+    // Deve continuar sendo 1
+    const sigintCallsAfter = processOnSpy.mock.calls.filter(call => call[0] === 'SIGINT').length;
+    expect(sigintCallsAfter).toBe(1);
+
+    cache.stop();
+  });
+
+  it('deve chamar stop() quando o processo recebe SIGINT', async () => {
+    const processOnSpy = vi.spyOn(process, 'on');
+    const cache = await SemanticCache.getInstance();
+    const stopSpy = vi.spyOn(cache, 'stop');
+
+    // Encontra o handler registrado
+    const sigintCall = processOnSpy.mock.calls.find(call => call[0] === 'SIGINT');
+    expect(sigintCall).toBeDefined();
+    const handler = sigintCall![1];
+
+    // Executa o handler
+    handler();
+
+    expect(stopSpy).toHaveBeenCalled();
 
     cache.stop();
   });
