@@ -90,6 +90,8 @@ export class AgenticWebCrawler {
   private queue: PQueue;
   private cacheFile: string;
   private cache: Map<string, CacheEntry>;
+  private isSaving = false;
+  private pendingSave = false;
 
   /**
    * Available sources organized by category
@@ -685,15 +687,32 @@ export class AgenticWebCrawler {
 
   /**
    * Save cache to disk
+   * Uses a lock mechanism to avoid concurrent writes and OOM
    */
-  private saveCache(): void {
+  private async saveCache(): Promise<void> {
+    if (this.isSaving) {
+      this.pendingSave = true;
+      return;
+    }
+
+    this.isSaving = true;
+    this.pendingSave = false;
+
     try {
       const entries = Array.from(this.cache.values());
-      fs.writeFileSync(this.cacheFile, JSON.stringify(entries, null, 2));
+      // we use a temp variable to avoid blocking the event loop more than necessary during stringification
+      const data = JSON.stringify(entries, null, 2);
+      await fs.promises.writeFile(this.cacheFile, data);
       logger.debug(`Saved ${entries.length} cached queries to disk`);
     } catch (error: unknown) {
       const err = error instanceof Error ? error : new Error(String(error));
-      logger.debug(`Failed to save cache: ${err.message}`);
+      logger.error(`Failed to save cache: ${err.message}`);
+    } finally {
+      this.isSaving = false;
+      if (this.pendingSave) {
+        // Schedule next save if requested during current save
+        setImmediate(() => this.saveCache());
+      }
     }
   }
 
@@ -725,6 +744,9 @@ export class AgenticWebCrawler {
     };
 
     this.cache.set(query, entry);
-    this.saveCache();
+    // Fire and forget - do not block the main flow for disk I/O
+    this.saveCache().catch((err) => {
+      logger.error(`[PERFORMANCE] Background cache save failed: ${err.message}`);
+    });
   }
 }
