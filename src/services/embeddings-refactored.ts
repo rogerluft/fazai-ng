@@ -85,7 +85,7 @@ export interface EmbeddingService {
 class OllamaEmbeddingService implements EmbeddingService {
   private readonly baseUrl: string;
   private modelCache: Map<CollectionType, EmbeddingModel>;
-  private readonly TARGET_DIMENSION = 1536;
+  private readonly TARGET_DIMENSION = 768; // Lei 768: native dimensions (sem padding)
 
   constructor(baseUrl: string = getOllamaEmbedUrl()) {
     this.baseUrl = baseUrl;
@@ -305,7 +305,7 @@ class OllamaEmbeddingService implements EmbeddingService {
     return {
       provider: "ollama" as const,
       model: "nomic-embed-text (dynamic + padding)",
-      dimension: 1536, // Standardized dimension
+      dimension: 768, // Lei 768: native dimensions
       isLocal: true,
     };
   }
@@ -326,7 +326,7 @@ class OpenAIEmbeddingService implements EmbeddingService {
   constructor(
     apiKey: string,
     model: string = "text-embedding-3-small",
-    dimension: number = 1536
+    dimension: number = 768
   ) {
     this.apiKey = apiKey;
     this.model = model;
@@ -556,13 +556,13 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
 
   if (openaiApiKey) {
     logger.info(
-      "✓ Using OpenAI for embeddings (text-embedding-3-small, 1536 dim)"
+      "✓ Using OpenAI for embeddings (text-embedding-3-small, 768 dim native)"
     );
     logger.warn("⚠️  OpenAI embeddings are paid ($0.02/1M tokens)");
     underlyingService = new OpenAIEmbeddingService(
       openaiApiKey,
       "text-embedding-3-small",
-      1536
+      768
     );
     return new CachedEmbeddingService(underlyingService, embeddingCache);
   }

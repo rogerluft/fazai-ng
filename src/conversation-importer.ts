@@ -70,7 +70,7 @@ type ChatGPTConversation = {
 // ==============================================================================
 
 function getQdrantClient(): QdrantClient {
-  const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
+  const url = getConfigValue("QDRANT_URL") || "http://127.0.0.1:6333";
   const apiKey = getConfigValue("QDRANT_API_KEY");
 
   return new QdrantClient({

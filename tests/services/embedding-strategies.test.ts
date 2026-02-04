@@ -19,6 +19,7 @@ import {
   type EmbeddingModel,
   EMBEDDING_STRATEGIES,
 } from "../../src/services/embedding-strategies";
+import { getOllamaEmbedUrl } from "../../src/config";
 
 describe("Embedding Strategies", () => {
   describe("semanticChunk()", () => {
@@ -192,7 +193,7 @@ describe("Embedding Strategies", () => {
 
       expect(strategy.collection).toBe("fazai_personality");
       expect(strategy.model).toBe("nomic-embed-text");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.dimension).toBe(768); // Lei 768
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(200);
@@ -202,8 +203,8 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("memory");
 
       expect(strategy.collection).toBe("fazai_memory");
-      expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.model).toBe("nomic-embed-text"); // Lei 768: 768d native
+      expect(strategy.dimension).toBe(768); // Lei 768
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(800);
@@ -213,8 +214,8 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("kb");
 
       expect(strategy.collection).toBe("fazai_kb");
-      expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.model).toBe("nomic-embed-text"); // Lei 768: 768d native
+      expect(strategy.dimension).toBe(768); // Lei 768
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(600);
@@ -224,8 +225,8 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("learning");
 
       expect(strategy.collection).toBe("fazai_learning");
-      expect(strategy.model).toBe("mxbai-embed-large");
-      expect(strategy.dimension).toBe(1536);
+      expect(strategy.model).toBe("nomic-embed-text"); // Lei 768: 768d native
+      expect(strategy.dimension).toBe(768); // Lei 768
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(400);
@@ -235,6 +236,7 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("inference");
 
       expect(strategy.collection).toBe("fazai_inference");
+      expect(strategy.model).toBe("nomic-embed-text"); // Unused but present
       expect(strategy.dimension).toBe(0);
       expect(strategy.requiresEmbedding).toBe(false);
       expect(strategy.chunking.maxChunkSize).toBe(0);
@@ -390,7 +392,7 @@ describe("Embedding Strategies", () => {
       expect(result).toBe(true);
       // Embeddings usam OLLAMA_EMBED_URL (servidor local)
       expect(fetch).toHaveBeenCalledWith(
-        "http://localhost:11434/api/tags",
+        `${getOllamaEmbedUrl()}/api/tags`,
         expect.objectContaining({ signal: expect.any(AbortSignal) })
       );
     });

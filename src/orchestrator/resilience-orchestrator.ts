@@ -48,13 +48,18 @@ export class ResilienceOrchestrator {
     }
     logger.warn('⚠️ AI models failed to execute the task. Moving to knowledge fallback.');
 
-    // Level 3: Context7 Fallback (Placeholder)
-    const context7Result = await this.tryContext7(query);
-    if (context7Result.success) {
-      logger.info('✅ Task resolved using Context7 knowledge base.');
-      return context7Result;
+    // Level 3: Context7 Fallback (se configurado)
+    const context7Configured = getConfigValue('MCP_CONTEXT7_URL') || getConfigValue('MCP_CONTEXT7_COMMAND');
+    if (context7Configured) {
+      const context7Result = await this.tryContext7(query);
+      if (context7Result.success) {
+        logger.info('✅ Task resolved using Context7 knowledge base.');
+        return context7Result;
+      }
+      logger.warn('⚠️ Context7 lookup failed or yielded no results. Moving to web search.');
+    } else {
+      logger.debug('⚠️ Context7 not configured. Skipping to web search.');
     }
-    logger.warn('⚠️ Context7 lookup failed or yielded no results. Moving to web search.');
 
     // Level 4: Web Search Fallback
     const webSearchResult = await this.tryWebSearch(query);

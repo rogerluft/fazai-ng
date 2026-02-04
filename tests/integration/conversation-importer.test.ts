@@ -14,7 +14,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
+const QDRANT_URL = process.env.QDRANT_URL || 'http://127.0.0.1:6333';
 const TEST_PREFIX = 'fazai_test_';
 const TEST_DIR = path.join(os.tmpdir(), 'fazai-importer-tests');
 
@@ -39,7 +39,7 @@ describe('Conversation Importer (REAL)', () => {
       }
 
       await client.createCollection(testCollection, {
-        vectors: { size: 1536, distance: 'Cosine' },
+        vectors: { size: 768, distance: 'Cosine' },
       });
     }
   });
@@ -94,6 +94,9 @@ describe('Conversation Importer (REAL)', () => {
       extractKnowledge: true,
       extractLearning: true,
     });
+
+    // Debug: log result
+    console.log("Import result:", JSON.stringify(result, null, 2));
 
     // Validar resultado
     expect(result.imported).toBe(1);

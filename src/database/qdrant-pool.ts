@@ -55,7 +55,7 @@ class QdrantConnectionPool {
       serviceName: "qdrant",
       failureThreshold: 3,        // Abre após 3 falhas
       resetTimeout: 30000,        // 30s antes de tentar novamente
-      operationTimeout: 10000,    // 10s timeout por operação
+      operationTimeout: 30000,    // 30s timeout por operação
     });
   }
 
@@ -127,13 +127,13 @@ class QdrantConnectionPool {
     this.metrics.reconnectionAttempts++;
     logger.debug("Attempting to initialize Qdrant connection...");
 
-    const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
+    const url = getConfigValue("QDRANT_URL") || "http://127.0.0.1:6333";
     const apiKey = getConfigValue("QDRANT_API_KEY");
 
     this.client = new QdrantClient({
       url,
       apiKey: apiKey || undefined,
-      timeout: 5000, // 5s timeout (reduzido para falhar mais rápido)
+      timeout: 30000, // 30s timeout
     });
 
     // Health check: list collections

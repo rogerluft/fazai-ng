@@ -107,27 +107,38 @@ export class LinuxCommandExecutor {
       logger.info(chalk.gray("Executando..."));
 
       // Usar spawn para melhor controle e output em tempo real
-      // SECURITY: shell: false (default) prevents command injection
+      // Lei 768: Detecta operadores shell (&&, ||, |, >, <) para habilitar shell quando necessário
       const result = await new Promise<{ success: boolean; output: string }>((resolve) => {
-        // FIX: Parseamento de argumentos respeitando aspas
-        // O split(' ') original quebrava argumentos citados (ex: git commit -m "msg")
-        // Este regex captura: sequências sem espaço OU strings entre aspas simples/duplas
-        const argsMatch = command.command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
+        const needsShell = /[&|><;]/.test(command.command);
 
-        const parsedArgs = argsMatch.map(arg => {
-            // Remove aspas envolventes se existirem para passar limpo ao spawn
-            if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
-                return arg.slice(1, -1);
-            }
-            return arg;
-        });
+        let child;
+        if (needsShell) {
+          // Comando complexo com operadores shell: executa via bash -c
+          child = spawn('bash', ['-c', command.command], {
+            stdio: ['inherit', 'pipe', 'pipe'],
+          });
+        } else {
+          // Comando simples: parseamento seguro sem shell
+          // FIX: Parseamento de argumentos respeitando aspas
+          // O split(' ') original quebrava argumentos citados (ex: git commit -m "msg")
+          // Este regex captura: sequências sem espaço OU strings entre aspas simples/duplas
+          const argsMatch = command.command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) || [];
 
-        const [cmd, ...args] = parsedArgs;
+          const parsedArgs = argsMatch.map(arg => {
+              // Remove aspas envolventes se existirem para passar limpo ao spawn
+              if ((arg.startsWith('"') && arg.endsWith('"')) || (arg.startsWith("'") && arg.endsWith("'"))) {
+                  return arg.slice(1, -1);
+              }
+              return arg;
+          });
 
-        const child = spawn(cmd, args, {
-          stdio: ['inherit', 'pipe', 'pipe'],
-          // shell: false is default - NOT enabling to prevent RCE
-        });
+          const [cmd, ...args] = parsedArgs;
+
+          child = spawn(cmd, args, {
+            stdio: ['inherit', 'pipe', 'pipe'],
+            // shell: false is default - NOT enabling to prevent RCE for simple commands
+          });
+        }
 
         let output = '';
         let errorOutput = '';

@@ -19,9 +19,10 @@ import {
   UniversalLocalEmbedder,
   padVector,
 } from "../../src/services/universal-embedder";
+import { getOllamaEmbedUrl } from "../../src/config";
 
 // Embedding server URL (local para melhor performance)
-const OLLAMA_EMBED_URL = "http://localhost:11434";
+const OLLAMA_EMBED_URL = getOllamaEmbedUrl();
 
 // Check if Ollama embedding server is available
 async function isOllamaAvailable(): Promise<boolean> {
@@ -176,7 +177,7 @@ describe("Universal Local Embedder (Integration Tests)", () => {
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(1536);
       // Embeddings usam servidor local (OLLAMA_EMBED_URL)
-      expect(info.ollamaUrl).toBe("http://localhost:11434");
+      expect(info.ollamaUrl).toBe(getOllamaEmbedUrl());
     });
 
     it("should handle special characters", async () => {

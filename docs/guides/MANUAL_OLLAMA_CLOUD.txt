@@ -1,0 +1,38 @@
+##########################################################################
+#
+# MANUAL DE USO DO OLLAMA LOCAL/CLOUD
+#
+#
+#
+# Se Usar Ollama diretamente online
+#OLLAMA_API_KEY=3674c3dde8a84ddf8d88f1ba5a75876c.d83UxarbLhdjlGzB2GCSZ3iE
+#
+#EX.
+#
+#
+#import os
+#
+#from ollama import Client
+#
+#client = Client(
+#    host="https://ollama.com",
+#    headers={'Authorization': 'Bearer ' + os.environ.get('OLLAMA_API_KEY')}
+#)
+#
+#messages = [
+#  {
+#    'role': 'user',
+#    'content': 'Why is the sky blue?',
+#  },
+#]
+#
+#for part in client.chat('gpt-oss:120b', messages=messages, stream=True):
+#  print(part['message']['content'], end='', flush=True)
+#
+#
+##########################################################################################################################
+# tambem eh possivel rodar o ollama cloud via api local no servidor de nome papaimach ou papaimach.local ip 192.168.0.101,
+# para isso deve fazer o pull do modelo COM ":cloud" no final e chamar ele localmente no papaimach 
+#
+#Consulte: https://docs.ollama.com/cloud
+##

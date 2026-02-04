@@ -12,6 +12,7 @@ import {
   generateUniversalEmbedding,
   UniversalLocalEmbedder,
 } from "../../src/services/universal-embedder";
+import { getOllamaEmbedUrl } from "../../src/config";
 
 describe("Universal Local Embedder (Unit Tests)", () => {
   describe("padVector", () => {
@@ -98,7 +99,7 @@ describe("Universal Local Embedder (Unit Tests)", () => {
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(1536);
       // Default usa getOllamaEmbedUrl() que retorna localhost:11434
-      expect(info.ollamaUrl).toBe("http://localhost:11434");
+      expect(info.ollamaUrl).toBe(getOllamaEmbedUrl());
     });
 
     it("should handle empty batch", async () => {

@@ -44,20 +44,25 @@ function loadModelsFromConfig(): Model[] {
   const models: Model[] = [];
 
   try {
+    // Lei 768: Respeita PROVIDER_FALLBACK_ORDER do config para ordenar providers
+    const fallbackOrder = getConfigValue("PROVIDER_FALLBACK_ORDER") || "anthropic,ollama,openrouter,google,openai,llama,perplexity";
+    const providerOrder = fallbackOrder.split(",").map(p => p.trim());
+
     // Provider configurations (max 3 models each)
-    const providers: Array<{
-      key: string;
-      provider: ProviderType;
-      limit: number;
-    }> = [
-      { key: "MODELS_LLAMA", provider: "llama", limit: 3 },   // llama.cpp local (Phi-3) - primary
-      { key: "MODELS_OLLAMA", provider: "ollama", limit: 3 }, // Ollama remote - only for embeddings
-      { key: "MODELS_OPENROUTER", provider: "openrouter", limit: 3 },
-      { key: "MODELS_OPENAI", provider: "openai", limit: 3 },
-      { key: "MODELS_ANTHROPIC", provider: "anthropic", limit: 3 },
-      { key: "MODELS_GOOGLE", provider: "google", limit: 3 },
-      { key: "MODELS_PERPLEXITY", provider: "perplexity", limit: 3 },
-    ];
+    const providerConfigs: Record<string, { key: string; provider: ProviderType; limit: number }> = {
+      llama: { key: "MODELS_LLAMA", provider: "llama", limit: 3 },
+      ollama: { key: "MODELS_OLLAMA", provider: "ollama", limit: 3 },
+      openrouter: { key: "MODELS_OPENROUTER", provider: "openrouter", limit: 3 },
+      openai: { key: "MODELS_OPENAI", provider: "openai", limit: 3 },
+      anthropic: { key: "MODELS_ANTHROPIC", provider: "anthropic", limit: 3 },
+      google: { key: "MODELS_GOOGLE", provider: "google", limit: 3 },
+      perplexity: { key: "MODELS_PERPLEXITY", provider: "perplexity", limit: 3 },
+    };
+
+    // Processa providers na ordem do PROVIDER_FALLBACK_ORDER
+    const providers = providerOrder
+      .map(p => providerConfigs[p])
+      .filter(Boolean);
 
     for (const { key, provider, limit } of providers) {
       const modelStr = getConfigValue(key);
