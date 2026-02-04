@@ -62,9 +62,7 @@ class MigrationEmbeddingService {
   }
 
   async generateBatch(texts: string[]): Promise<number[][]> {
-    const results: number[][] = [];
-
-    for (const text of texts) {
+    return Promise.all(texts.map(async (text) => {
       // Aggressive truncation
       const truncated = text.length > this.MAX_CHARS ? text.substring(0, this.MAX_CHARS) : text;
 
@@ -81,10 +79,8 @@ class MigrationEmbeddingService {
         throw new Error(`Both servers failed! Expected ${this.dimension}d, got ${embedding?.length}`);
       }
 
-      results.push(embedding);
-    }
-
-    return results;
+      return embedding;
+    }));
   }
 
   getInfo() {
