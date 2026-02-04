@@ -1,20 +1,17 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-
-// SpamExperts API stub - Replace with actual SpamExperts manager integration
-// For now, returns mock data structure compatible with frontend
+import { SpamExpertsManager } from '@/lib/managers/spamexperts-manager';
 
 export async function GET() {
   try {
-    // TODO: Replace with actual SpamExpertsManager integration
-    // const manager = await createSpamExpertsManager();
-    // const domains = await manager.listDomains();
+    const manager = new SpamExpertsManager();
+    const domains = await manager.getDomains();
 
     return NextResponse.json({
       success: true,
-      result: [],
+      result: domains,
       errors: [],
-      messages: ['SpamExperts integration pending - configure SPAMEXPERTS_API_KEY']
+      messages: []
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -33,16 +30,28 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { domain, deliveryHost } = body;
 
-    // TODO: Replace with actual SpamExpertsManager integration
-    // const manager = await createSpamExpertsManager();
-    // const domain = await manager.addDomain(body);
+    if (!domain) {
+      return NextResponse.json(
+        {
+          success: false,
+          result: null,
+          errors: [{ code: 'SE004', message: 'Domain is required' }],
+          messages: []
+        },
+        { status: 400 }
+      );
+    }
+
+    const manager = new SpamExpertsManager();
+    const result = await manager.addDomain(domain, deliveryHost || '');
 
     return NextResponse.json({
       success: true,
-      result: { domain: body.domain, status: 'pending' },
+      result: result,
       errors: [],
-      messages: ['Domain add pending - SpamExperts integration not configured']
+      messages: []
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
