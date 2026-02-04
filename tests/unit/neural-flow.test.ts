@@ -4,7 +4,7 @@
  * Testa o fluxo de comandos aprendidos vs providers
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Mock types para simular o comportamento
 interface CommandResult {
