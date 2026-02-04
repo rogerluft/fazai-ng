@@ -2,36 +2,9 @@
  * Neural Flow Unit Tests
  *
  * Testa o fluxo de comandos aprendidos vs providers
- *
- * PROBLEMA IDENTIFICADO (commit 34d82f4):
- * - Quando learnedCommands existe, o código faz yield mas NÃO retorna
- * - O provider chain continua executando e pode emitir comandos duplicados
- *
- * FLUXO ATUAL (BUGADO):
- * ┌─────────────────────────────────────────────────────────────────┐
- * │ consultNeuralFlow() → learnedCommands                           │
- * │         ↓                                                        │
- * │ if (learnedCommands.length > 0)                                 │
- * │   → yield commands (EMITE)                                      │
- * │   → NÃO RETORNA! ← BUG                                          │
- * │         ↓                                                        │
- * │ Provider Chain executa                                          │
- * │   → yield commands (EMITE NOVAMENTE) ← DUPLICAÇÃO               │
- * └─────────────────────────────────────────────────────────────────┘
- *
- * FLUXO ESPERADO (CORRETO):
- * ┌─────────────────────────────────────────────────────────────────┐
- * │ consultNeuralFlow() → learnedCommands                           │
- * │         ↓                                                        │
- * │ if (learnedCommands.length > 0)                                 │
- * │   → yield commands                                              │
- * │   → RETURN ← CORRETO                                            │
- * │         ↓                                                        │
- * │ Provider Chain NÃO executa (função já retornou)                 │
- * └─────────────────────────────────────────────────────────────────┘
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 
 // Mock types para simular o comportamento
 interface CommandResult {
@@ -42,36 +15,10 @@ interface CommandResult {
 }
 
 /**
- * Simula o comportamento ATUAL (bugado) do generateLinuxCommands
- * Quando há comandos aprendidos, emite E continua para provider
- */
-async function* simulateCurrentBehavior(
-  hasLearnedCommands: boolean,
-  learnedCommands: string[],
-  providerCommands: string[]
-): AsyncGenerator<CommandResult> {
-  // Neural Flow: busca comandos aprendidos
-  if (hasLearnedCommands && learnedCommands.length > 0) {
-    // Emite comandos aprendidos
-    for (const cmd of learnedCommands) {
-      yield { type: 'command', command: cmd };
-    }
-    yield { type: 'allcommands', commands: learnedCommands };
-    // BUG: NÃO RETORNA! Continua para provider chain
-  }
-
-  // Provider Chain (sempre executa - BUG!)
-  for (const cmd of providerCommands) {
-    yield { type: 'command', command: cmd };
-  }
-  yield { type: 'allcommands', commands: providerCommands };
-}
-
-/**
- * Simula o comportamento CORRETO do generateLinuxCommands
+ * Simula o comportamento do Neural Flow no getLinuxCommandsFromAI
  * Quando há comandos aprendidos, emite E RETORNA
  */
-async function* simulateCorrectBehavior(
+async function* simulateNeuralFlowBehavior(
   hasLearnedCommands: boolean,
   learnedCommands: string[],
   providerCommands: string[]
@@ -110,46 +57,10 @@ describe('Neural Flow - Duplicação de Comandos', () => {
   const learnedCommands = ['sudo apt update', 'sudo apt upgrade -y'];
   const providerCommands = ['apt-get update', 'apt-get upgrade'];
 
-  describe('Comportamento ATUAL (Bugado)', () => {
-    it('deve emitir comandos aprendidos E provider (DUPLICAÇÃO)', async () => {
-      const results = await collectResults(
-        simulateCurrentBehavior(true, learnedCommands, providerCommands)
-      );
-
-      // Conta quantos "allcommands" foram emitidos
-      const allCommandsResults = results.filter(r => r.type === 'allcommands');
-
-      // BUG: Emite 2 vezes allcommands (learned + provider)
-      expect(allCommandsResults.length).toBe(2);
-
-      // Total de comandos individuais emitidos
-      const commandResults = results.filter(r => r.type === 'command');
-      expect(commandResults.length).toBe(4); // 2 learned + 2 provider = 4 (DUPLICAÇÃO!)
-    });
-
-    it('deve incluir comandos de AMBAS as fontes', async () => {
-      const results = await collectResults(
-        simulateCurrentBehavior(true, learnedCommands, providerCommands)
-      );
-
-      const allCommands = results
-        .filter(r => r.type === 'command')
-        .map(r => r.command);
-
-      // Contém comandos aprendidos
-      expect(allCommands).toContain('sudo apt update');
-      expect(allCommands).toContain('sudo apt upgrade -y');
-
-      // TAMBÉM contém comandos do provider (BUG!)
-      expect(allCommands).toContain('apt-get update');
-      expect(allCommands).toContain('apt-get upgrade');
-    });
-  });
-
-  describe('Comportamento CORRETO (Esperado)', () => {
+  describe('Neural Flow - Comportamento do Fluxo', () => {
     it('deve emitir APENAS comandos aprendidos quando existem', async () => {
       const results = await collectResults(
-        simulateCorrectBehavior(true, learnedCommands, providerCommands)
+        simulateNeuralFlowBehavior(true, learnedCommands, providerCommands)
       );
 
       // Apenas 1 allcommands (learned)
@@ -159,11 +70,18 @@ describe('Neural Flow - Duplicação de Comandos', () => {
       // Apenas comandos aprendidos
       const commandResults = results.filter(r => r.type === 'command');
       expect(commandResults.length).toBe(2); // Apenas 2 comandos aprendidos
+
+      const commands = commandResults.map(r => r.command);
+      expect(commands).toContain('sudo apt update');
+      expect(commands).toContain('sudo apt upgrade -y');
+
+      // NÃO deve conter comandos do provider
+      expect(commands).not.toContain('apt-get update');
     });
 
     it('deve usar provider APENAS quando não há comandos aprendidos', async () => {
       const results = await collectResults(
-        simulateCorrectBehavior(false, [], providerCommands)
+        simulateNeuralFlowBehavior(false, [], providerCommands)
       );
 
       // Apenas comandos do provider
@@ -177,46 +95,13 @@ describe('Neural Flow - Duplicação de Comandos', () => {
       // NÃO contém comandos aprendidos
       expect(commands).not.toContain('sudo apt update');
     });
-
-    it('NÃO deve emitir comandos do provider quando learned existe', async () => {
-      const results = await collectResults(
-        simulateCorrectBehavior(true, learnedCommands, providerCommands)
-      );
-
-      const allCommands = results
-        .filter(r => r.type === 'command')
-        .map(r => r.command);
-
-      // NÃO deve conter comandos do provider
-      expect(allCommands).not.toContain('apt-get update');
-      expect(allCommands).not.toContain('apt-get upgrade');
-    });
-  });
-
-  describe('Comparação de Resultados', () => {
-    it('comportamento atual produz MAIS resultados que o correto', async () => {
-      const currentResults = await collectResults(
-        simulateCurrentBehavior(true, learnedCommands, providerCommands)
-      );
-
-      const correctResults = await collectResults(
-        simulateCorrectBehavior(true, learnedCommands, providerCommands)
-      );
-
-      // Atual emite mais (BUG)
-      expect(currentResults.length).toBeGreaterThan(correctResults.length);
-
-      // Diferença é exatamente os comandos do provider
-      const diff = currentResults.length - correctResults.length;
-      expect(diff).toBe(providerCommands.length + 1); // +1 para allcommands
-    });
   });
 });
 
 describe('Neural Flow - Casos Extremos', () => {
   it('deve funcionar com array vazio de comandos aprendidos', async () => {
     const results = await collectResults(
-      simulateCorrectBehavior(true, [], ['cmd1'])
+      simulateNeuralFlowBehavior(true, [], ['cmd1'])
     );
 
     // Array vazio não deve entrar no if (length > 0)
@@ -226,7 +111,7 @@ describe('Neural Flow - Casos Extremos', () => {
 
   it('deve funcionar quando provider retorna vazio', async () => {
     const results = await collectResults(
-      simulateCorrectBehavior(false, [], [])
+      simulateNeuralFlowBehavior(false, [], [])
     );
 
     const commandResults = results.filter(r => r.type === 'command');
@@ -236,7 +121,7 @@ describe('Neural Flow - Casos Extremos', () => {
   it('deve manter ordem dos comandos aprendidos', async () => {
     const ordered = ['primeiro', 'segundo', 'terceiro'];
     const results = await collectResults(
-      simulateCorrectBehavior(true, ordered, ['ignorado'])
+      simulateNeuralFlowBehavior(true, ordered, ['ignorado'])
     );
 
     const commands = results
