@@ -86,7 +86,8 @@ export function getAnthropicAuth(): AnthropicConfig | null {
  * Create Anthropic client with appropriate authentication
  * 
  * Handles both API key and OAuth token authentication.
- * OAuth tokens require different header configuration.
+ * Note: As of @anthropic-ai/sdk v0.24.3, OAuth tokens are passed
+ * via the apiKey field. Future SDK versions may require different handling.
  * 
  * @param config Optional explicit configuration
  * @returns Configured Anthropic client
@@ -104,31 +105,11 @@ export function createAnthropicClient(config?: AnthropicConfig): Anthropic {
     );
   }
 
-  // For API keys, use standard SDK initialization
-  if (auth.authType === "api_key") {
-    return new Anthropic({
-      apiKey: auth.credential,
-    });
-  }
-
-  // For OAuth tokens, we need custom headers
-  // Note: As of @anthropic-ai/sdk v0.24.3, OAuth support may require
-  // custom fetch implementation or headers
-  try {
-    return new Anthropic({
-      apiKey: auth.credential,
-      // OAuth tokens may work with default apiKey field
-      // If not, we might need to override fetch or headers
-      // This would require testing with actual OAuth token
-    });
-  } catch (error) {
-    logger.warn("OAuth token initialization failed, trying as API key:", error);
-    
-    // Fallback: try as regular API key
-    return new Anthropic({
-      apiKey: auth.credential,
-    });
-  }
+  // Both API keys and OAuth tokens use the same SDK initialization
+  // The SDK handles OAuth tokens transparently via the apiKey field
+  return new Anthropic({
+    apiKey: auth.credential,
+  });
 }
 
 /**

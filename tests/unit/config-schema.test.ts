@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { validateConfig, validateField } from "../src/config/schema";
+import { validateConfig, validateField } from "../../src/config/schema";
 
 describe("Config Schema Validation", () => {
   describe("URL Validation", () => {

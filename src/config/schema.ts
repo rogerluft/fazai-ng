@@ -216,6 +216,17 @@ export const configSchema = z.object({
 export type FazAIConfig = z.infer<typeof configSchema>;
 
 /**
+ * Fields that should be converted to numbers
+ */
+const NUMERIC_FIELDS = new Set([
+  "FAZAI_MAX_RETRIES",
+  "WEB_PORT",
+  "VECTOR_DIMENSION",
+  "API_TIMEOUT",
+  "EMBEDDING_TIMEOUT",
+]);
+
+/**
  * Validate configuration object
  * 
  * @param config Configuration object to validate
@@ -236,13 +247,8 @@ export function validateConfig(config: Record<string, string | number | boolean>
         continue;
       }
 
-      // Convert numeric fields
-      if (
-        key.includes("TIMEOUT") ||
-        key === "FAZAI_MAX_RETRIES" ||
-        key === "WEB_PORT" ||
-        key === "VECTOR_DIMENSION"
-      ) {
+      // Convert numeric fields explicitly
+      if (NUMERIC_FIELDS.has(key)) {
         const num = typeof value === "number" ? value : parseInt(value as string, 10);
         if (!isNaN(num)) {
           typedConfig[key] = num;
