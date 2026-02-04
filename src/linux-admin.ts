@@ -29,19 +29,22 @@ const FALLBACK_CHAINS: Record<Provider, Provider[]> = {
 
 // Check if a provider is configured
 function isProviderAvailable(provider: Provider): boolean {
+  // Lei 768: Carrega do config se não estiver em process.env
+  const { getConfigValue } = require("./config");
+
   switch (provider) {
     case "llama":
       return true; // Always try llama.cpp local server
     case "ollama":
       return true; // Always try Ollama
     case "openrouter":
-      return !!process.env.OPENROUTER_API_KEY;
+      return !!(process.env.OPENROUTER_API_KEY || getConfigValue("OPENROUTER_API_KEY"));
     case "anthropic":
-      return !!process.env.ANTHROPIC_API_KEY;
+      return !!(process.env.ANTHROPIC_API_KEY || getConfigValue("ANTHROPIC_API_KEY"));
     case "openai":
-      return !!process.env.OPENAI_API_KEY;
+      return !!(process.env.OPENAI_API_KEY || getConfigValue("OPENAI_API_KEY"));
     case "google":
-      return !!(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY);
+      return !!(process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || getConfigValue("GOOGLE_API_KEY") || getConfigValue("GEMINI_API_KEY"));
     default:
       return false;
   }

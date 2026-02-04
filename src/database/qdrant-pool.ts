@@ -55,7 +55,7 @@ class QdrantConnectionPool {
       serviceName: "qdrant",
       failureThreshold: 3,        // Abre após 3 falhas
       resetTimeout: 30000,        // 30s antes de tentar novamente
-      operationTimeout: 10000,    // 10s timeout por operação
+      operationTimeout: 30000,    // 30s timeout por operação
     });
   }
 
@@ -133,7 +133,7 @@ class QdrantConnectionPool {
     this.client = new QdrantClient({
       url,
       apiKey: apiKey || undefined,
-      timeout: 5000, // 5s timeout (reduzido para falhar mais rápido)
+      timeout: 30000, // 30s timeout
     });
 
     // Health check: list collections

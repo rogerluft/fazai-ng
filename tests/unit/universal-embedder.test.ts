@@ -12,6 +12,7 @@ import {
   generateUniversalEmbedding,
   UniversalLocalEmbedder,
 } from "../../src/services/universal-embedder";
+import { getOllamaEmbedUrl } from "../../src/config";
 
 describe("Universal Local Embedder (Unit Tests)", () => {
   describe("padVector", () => {

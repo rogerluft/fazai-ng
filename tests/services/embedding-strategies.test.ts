@@ -19,6 +19,7 @@ import {
   type EmbeddingModel,
   EMBEDDING_STRATEGIES,
 } from "../../src/services/embedding-strategies";
+import { getOllamaEmbedUrl } from "../../src/config";
 
 describe("Embedding Strategies", () => {
   describe("semanticChunk()", () => {
@@ -235,6 +236,7 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("inference");
 
       expect(strategy.collection).toBe("fazai_inference");
+      expect(strategy.model).toBe("nomic-embed-text"); // Unused but present
       expect(strategy.dimension).toBe(0);
       expect(strategy.requiresEmbedding).toBe(false);
       expect(strategy.chunking.maxChunkSize).toBe(0);

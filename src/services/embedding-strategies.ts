@@ -223,7 +223,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   inference: {
     collection: "fazai_inference",
-    model: "mxbai-embed-large", // Unused but required for interface
+    model: "nomic-embed-text", // Lei 768: 768d native model // Unused but required for interface
     dimension: 0, // No embeddings needed
     chunking: CHUNKING_STRATEGIES.inference,
     distanceMetric: "Dot", // Unused

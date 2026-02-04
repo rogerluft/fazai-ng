@@ -326,7 +326,7 @@ class OpenAIEmbeddingService implements EmbeddingService {
   constructor(
     apiKey: string,
     model: string = "text-embedding-3-small",
-    dimension: number = 1536
+    dimension: number = 768
   ) {
     this.apiKey = apiKey;
     this.model = model;
@@ -556,13 +556,13 @@ export async function createEmbeddingService(): Promise<EmbeddingService> {
 
   if (openaiApiKey) {
     logger.info(
-      "✓ Using OpenAI for embeddings (text-embedding-3-small, 1536 dim)"
+      "✓ Using OpenAI for embeddings (text-embedding-3-small, 768 dim native)"
     );
     logger.warn("⚠️  OpenAI embeddings are paid ($0.02/1M tokens)");
     underlyingService = new OpenAIEmbeddingService(
       openaiApiKey,
       "text-embedding-3-small",
-      1536
+      768
     );
     return new CachedEmbeddingService(underlyingService, embeddingCache);
   }

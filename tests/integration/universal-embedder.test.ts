@@ -19,9 +19,10 @@ import {
   UniversalLocalEmbedder,
   padVector,
 } from "../../src/services/universal-embedder";
+import { getOllamaEmbedUrl } from "../../src/config";
 
 // Embedding server URL (local para melhor performance)
-const OLLAMA_EMBED_URL = "http://localhost:11434";
+const OLLAMA_EMBED_URL = getOllamaEmbedUrl();
 
 // Check if Ollama embedding server is available
 async function isOllamaAvailable(): Promise<boolean> {

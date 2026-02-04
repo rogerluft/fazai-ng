@@ -96,6 +96,9 @@ describe('Conversation Importer (REAL)', () => {
       collectionPrefix: TEST_PREFIX,
     });
 
+    // Debug: log result
+    console.log("Import result:", JSON.stringify(result, null, 2));
+
     // Validar resultado
     console.log('RESULT:', JSON.stringify(result, null, 2));
     if (result.errors.length > 0) {

@@ -13,7 +13,7 @@ import { describe, it } from 'vitest';
 /**
  * URL do Qdrant (pode ser sobrescrita por variável de ambiente)
  */
-export const QDRANT_URL = process.env.QDRANT_URL || 'http://localhost:6333';
+export const QDRANT_URL = process.env.QDRANT_URL || 'http://127.0.0.1:6333';
 
 /**
  * Timeout para verificação de disponibilidade (2 segundos)
