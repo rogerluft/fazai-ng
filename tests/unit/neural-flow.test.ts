@@ -15,7 +15,7 @@ interface CommandResult {
 }
 
 /**
- * Simula o comportamento do Neural Flow no generateLinuxCommands
+ * Simula o comportamento do Neural Flow no getLinuxCommandsFromAI
  * Quando há comandos aprendidos, emite E RETORNA
  */
 async function* simulateNeuralFlowBehavior(
