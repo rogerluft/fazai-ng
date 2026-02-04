@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Slider } from "@/components/ui/slider";
-import { Trash2, Plus } from "lucide-react";
+import { Trash2, Plus, Edit2 } from "lucide-react";
 import type { Trait } from "@/types/fazai";
 
 interface TraitEditorProps {
@@ -27,18 +27,39 @@ export function TraitEditor({
     intensity: 0.5,
   });
   const [showForm, setShowForm] = useState(false);
+  const [editingTraitName, setEditingTraitName] = useState<string | null>(null);
 
-  const handleAddTrait = () => {
+  const handleSaveTrait = () => {
     if (newTrait.trait_name && newTrait.value && newTrait.category) {
-      onAddTrait({
+      const traitData: Trait = {
         trait_name: newTrait.trait_name,
         value: newTrait.value,
         category: newTrait.category as any,
         intensity: newTrait.intensity || 0.5,
-      });
+      };
+
+      if (editingTraitName) {
+        onUpdateTrait(traitData);
+      } else {
+        onAddTrait(traitData);
+      }
+
       setNewTrait({ category: "comunicação", intensity: 0.5 });
       setShowForm(false);
+      setEditingTraitName(null);
     }
+  };
+
+  const handleEditClick = (trait: Trait) => {
+    setNewTrait(trait);
+    setEditingTraitName(trait.trait_name);
+    setShowForm(true);
+  };
+
+  const handleCancel = () => {
+    setNewTrait({ category: "comunicação", intensity: 0.5 });
+    setShowForm(false);
+    setEditingTraitName(null);
   };
 
   const categories = [
@@ -52,17 +73,32 @@ export function TraitEditor({
       <div className="flex items-center justify-between">
         <h2 className="text-2xl font-bold">Traits</h2>
         <Button
-          onClick={() => setShowForm(!showForm)}
+          onClick={showForm ? handleCancel : () => setShowForm(true)}
           variant={showForm ? "outline" : "default"}
         >
-          <Plus className="h-4 w-4" />
-          {showForm ? "Cancel" : "Add Trait"}
+          {showForm ? (
+            "Cancel"
+          ) : (
+            <>
+              <Plus className="mr-2 h-4 w-4" /> Add Trait
+            </>
+          )}
         </Button>
       </div>
 
       {showForm && (
         <Card className="border-primary/50 bg-primary/5">
-          <CardContent className="pt-6">
+          <CardHeader>
+            <CardTitle>
+              {editingTraitName ? "Edit Trait" : "Add New Trait"}
+            </CardTitle>
+            <CardDescription>
+              {editingTraitName
+                ? "Update the details of the selected trait"
+                : "Define a new behavioral characteristic for the agent"}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
             <div className="space-y-4">
               <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
@@ -70,10 +106,16 @@ export function TraitEditor({
                   <Input
                     placeholder="e.g., Autonomy, Creativity"
                     value={newTrait.trait_name || ""}
+                    disabled={!!editingTraitName}
                     onChange={(e) =>
                       setNewTrait({ ...newTrait, trait_name: e.target.value })
                     }
                   />
+                  {editingTraitName && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Trait name cannot be changed while editing
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="text-sm font-medium">Value</label>
@@ -129,8 +171,8 @@ export function TraitEditor({
                 />
               </div>
 
-              <Button onClick={handleAddTrait} className="w-full">
-                Add Trait
+              <Button onClick={handleSaveTrait} className="w-full">
+                {editingTraitName ? "Update Trait" : "Add Trait"}
               </Button>
             </div>
           </CardContent>
@@ -181,12 +223,22 @@ export function TraitEditor({
                         </div>
                       </div>
                     </div>
-                    <button
-                      onClick={() => onRemoveTrait(trait.trait_name)}
-                      className="text-muted-foreground hover:text-destructive transition-colors p-2"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                    <div className="flex flex-col gap-2">
+                      <button
+                        onClick={() => handleEditClick(trait)}
+                        className="text-muted-foreground hover:text-primary transition-colors p-2"
+                        title="Edit trait"
+                      >
+                        <Edit2 className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => onRemoveTrait(trait.trait_name)}
+                        className="text-muted-foreground hover:text-destructive transition-colors p-2"
+                        title="Delete trait"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

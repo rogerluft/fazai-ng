@@ -41,6 +41,46 @@ export async function POST(request: Request) {
   }
 }
 
+export async function PUT(request: Request) {
+  try {
+    const body = await request.json();
+    const { trait_name, category, value, intensity, context, tags } = body;
+
+    if (!trait_name || !category || !value) {
+      return NextResponse.json(
+        { error: "Missing required fields: trait_name, category, value" },
+        { status: 400 }
+      );
+    }
+
+    // Generate ID from trait name hash (consistent with POST)
+    const id = Math.abs(
+      trait_name.split("").reduce((a: number, b: string) => a + b.charCodeAt(0), 0)
+    );
+
+    await upsertPoint("fazai_personality", id, {
+      trait_name,
+      category,
+      value,
+      intensity: intensity || 0.5,
+      context,
+      tags,
+      updated_at: new Date().toISOString(),
+    });
+
+    return NextResponse.json({
+      success: true,
+      trait: { id, trait_name, category, value, intensity, context, tags },
+    });
+  } catch (error: any) {
+    console.error("Failed to update trait:", error);
+    return NextResponse.json(
+      { error: "Failed to update trait", details: error.message },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
