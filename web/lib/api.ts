@@ -63,11 +63,23 @@ export async function getMemoryByRole(role: string, limit: number = 50): Promise
 
 // Personality
 export async function getPersonality(): Promise<Personality> {
-    return Promise.resolve({ traits: [] });
+  const response = await apiClient.get<Personality>("/api/personality");
+  return response.data;
 }
 
-export async function addTrait(trait: any): Promise<void> { }
-export async function removeTrait(name: string): Promise<void> { }
+export async function addTrait(trait: any): Promise<void> {
+  await apiClient.post("/api/personality/traits", trait);
+}
+
+export async function removeTrait(name: string): Promise<void> {
+  await apiClient.delete("/api/personality/traits", {
+    params: { trait_name: name },
+  });
+}
+
+export async function updateTrait(trait: any): Promise<void> {
+  await apiClient.put("/api/personality/traits", trait);
+}
 
 // Source Code endpoints
 export async function getSourceCode(limit: number = 100): Promise<SourceCode[]> {
@@ -86,24 +98,25 @@ export default apiClient;
 
 // This export map ensures all functions are available under a single 'api' import
 export const api = {
-    getAgentStatus,
-    pauseAgent,
-    resumeAgent,
-    stopAgent,
-    getRecentActions,
-    getRules,
-    createRule,
-    updateRule,
-    deleteRule,
-    testRule,
-    getKnowledge,
-    createKnowledge,
-    deleteKnowledge,
-    getLearning,
-    searchMemory,
-    getMemoryByRole,
-    getPersonality,
-    addTrait,
-    removeTrait,
-    getSourceCode,
+  getAgentStatus,
+  pauseAgent,
+  resumeAgent,
+  stopAgent,
+  getRecentActions,
+  getRules,
+  createRule,
+  updateRule,
+  deleteRule,
+  testRule,
+  getKnowledge,
+  createKnowledge,
+  deleteKnowledge,
+  getLearning,
+  searchMemory,
+  getMemoryByRole,
+  getPersonality,
+  addTrait,
+  removeTrait,
+  updateTrait,
+  getSourceCode,
 };
