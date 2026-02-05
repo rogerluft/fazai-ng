@@ -9,6 +9,7 @@ import fs from "fs";
 import path from "path";
 import { createHash } from "crypto";
 import { QdrantClient } from "@qdrant/js-client-rest";
+import PQueue from "p-queue";
 import { logger } from "./logger";
 import chalk from "chalk";
 import { createEmbeddingService, EmbeddingService } from "./services/embeddings-refactored";
@@ -69,6 +70,12 @@ type ChatGPTConversation = {
 // Cliente Qdrant (usa pool singleton)
 // ==============================================================================
 // REMOVIDO: agora usa getQdrantClientFromPool() do qdrant-pool.ts
+
+// ==============================================================================
+// Constantes de Performance
+// ==============================================================================
+
+const MAX_CONCURRENCY = 10;
 
 // ==============================================================================
 // Importação Principal
@@ -255,7 +262,9 @@ async function processClaudeExport(
 
   logger.info(chalk.cyan(`📝 Processando ${conversations.length} conversas Claude`));
 
-  for (const conv of conversations) {
+  const queue = new PQueue({ concurrency: MAX_CONCURRENCY });
+
+  const tasks = conversations.map(conv => queue.add(async () => {
     try {
       // Gerar embeddings para todas as mensagens da conversa em um batch
       const messageContents = conv.messages.map(msg => msg.content);
@@ -324,7 +333,9 @@ async function processClaudeExport(
       result.errors.push(`Erro ao importar conversa ${conv.id}: ${error.message}`);
       result.skipped++;
     }
-  }
+  }));
+
+  await Promise.all(tasks);
 }
 
 // ==============================================================================
@@ -350,7 +361,9 @@ async function processChatGPTExport(
 
   logger.info(chalk.cyan(`📝 Processando ${conversations.length} conversas ChatGPT`));
 
-  for (const conv of conversations) {
+  const queue = new PQueue({ concurrency: MAX_CONCURRENCY });
+
+  const tasks = conversations.map(conv => queue.add(async () => {
     try {
       // Converter mapping para array de mensagens
       const messages = Object.values(conv.mapping)
@@ -442,7 +455,9 @@ async function processChatGPTExport(
       result.errors.push(`Erro ao importar conversa ${conv.id}: ${error.message}`);
       result.skipped++;
     }
-  }
+  }));
+
+  await Promise.all(tasks);
 }
 
 // ==============================================================================
