@@ -228,6 +228,11 @@ OLLAMA_BASE_URL=http://localhost:11434
 # Web search fallback provider (currently DuckDuckGo)
 # WEB_SEARCH_PROVIDER=duckduckgo
 
+# Block Storage Configuration
+# EXECUTION_BLOCKS_BACKEND=json | sqlite | qdrant
+# EXECUTION_BLOCKS_SQLITE_PATH=/opt/fazai/data/execution-blocks.sqlite
+# EXECUTION_BLOCKS_PATH=/opt/fazai/data/execution-blocks.json
+
 # Vector store integration (Qdrant)
 # VECTOR_PROVIDER=qdrant
 # VECTOR_DIMENSION=1536

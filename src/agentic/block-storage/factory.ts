@@ -14,6 +14,7 @@
 import { BlockStorageBackend, StorageBackendType, SystemContext, BlockMatch } from "./types";
 import { JsonBlockStorage } from "./json-backend";
 import { QdrantBlockStorage } from "./qdrant-backend";
+import { SqliteBlockStorage } from "./sqlite-backend";
 import { getConfigValue } from "../../config";
 import { logger } from "../../logger";
 
@@ -41,9 +42,7 @@ export function createBlockStorage(): BlockStorageBackend {
       break;
 
     case "sqlite":
-      // TODO: Implementar SQLiteBlockStorage
-      logger.warn("SQLite backend not implemented, falling back to JSON");
-      instance = new JsonBlockStorage();
+      instance = new SqliteBlockStorage();
       break;
 
     default:
