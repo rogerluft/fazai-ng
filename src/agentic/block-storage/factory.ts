@@ -79,14 +79,19 @@ export async function findBlocksForIntents(
   const storage = createBlockStorage();
   const results = new Map<string, BlockMatch | null>();
 
-  for (const intent of intents) {
+  const searchPromises = intents.map(async (intent) => {
     try {
       const matches = await storage.findSimilar(intent, context, threshold, 1);
-      results.set(intent, matches.length > 0 ? matches[0] : null);
+      return { intent, match: matches.length > 0 ? matches[0] : null };
     } catch (error) {
       logger.debug(`Failed to find block for intent "${intent}": ${error}`);
-      results.set(intent, null);
+      return { intent, match: null };
     }
+  });
+
+  const searchResults = await Promise.all(searchPromises);
+  for (const { intent, match } of searchResults) {
+    results.set(intent, match);
   }
 
   return results;
