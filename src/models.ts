@@ -112,28 +112,33 @@ function getBuiltInModels(): Model[] {
   // Google Gemini (preview feature)
   if (previewEnabled) {
     models.push({
-      name: "gemini-3.0-pro-latest",
+      name: "gemini-3-pro-preview",
       provider: "google",
-      description: "Gemini 3 Pro (Preview)",
+      description: "Gemini 3 Pro Preview (Latest experimental)",
     });
   }
 
-  // Google Gemini (stable)
+  // Google Gemini (stable - Google One AI Premium models)
   models.push(
+    {
+      name: "gemini-3-pro",
+      provider: "google",
+      description: "Gemini 3 Pro (state-of-the-art reasoning)",
+    },
+    {
+      name: "gemini-3-flash",
+      provider: "google",
+      description: "Gemini 3 Flash (ultra-low latency)",
+    },
     {
       name: "gemini-2.5-pro",
       provider: "google",
-      description: "Gemini 2.5 Pro (deep reasoning)",
+      description: "Gemini 2.5 Pro (stable, deep reasoning)",
     },
     {
       name: "gemini-2.5-flash",
       provider: "google",
       description: "Gemini 2.5 Flash (fast & balanced)",
-    },
-    {
-      name: "gemini-2.5-flash-lite",
-      provider: "google",
-      description: "Gemini 2.5 Flash Lite (quick tasks)",
     }
   );
 

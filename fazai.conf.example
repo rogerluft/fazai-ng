@@ -91,18 +91,21 @@ MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
 # PERPLEXITY_API_KEY=pplx-xxxxx
 
 # -----------------------------------------------------------------------------
-# GOOGLE GEMINI (Google's AI Models)
+# GOOGLE GEMINI (Google's AI Models - Google One AI Premium)
 # -----------------------------------------------------------------------------
 # Native Google Gemini API (not via OpenRouter)
 #
 # Get API key: https://makersuite.google.com/app/apikey
 #
-# Available models (2026):
-#   - gemini-3.0-pro        → State-of-the-art reasoning (DEFAULT)
-#   - gemini-3.0-flash      → Ultra-low latency, high throughput
-#   - gemini-2.5-pro        → Previous generation stable
+# Available models (2026 - Updated):
+#   - gemini-3-pro          → State-of-the-art reasoning (RECOMMENDED)
+#   - gemini-3-pro-preview  → Latest preview with enhanced capabilities
+#   - gemini-3-flash        → Ultra-low latency, high throughput
+#   - gemini-2.5-pro        → Stable previous generation
+#   - gemini-2.5-flash      → Fast & balanced (previous gen)
 #
-# MODELS_GOOGLE=gemini-3.0-pro,gemini-3.0-flash,gemini-2.5-pro
+# Note: Limit 3 models per provider
+# MODELS_GOOGLE=gemini-3-pro,gemini-3-flash,gemini-2.5-pro
 # GEMINI_API_KEY=AIzaSyxxxxx
 
 # -----------------------------------------------------------------------------
@@ -121,23 +124,31 @@ MODELS_PERPLEXITY=llama-3-sonar-small-32k-online,llama-3-sonar-large-32k-online
 # OPENAI_API_KEY=sk-xxxxx
 
 # -----------------------------------------------------------------------------
-# ANTHROPIC CLAUDE (Optional, Requires API Key)
+# ANTHROPIC CLAUDE (Optional, Requires API Key or OAuth Token)
 # -----------------------------------------------------------------------------
 # Anthropic's Claude models (commercial service)
 #
 # Get API key: https://console.anthropic.com/
+# OAuth token: Run `claude setup-token` (for Claude Code CLI users)
 #
-# Claude 4.5 Family (2025/2026):
-#   - claude-opus-4-5-20251101    → Premium: Deep reasoning, complex tasks
-#   - claude-sonnet-4-5-20250929  → Balanced: Fast + capable (RECOMMENDED)
-#   - claude-3-5-haiku-latest     → Efficient: Quick tasks, low cost
+# Authentication Methods:
+# 1. API Key (standard): ANTHROPIC_API_KEY=sk-ant-xxxxx
+# 2. OAuth Token (Claude Code CLI): ANTHROPIC_OAUTH_TOKEN=<token from claude setup-token>
 #
-# Previous Generation (still supported):
-#   - claude-3-5-sonnet-latest    → Claude 3.5 Sonnet
-#   - claude-3-haiku-20240307     → Claude 3 Haiku
+# Claude 4 Family (2025/2026 - Updated naming):
+#   - claude-opus-4-5    → Premium: Deep reasoning, complex tasks
+#   - claude-sonnet-4-5  → Balanced: Fast + capable (RECOMMENDED)
+#   - claude-haiku-4     → Efficient: Quick tasks, low cost
 #
-# MODELS_ANTHROPIC=claude-opus-4-5-20251101,claude-sonnet-4-5-20250929,claude-3-5-haiku-latest
+# Legacy naming (still supported):
+#   - claude-opus-4-5-20251101
+#   - claude-sonnet-4-5-20250929
+#   - claude-3-5-haiku-latest
+#
+# MODELS_ANTHROPIC=claude-opus-4-5,claude-sonnet-4-5,claude-haiku-4
 # ANTHROPIC_API_KEY=sk-ant-xxxxx
+# or
+# ANTHROPIC_OAUTH_TOKEN=<oauth token from claude setup-token>
 
 # Perplexity AI models (cloud, max 3, requires API key)
 # Get API key: https://docs.perplexity.ai/docs/getting-started
