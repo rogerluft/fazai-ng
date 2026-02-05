@@ -40,7 +40,13 @@ function isProviderAvailable(provider: Provider): boolean {
     case "openrouter":
       return !!(process.env.OPENROUTER_API_KEY || getConfigValue("OPENROUTER_API_KEY"));
     case "anthropic":
-      return !!(process.env.ANTHROPIC_API_KEY || getConfigValue("ANTHROPIC_API_KEY"));
+      // Support both OAuth token and API key
+      return !!(
+        process.env.ANTHROPIC_OAUTH_TOKEN || 
+        getConfigValue("ANTHROPIC_OAUTH_TOKEN") ||
+        process.env.ANTHROPIC_API_KEY || 
+        getConfigValue("ANTHROPIC_API_KEY")
+      );
     case "openai":
       return !!(process.env.OPENAI_API_KEY || getConfigValue("OPENAI_API_KEY"));
     case "google":
@@ -482,8 +488,8 @@ export async function* getLinuxCommandsFromAI(
       yield { type: "command", command: cmd };
     }
     yield { type: "allcommands", commands: learnedCommands };
-    // FIX: Retorna após emitir comandos aprendidos para evitar duplicação
-    // com comandos do provider chain (issue identificada em análise de código)
+    // ✅ FIX: Retorna após emitir comandos aprendidos para evitar duplicação
+    // com comandos do provider chain (Validado e corrigido)
     return;
   }
 

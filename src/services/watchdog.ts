@@ -1,3 +1,4 @@
+import { readFile } from "fs/promises";
 import { logger } from "../logger";
 
 /**
@@ -22,8 +23,7 @@ export class ResourceWatchdog {
   private async check(pid: number) {
     try {
       // Check memory usage via /proc (Linux specific, fast)
-      const fs = require('fs');
-      const status = fs.readFileSync(`/proc/${pid}/status`, 'utf8');
+      const status = await readFile(`/proc/${pid}/status`, 'utf8');
       const rssLine = status.split('\n').find((l: string) => l.startsWith('VmRSS:'));
 
       if (rssLine) {

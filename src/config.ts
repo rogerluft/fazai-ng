@@ -175,6 +175,41 @@ export function listConfigEntries(): Record<string, string> {
   return entries;
 }
 
+/**
+ * Validate configuration file using Zod schema
+ * 
+ * @returns Validation result with errors if any
+ */
+export function validateConfiguration(): {
+  success: boolean;
+  errors: Array<{ field: string; message: string }>;
+} {
+  const { validateConfig } = require("./config/schema");
+  const entries = listConfigEntries();
+  return validateConfig(entries);
+}
+
+/**
+ * Get configuration entries with validation
+ * 
+ * @param throwOnError If true, throws on validation errors
+ * @returns Configuration entries
+ */
+export function getValidatedConfig(throwOnError: boolean = false): Record<string, string> {
+  const entries = listConfigEntries();
+  const { validateConfig } = require("./config/schema");
+  const validation = validateConfig(entries);
+  
+  if (!validation.success && throwOnError) {
+    const errorMsg = validation.errors
+      .map((e) => `${e.field}: ${e.message}`)
+      .join("\n");
+    throw new Error(`Configuration validation failed:\n${errorMsg}`);
+  }
+  
+  return entries;
+}
+
 export function getConfigFilePath(): string {
   return resolveConfigPath();
 }

@@ -118,6 +118,11 @@ function cosineSimilarity(a: number[], b: number[]): number {
  */
 export class SemanticCache {
   private static instance: SemanticCache | null = null;
+  private static handlersRegistered = false;
+
+  // Signal handlers for graceful shutdown
+  private static sigintHandler: (() => void) | null = null;
+  private static sigtermHandler: (() => void) | null = null;
 
   // Cache storage
   private cache: Map<string, CachedResponse> = new Map();
@@ -369,6 +374,23 @@ export class SemanticCache {
     // Prevent timer from keeping process alive
     if (this.cleanupTimer.unref) {
       this.cleanupTimer.unref();
+    }
+
+    // Register process signal handlers for graceful shutdown (only once globally)
+    if (!SemanticCache.handlersRegistered) {
+      SemanticCache.sigintHandler = () => {
+        logger.debug("Received SIGINT, stopping semantic cache...");
+        if (SemanticCache.instance) SemanticCache.instance.stop();
+      };
+      SemanticCache.sigtermHandler = () => {
+        logger.debug("Received SIGTERM, stopping semantic cache...");
+        if (SemanticCache.instance) SemanticCache.instance.stop();
+      };
+
+      process.on("SIGINT", SemanticCache.sigintHandler);
+      process.on("SIGTERM", SemanticCache.sigtermHandler);
+
+      SemanticCache.handlersRegistered = true;
     }
   }
 
