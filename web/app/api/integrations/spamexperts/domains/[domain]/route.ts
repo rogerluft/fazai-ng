@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { SpamExpertsManager } from '@/lib/managers/spamexperts-manager';
 
 export async function DELETE(
   request: NextRequest,
@@ -8,15 +9,14 @@ export async function DELETE(
   try {
     const { domain } = await params;
 
-    // TODO: Replace with actual SpamExpertsManager integration
-    // const manager = await createSpamExpertsManager();
-    // await manager.removeDomain(domain);
+    const manager = new SpamExpertsManager();
+    await manager.deleteDomain(domain);
 
     return NextResponse.json({
       success: true,
       result: { domain },
       errors: [],
-      messages: ['Domain removal pending - SpamExperts integration not configured']
+      messages: ['Domain removed successfully']
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
