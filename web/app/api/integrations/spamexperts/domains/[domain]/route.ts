@@ -16,7 +16,7 @@ export async function DELETE(
       success: true,
       result: { domain },
       errors: [],
-      messages: ['Domain removed successfully']
+      messages: [`Domain ${domain} removed successfully from SpamExperts`]
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
