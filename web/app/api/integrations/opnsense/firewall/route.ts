@@ -1,19 +1,19 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { OPNsenseManager } from '@/lib/managers/opnsense-manager';
 
 // OPNsense Firewall API
 // Returns data compatible with OPNsense API response structure
 
 export async function GET() {
   try {
-    // TODO: Replace with actual OPNsenseManager integration
-    // const manager = await createOPNsenseManager();
-    // const rules = await manager.listFirewallRules();
+    const manager = new OPNsenseManager();
+    const rules = await manager.getFirewallRules();
 
     return NextResponse.json({
       result: 'ok',
-      data: [],
-      message: 'OPNsense integration pending - configure OPNSENSE_API credentials'
+      data: rules,
+      message: 'Successfully retrieved firewall rules'
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
@@ -31,15 +31,13 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-
-    // TODO: Replace with actual OPNsenseManager integration
-    // const manager = await createOPNsenseManager();
-    // const rule = await manager.addFirewallRule(body);
+    const manager = new OPNsenseManager();
+    const rule = await manager.createFirewallRule(body);
 
     return NextResponse.json({
       result: 'ok',
-      data: { uuid: 'pending-' + Date.now(), ...body },
-      message: 'Firewall rule add pending - OPNsense integration not configured'
+      data: rule,
+      message: 'Firewall rule created successfully'
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
