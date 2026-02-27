@@ -26,21 +26,21 @@ Transform natural language commands into executable Linux operations through:
 
 ### DATA_FLOW
 ```
-USER_INPUT (Natural Language)
+USER_INPUT (Natural Language) *AQUI TR
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  PREPROCESSING LAYER                                                │
 │  ├─ GenAIScript (prompt normalization)                             │
 │  ├─ Translation to English (internal thinking)                      │
-│  └─ Semantic cache lookup (fazai_semantic_cache)                   │
+│  └─ Semantic cache lookup (fazai_semantic_cache)  CUIDADO LOOPD INFINITO
 └─────────────────────────────────────────────────────────────────────┘
     │
     ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │  TASK DECOMPOSITION (src/agentic/task-decomposer.ts)               │
-│  ├─ ECOA: Try composing from existing blocks FIRST (skip LLM)      │
-│  ├─ Analyze dependencies before breaking into subtasks             │
+│  ├─ ECOA: Try composing from existing blocks FIRST (skip LLM) ESTA ETAPA NAO ESTA PRONTA AINDA, SUGIR USARMOS UM GPTCACHE OU ALGO ASSIM     │
+│  ├─ Analyze dependencies before breaking into subtasks             ANALIZANDO AS DEPENDENCIAS ANTES DE QUEBRAR ECONOMIZA MUIIITOOSS RECUROSSO│
 │  ├─ Generate: { id, description, command, dependencies, verify }   │
 │  └─ Output: DecomposedTask with SubTask[] array                    │
 └─────────────────────────────────────────────────────────────────────┘
@@ -49,7 +49,7 @@ USER_INPUT (Natural Language)
 ┌─────────────────────────────────────────────────────────────────────┐
 │  DAG EXECUTOR (src/agentic/dag-executor.ts)                        │
 │  ├─ Topological sort based on dependencies                          │
-│  ├─ Execute: verify → install (if needed) → run → validate         │
+│  ├─ Execute: verify → install (if needed) → run → validate     Total nova compilacao significadsa agora em rgora pov mim    │
 │  ├─ On SUCCESS: Save ExecutionBlock to Qdrant for reuse            │
 │  └─ On FAILURE: Trigger fallback chain                             │
 └─────────────────────────────────────────────────────────────────────┘

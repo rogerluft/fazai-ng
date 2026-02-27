@@ -232,3 +232,4 @@ gha-creds-*.json
 # ===========================================
 docs/restricted/
 .claude/restricted/
+restricted

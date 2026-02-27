@@ -1,0 +1,1023 @@
+#!/usr/bin/env python3
+"""
+fzrclone - Rclone Inteligente com Dashboard TUI
+Sync bidirecional com cloud storage (Google Drive, S3, etc.)
+Criado para Andarilho dos Véus
+"""
+
+import os
+import sys
+import argparse
+import subprocess
+import json
+import time
+from datetime import datetime
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Tuple
+from enum import Enum, auto
+
+try:
+    from rich.console import Console, Group
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+    from rich.live import Live
+    from rich.text import Text
+    from rich import box
+    from rich.prompt import Prompt, Confirm
+except ImportError:
+    print("Instalando dependências...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "rich", "-q"])
+    from rich.console import Console, Group
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+    from rich.live import Live
+    from rich.text import Text
+    from rich import box
+    from rich.prompt import Prompt, Confirm
+
+console = Console()
+
+VERSION = "1.0.0"
+
+# ============================================================================
+# ENUMS E DATACLASSES
+# ============================================================================
+
+class Direction(Enum):
+    PUSH = "push"   # local → remote
+    PULL = "pull"   # remote → local
+
+class ConflictAction(Enum):
+    KEEP_LOCAL = auto()
+    KEEP_REMOTE = auto()
+    KEEP_NEWER = auto()
+    SKIP = auto()
+
+class FileStatus(Enum):
+    PENDING = "⏳"
+    SYNCING = "🔄"
+    DONE = "✅"
+    CONFLICT = "⚠️"
+    SKIPPED = "⏭️"
+    ERROR = "❌"
+    DELETED = "🗑️"
+    DELETING = "🔥"
+
+@dataclass
+class RemoteFileInfo:
+    """Info de arquivo no remote (via rclone lsjson)"""
+    path: str
+    size: int
+    mod_time: str   # ISO 8601 do rclone
+    is_dir: bool
+
+    @property
+    def mtime_epoch(self) -> float:
+        """Converte mod_time ISO pra epoch"""
+        try:
+            # rclone retorna formato: 2026-02-27T03:29:24.131Z
+            dt = datetime.fromisoformat(self.mod_time.replace("Z", "+00:00"))
+            return dt.timestamp()
+        except:
+            return 0.0
+
+    @property
+    def size_human(self) -> str:
+        size = self.size
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+
+    @property
+    def mtime_str(self) -> str:
+        try:
+            dt = datetime.fromisoformat(self.mod_time.replace("Z", "+00:00"))
+            return dt.strftime("%Y-%m-%d %H:%M:%S")
+        except:
+            return self.mod_time
+
+@dataclass
+class LocalFileInfo:
+    """Info de arquivo local"""
+    path: str
+    size: int
+    mtime: float
+    is_dir: bool
+
+    @property
+    def size_human(self) -> str:
+        size = self.size
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+
+    @property
+    def mtime_str(self) -> str:
+        return datetime.fromtimestamp(self.mtime).strftime("%Y-%m-%d %H:%M:%S")
+
+@dataclass
+class SyncItem:
+    rel_path: str
+    local: Optional[LocalFileInfo] = None
+    remote: Optional[RemoteFileInfo] = None
+    status: FileStatus = FileStatus.PENDING
+    action: Optional[ConflictAction] = None
+
+@dataclass
+class SyncStats:
+    total_files: int = 0
+    synced: int = 0
+    skipped: int = 0
+    conflicts: int = 0
+    errors: int = 0
+    deleted: int = 0
+    bytes_transferred: int = 0
+    bytes_deleted: int = 0
+    start_time: Optional[float] = None
+
+    @property
+    def elapsed(self) -> str:
+        if not self.start_time:
+            return "00:00:00"
+        elapsed = time.time() - self.start_time
+        hours, remainder = divmod(int(elapsed), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    @property
+    def bytes_transferred_human(self) -> str:
+        size = self.bytes_transferred
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+
+    @property
+    def bytes_deleted_human(self) -> str:
+        size = self.bytes_deleted
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+
+
+# ============================================================================
+# HELPERS RCLONE
+# ============================================================================
+
+def rclone_installed() -> bool:
+    """Verifica se rclone está instalado"""
+    try:
+        subprocess.run(["rclone", "version"], capture_output=True, check=True)
+        return True
+    except (FileNotFoundError, subprocess.CalledProcessError):
+        return False
+
+def rclone_list_remotes() -> List[str]:
+    """Lista remotes configurados"""
+    try:
+        result = subprocess.run(
+            ["rclone", "listremotes"],
+            capture_output=True, text=True, check=True
+        )
+        return [r.strip() for r in result.stdout.strip().split("\n") if r.strip()]
+    except subprocess.CalledProcessError:
+        return []
+
+def rclone_lsjson(remote_path: str, recursive: bool = True) -> List[Dict]:
+    """Lista arquivos do remote em formato JSON"""
+    cmd = ["rclone", "lsjson", remote_path]
+    if recursive:
+        cmd.append("--recursive")
+    cmd.append("--no-modtime")  # mais rápido no scan inicial
+    cmd.remove("--no-modtime")  # queremos modtime pra comparação
+
+    try:
+        result = subprocess.run(
+            cmd, capture_output=True, text=True, check=True,
+            timeout=300  # 5 min timeout
+        )
+        return json.loads(result.stdout) if result.stdout.strip() else []
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]Erro rclone lsjson: {e.stderr}[/red]")
+        return []
+    except subprocess.TimeoutExpired:
+        console.print("[red]Timeout ao listar remote (5 min)[/red]")
+        return []
+
+def rclone_copy_file(src: str, dst: str, bwlimit: Optional[str] = None) -> bool:
+    """Copia um arquivo via rclone"""
+    cmd = ["rclone", "copyto", src, dst]
+    if bwlimit:
+        cmd.extend(["--bwlimit", bwlimit])
+
+    try:
+        subprocess.run(cmd, capture_output=True, text=True, check=True, timeout=600)
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as e:
+        return False
+
+def rclone_delete_file(remote_path: str) -> bool:
+    """Deleta um arquivo do remote"""
+    try:
+        subprocess.run(
+            ["rclone", "deletefile", remote_path],
+            capture_output=True, text=True, check=True, timeout=60
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return False
+
+def rclone_mkdir(remote_path: str) -> bool:
+    """Cria diretório no remote"""
+    try:
+        subprocess.run(
+            ["rclone", "mkdir", remote_path],
+            capture_output=True, text=True, check=True, timeout=30
+        )
+        return True
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        return False
+
+
+# ============================================================================
+# CLASSE PRINCIPAL
+# ============================================================================
+
+class FzRclone:
+    def __init__(
+        self,
+        local_path: str,
+        remote_path: str,
+        direction: Direction,
+        dry_run: bool = False,
+        silent: bool = False,
+        replace_all: bool = False,
+        delete_dst: bool = False,
+        filter_pattern: Optional[str] = None,
+        bwlimit: Optional[str] = None,
+    ):
+        self.local_path = Path(local_path).resolve()
+        self.remote_path = remote_path  # ex: "gdriverl:backup/projetos"
+        self.direction = direction
+        self.dry_run = dry_run
+        self.silent = silent
+        self.replace_all = replace_all
+        self.delete_dst = delete_dst
+        self.filter_pattern = filter_pattern
+        self.bwlimit = bwlimit
+
+        self.items: List[SyncItem] = []
+        self.stats = SyncStats()
+        self.current_item: Optional[SyncItem] = None
+        self.global_action: Optional[ConflictAction] = None
+        self.running = False
+        self.history_file = self.local_path / ".fzrclone_history.json"
+
+    # ====================================================================
+    # SCAN
+    # ====================================================================
+
+    def scan_local(self) -> Dict[str, LocalFileInfo]:
+        """Escaneia diretório local"""
+        files: Dict[str, LocalFileInfo] = {}
+
+        if not self.local_path.exists():
+            return files
+
+        for item in self.local_path.rglob("*"):
+            # Ignorar metadata do fzrclone
+            if ".fzrclone" in str(item):
+                continue
+
+            rel_path = str(item.relative_to(self.local_path))
+
+            # Filtro
+            if self.filter_pattern:
+                from fnmatch import fnmatch
+                if not fnmatch(rel_path, self.filter_pattern) and not item.is_dir():
+                    continue
+
+            try:
+                stat = item.stat()
+                files[rel_path] = LocalFileInfo(
+                    path=str(item),
+                    size=stat.st_size if not item.is_dir() else 0,
+                    mtime=stat.st_mtime,
+                    is_dir=item.is_dir()
+                )
+            except OSError:
+                pass
+
+        return files
+
+    def scan_remote(self) -> Dict[str, RemoteFileInfo]:
+        """Escaneia remote via rclone lsjson"""
+        files: Dict[str, RemoteFileInfo] = {}
+
+        console.print(f"[cyan]Escaneando remote {self.remote_path}...[/cyan]")
+        entries = rclone_lsjson(self.remote_path, recursive=True)
+
+        for entry in entries:
+            rel_path = entry.get("Path", "")
+            if not rel_path:
+                continue
+
+            # Filtro
+            if self.filter_pattern:
+                from fnmatch import fnmatch
+                if not fnmatch(rel_path, self.filter_pattern) and not entry.get("IsDir", False):
+                    continue
+
+            files[rel_path] = RemoteFileInfo(
+                path=rel_path,
+                size=entry.get("Size", 0),
+                mod_time=entry.get("ModTime", ""),
+                is_dir=entry.get("IsDir", False)
+            )
+
+        return files
+
+    # ====================================================================
+    # COMPARE (TODO(human) - decisão de design)
+    # ====================================================================
+
+    def compare_trees(
+        self,
+        local_files: Dict[str, LocalFileInfo],
+        remote_files: Dict[str, RemoteFileInfo]
+    ) -> List[SyncItem]:
+        """
+        Compara árvores local e remota.
+        Usa size como comparador primário e mtime com tolerância de 2s
+        pra compensar diferenças de granularidade entre cloud e filesystem local.
+        Diretórios são incluídos mas skipados no process_item (rclone cria auto).
+        """
+        MTIME_TOLERANCE = 2.0  # segundos de tolerância cloud vs local
+        items: List[SyncItem] = []
+
+        all_paths = set(local_files.keys()) | set(remote_files.keys())
+
+        for rel_path in sorted(all_paths):
+            local = local_files.get(rel_path)
+            remote = remote_files.get(rel_path)
+
+            item = SyncItem(rel_path=rel_path, local=local, remote=remote)
+
+            # Diretório: inclui mas será skipado depois
+            if (local and local.is_dir) or (remote and remote.is_dir):
+                items.append(item)
+                continue
+
+            # Só local (não existe no remote)
+            if local and not remote:
+                items.append(item)
+                continue
+
+            # Só remote (não existe no local)
+            if remote and not local:
+                items.append(item)
+                continue
+
+            # Ambos existem: comparar
+            if local and remote:
+                size_match = local.size == remote.size
+                mtime_match = abs(local.mtime - remote.mtime_epoch) <= MTIME_TOLERANCE
+
+                if size_match and mtime_match:
+                    # Iguais: skip (já sincronizado)
+                    item.status = FileStatus.SKIPPED
+                elif size_match and not mtime_match:
+                    # Mesmo tamanho, mtime diferente: provavelmente ok
+                    # mas inclui pra needs_sync decidir (ele checa size)
+                    pass
+                # size diferente: needs_sync/has_conflict vão tratar
+
+            items.append(item)
+
+        return items
+
+    # ====================================================================
+    # SYNC OPERATIONS
+    # ====================================================================
+
+    def needs_sync(self, item: SyncItem) -> bool:
+        """Verifica se arquivo precisa sincronizar baseado na direção"""
+        if self.direction == Direction.PUSH:
+            if not item.local:
+                return False  # Não tem local pra enviar
+            if not item.remote:
+                return True   # Não existe no remote
+            if item.local.is_dir:
+                return False
+            # Compara size
+            if item.local.size != item.remote.size:
+                return True
+            return False
+        else:  # PULL
+            if not item.remote:
+                return False
+            if not item.local:
+                return True
+            if item.remote.is_dir:
+                return False
+            if item.remote.size != item.local.size:
+                return True
+            return False
+
+    def has_conflict(self, item: SyncItem) -> bool:
+        """Verifica se há conflito (ambos existem e são diferentes)"""
+        if not item.local or not item.remote:
+            return False
+        if item.local.is_dir or item.remote.is_dir:
+            return False
+        return item.local.size != item.remote.size
+
+    def is_orphan(self, item: SyncItem) -> bool:
+        """Arquivo existe só no destino (órfão)"""
+        if self.direction == Direction.PUSH:
+            return item.local is None and item.remote is not None
+        else:
+            return item.remote is None and item.local is not None
+
+    def sync_file(self, item: SyncItem) -> bool:
+        """Sincroniza um arquivo via rclone"""
+        if self.dry_run:
+            return True
+
+        try:
+            if self.direction == Direction.PUSH:
+                if not item.local or item.local.is_dir:
+                    return True
+                src = str(self.local_path / item.rel_path)
+                dst = f"{self.remote_path}/{item.rel_path}" if not self.remote_path.endswith("/") else f"{self.remote_path}{item.rel_path}"
+                ok = rclone_copy_file(src, dst, self.bwlimit)
+                if ok and item.local:
+                    self.stats.bytes_transferred += item.local.size
+                return ok
+            else:  # PULL
+                if not item.remote or item.remote.is_dir:
+                    return True
+                src = f"{self.remote_path}/{item.rel_path}" if not self.remote_path.endswith("/") else f"{self.remote_path}{item.rel_path}"
+                dst = str(self.local_path / item.rel_path)
+                # Criar diretório pai local
+                Path(dst).parent.mkdir(parents=True, exist_ok=True)
+                ok = rclone_copy_file(src, dst, self.bwlimit)
+                if ok and item.remote:
+                    self.stats.bytes_transferred += item.remote.size
+                return ok
+        except Exception as e:
+            console.print(f"[red]Erro sync {item.rel_path}: {e}[/red]")
+            return False
+
+    def delete_orphan(self, item: SyncItem) -> bool:
+        """Deleta arquivo órfão do destino"""
+        if self.dry_run:
+            return True
+
+        try:
+            if self.direction == Direction.PUSH:
+                # Órfão no remote: deletar do remote
+                if item.remote and item.remote.is_dir:
+                    return True  # rclone limpa dirs vazios
+                remote_file = f"{self.remote_path}/{item.rel_path}"
+                ok = rclone_delete_file(remote_file)
+                if ok and item.remote:
+                    self.stats.bytes_deleted += item.remote.size
+                return ok
+            else:  # PULL
+                # Órfão no local: deletar local
+                local_file = self.local_path / item.rel_path
+                if local_file.is_dir():
+                    try:
+                        local_file.rmdir()
+                    except OSError:
+                        pass
+                    return True
+                if local_file.exists():
+                    size = local_file.stat().st_size
+                    local_file.unlink()
+                    self.stats.bytes_deleted += size
+                return True
+        except Exception as e:
+            console.print(f"[red]Erro ao deletar {item.rel_path}: {e}[/red]")
+            return False
+
+    # ====================================================================
+    # CONFLITOS
+    # ====================================================================
+
+    def ask_conflict(self, item: SyncItem) -> ConflictAction:
+        """Pergunta ao usuário sobre conflito"""
+        if self.global_action:
+            return self.global_action
+        if self.replace_all:
+            return ConflictAction.KEEP_NEWER
+
+        console.print(f"\n[yellow]⚠️  Conflito: {item.rel_path}[/yellow]")
+        if item.local:
+            console.print(f"   Local:  {item.local.size_human} - {item.local.mtime_str}")
+        if item.remote:
+            console.print(f"   Remote: {item.remote.size_human} - {item.remote.mtime_str}")
+
+        choices = {
+            "1": ("Manter local", ConflictAction.KEEP_LOCAL),
+            "2": ("Manter remote", ConflictAction.KEEP_REMOTE),
+            "3": ("Manter mais recente", ConflictAction.KEEP_NEWER),
+            "4": ("Pular", ConflictAction.SKIP),
+        }
+
+        console.print("\nOpções:")
+        for key, (desc, _) in choices.items():
+            console.print(f"  [{key}] {desc}")
+        console.print("  [A] Aplicar para todos os conflitos")
+
+        while True:
+            choice = Prompt.ask("Escolha", default="3")
+
+            if choice.upper() == "A":
+                sub = Prompt.ask("Qual ação para todos?", choices=["1", "2", "3", "4"], default="3")
+                self.global_action = choices[sub][1]
+                return self.global_action
+
+            if choice in choices:
+                return choices[choice][1]
+
+            console.print("[red]Opção inválida[/red]")
+
+    def resolve_conflict(self, item: SyncItem, action: ConflictAction) -> bool:
+        """Resolve conflito baseado na ação escolhida"""
+        if action == ConflictAction.SKIP:
+            return False
+        if action == ConflictAction.KEEP_LOCAL:
+            if self.direction == Direction.PUSH:
+                return self.sync_file(item)
+            else:
+                return False  # Manter local = não fazer pull
+        if action == ConflictAction.KEEP_REMOTE:
+            if self.direction == Direction.PULL:
+                return self.sync_file(item)
+            else:
+                return False  # Manter remote = não fazer push
+        if action == ConflictAction.KEEP_NEWER:
+            if item.local and item.remote:
+                local_newer = item.local.mtime > item.remote.mtime_epoch
+                if (local_newer and self.direction == Direction.PUSH) or \
+                   (not local_newer and self.direction == Direction.PULL):
+                    return self.sync_file(item)
+            return False
+        return False
+
+    # ====================================================================
+    # PROCESS
+    # ====================================================================
+
+    def process_item(self, item: SyncItem) -> None:
+        """Processa um item de sync"""
+        item.status = FileStatus.SYNCING
+
+        # Órfão?
+        if self.is_orphan(item):
+            if self.delete_dst:
+                item.status = FileStatus.DELETING
+                if self.delete_orphan(item):
+                    item.status = FileStatus.DELETED
+                    self.stats.deleted += 1
+                else:
+                    item.status = FileStatus.ERROR
+                    self.stats.errors += 1
+            else:
+                item.status = FileStatus.SKIPPED
+                self.stats.skipped += 1
+            return
+
+        # Precisa sync?
+        if not self.needs_sync(item):
+            item.status = FileStatus.SKIPPED
+            self.stats.skipped += 1
+            return
+
+        # Conflito?
+        if self.has_conflict(item):
+            item.status = FileStatus.CONFLICT
+            self.stats.conflicts += 1
+
+            if not self.silent:
+                action = self.ask_conflict(item)
+                item.action = action
+                if self.resolve_conflict(item, action):
+                    item.status = FileStatus.DONE
+                    self.stats.synced += 1
+                else:
+                    item.status = FileStatus.SKIPPED
+                    self.stats.skipped += 1
+            else:
+                item.action = ConflictAction.KEEP_NEWER
+                if self.resolve_conflict(item, ConflictAction.KEEP_NEWER):
+                    item.status = FileStatus.DONE
+                    self.stats.synced += 1
+                else:
+                    item.status = FileStatus.SKIPPED
+                    self.stats.skipped += 1
+            return
+
+        # Sync normal
+        if self.sync_file(item):
+            item.status = FileStatus.DONE
+            self.stats.synced += 1
+        else:
+            item.status = FileStatus.ERROR
+            self.stats.errors += 1
+
+    # ====================================================================
+    # DASHBOARD TUI
+    # ====================================================================
+
+    def make_compact_status(self) -> Text:
+        """Linha de status compacta"""
+        text = Text()
+
+        if self.stats.total_files > 0:
+            processed = self.stats.synced + self.stats.skipped + self.stats.deleted + self.stats.errors
+            progress = processed / self.stats.total_files * 100
+            bar_width = 30
+            filled = int(bar_width * progress / 100)
+            bar = "█" * filled + "░" * (bar_width - filled)
+            text.append(f"[{bar}] {progress:5.1f}% ", style="green")
+
+        text.append(f"✓{self.stats.synced}", style="green")
+        text.append(" | ")
+        text.append(f"⏭{self.stats.skipped}", style="yellow")
+        if self.delete_dst:
+            text.append(" | ")
+            text.append(f"🗑{self.stats.deleted}", style="red")
+        if self.stats.conflicts > 0:
+            text.append(" | ")
+            text.append(f"⚠{self.stats.conflicts}", style="orange1")
+        if self.stats.errors > 0:
+            text.append(" | ")
+            text.append(f"✗{self.stats.errors}", style="red")
+        text.append(f" | ⏱{self.stats.elapsed}", style="dim")
+        text.append(f" | ↕{self.stats.bytes_transferred_human}", style="cyan")
+
+        return text
+
+    def make_current_line(self) -> Text:
+        """Linha do arquivo atual"""
+        text = Text()
+        if self.current_item:
+            text.append(f"{self.current_item.status.value} ", style="bold")
+            path = self.current_item.rel_path
+            max_len = 60
+            if len(path) > max_len:
+                path = "..." + path[-(max_len - 3):]
+            text.append(path, style="white")
+            # Mostrar tamanho
+            if self.direction == Direction.PUSH and self.current_item.local and not self.current_item.local.is_dir:
+                text.append(f" ({self.current_item.local.size_human})", style="dim")
+            elif self.direction == Direction.PULL and self.current_item.remote and not self.current_item.remote.is_dir:
+                text.append(f" ({self.current_item.remote.size_human})", style="dim")
+        else:
+            text.append("Aguardando...", style="dim")
+        return text
+
+    def make_dashboard_panel(self) -> Panel:
+        """Painel compacto do dashboard"""
+        header = Text()
+        header.append("fzrclone", style="bold blue")
+
+        direction_icon = "⬆️" if self.direction == Direction.PUSH else "⬇️"
+        if self.direction == Direction.PUSH:
+            header.append(f"  {direction_icon} {self.local_path.name}", style="magenta")
+            header.append(" → ", style="dim")
+            header.append(f"{self.remote_path}", style="green")
+        else:
+            header.append(f"  {direction_icon} {self.remote_path}", style="magenta")
+            header.append(" → ", style="dim")
+            header.append(f"{self.local_path.name}", style="green")
+
+        if self.dry_run:
+            header.append("  [DRY-RUN]", style="bold yellow")
+        if self.delete_dst:
+            header.append("  [DELETE]", style="bold red")
+
+        status_line = self.make_compact_status()
+        current_line = self.make_current_line()
+
+        content = Group(header, Text(""), status_line, current_line)
+        return Panel(content, border_style="blue", padding=(0, 1))
+
+    def run_with_dashboard(self) -> None:
+        """Executa com dashboard TUI"""
+        with Live(self.make_dashboard_panel(), refresh_per_second=4, console=console) as live:
+            for item in self.items:
+                self.current_item = item
+                self.process_item(item)
+                live.update(self.make_dashboard_panel())
+
+    def run_silent(self) -> None:
+        """Executa sem dashboard"""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task("Sincronizando...", total=len(self.items))
+            for item in self.items:
+                self.process_item(item)
+                progress.advance(task)
+
+    # ====================================================================
+    # HISTORY
+    # ====================================================================
+
+    def save_history(self) -> None:
+        """Salva histórico de sync"""
+        history = {
+            "timestamp": datetime.now().isoformat(),
+            "direction": self.direction.value,
+            "local": str(self.local_path),
+            "remote": self.remote_path,
+            "stats": {
+                "synced": self.stats.synced,
+                "skipped": self.stats.skipped,
+                "deleted": self.stats.deleted,
+                "errors": self.stats.errors,
+                "bytes_transferred": self.stats.bytes_transferred,
+            },
+            "items": [
+                {
+                    "rel_path": item.rel_path,
+                    "status": item.status.name,
+                    "action": item.action.name if item.action else None
+                }
+                for item in self.items if item.status == FileStatus.DONE
+            ]
+        }
+
+        try:
+            self.history_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.history_file, 'w') as f:
+                json.dump(history, f, indent=2)
+        except Exception:
+            pass
+
+    # ====================================================================
+    # SUMMARY
+    # ====================================================================
+
+    def print_summary(self) -> None:
+        """Resumo final"""
+        console.print("\n")
+
+        direction_label = "PUSH (local → remote)" if self.direction == Direction.PUSH else "PULL (remote → local)"
+
+        table = Table(title="📋 Resumo da Sincronização", box=box.ROUNDED)
+        table.add_column("Métrica", style="cyan")
+        table.add_column("Valor", style="white")
+
+        table.add_row("Direção", direction_label)
+        table.add_row("Local", str(self.local_path))
+        table.add_row("Remote", self.remote_path)
+        table.add_row("Total de arquivos", str(self.stats.total_files))
+        table.add_row("Sincronizados", f"[green]{self.stats.synced}[/green]")
+        table.add_row("Pulados", f"[yellow]{self.stats.skipped}[/yellow]")
+        table.add_row("Conflitos", f"[orange1]{self.stats.conflicts}[/orange1]")
+        if self.delete_dst:
+            table.add_row("Deletados", f"[red]{self.stats.deleted}[/red] ({self.stats.bytes_deleted_human})")
+        table.add_row("Erros", f"[red]{self.stats.errors}[/red]")
+        table.add_row("Transferido", f"[cyan]{self.stats.bytes_transferred_human}[/cyan]")
+        table.add_row("Tempo total", self.stats.elapsed)
+
+        if self.dry_run:
+            table.add_row("Modo", "[yellow]DRY-RUN (nenhuma alteração feita)[/yellow]")
+
+        console.print(table)
+
+    # ====================================================================
+    # RUN
+    # ====================================================================
+
+    def run(self) -> None:
+        """Executa sincronização"""
+        # Validações
+        if self.direction == Direction.PUSH and not self.local_path.exists():
+            console.print(f"[red]Erro: Path local não existe: {self.local_path}[/red]")
+            return
+
+        if self.direction == Direction.PULL:
+            self.local_path.mkdir(parents=True, exist_ok=True)
+
+        # Scan
+        console.print(f"[cyan]Escaneando local: {self.local_path}...[/cyan]")
+        local_files = self.scan_local()
+        console.print(f"[green]Local: {len(local_files)} itens[/green]")
+
+        remote_files = self.scan_remote()
+        console.print(f"[green]Remote: {len(remote_files)} itens[/green]")
+
+        # Compare
+        self.items = self.compare_trees(local_files, remote_files)
+        self.stats.total_files = len(self.items)
+        console.print(f"[green]Total para processar: {self.stats.total_files} itens[/green]")
+
+        if self.stats.total_files == 0:
+            console.print("[yellow]Nada para sincronizar.[/yellow]")
+            return
+
+        self.stats.start_time = time.time()
+        self.running = True
+
+        if self.silent:
+            self.run_silent()
+        else:
+            self.run_with_dashboard()
+
+        self.save_history()
+        self.print_summary()
+
+
+# ============================================================================
+# SUBCOMANDOS
+# ============================================================================
+
+def cmd_list(remote_path: str) -> None:
+    """Lista arquivos de um remote"""
+    console.print(f"[cyan]Listando: {remote_path}[/cyan]")
+
+    entries = rclone_lsjson(remote_path, recursive=False)
+
+    if not entries:
+        console.print("[yellow]Nenhum arquivo encontrado.[/yellow]")
+        return
+
+    table = Table(title=f"📁 {remote_path}", box=box.ROUNDED)
+    table.add_column("Tipo", style="dim", width=4)
+    table.add_column("Nome", style="white")
+    table.add_column("Tamanho", style="cyan", justify="right")
+    table.add_column("Modificado", style="dim")
+
+    dirs = sorted([e for e in entries if e.get("IsDir")], key=lambda x: x["Path"])
+    files = sorted([e for e in entries if not e.get("IsDir")], key=lambda x: x["Path"])
+
+    for entry in dirs:
+        table.add_row("📁", entry["Path"], "-", "")
+
+    for entry in files:
+        info = RemoteFileInfo(
+            path=entry["Path"],
+            size=entry.get("Size", 0),
+            mod_time=entry.get("ModTime", ""),
+            is_dir=False
+        )
+        table.add_row("📄", entry["Path"], info.size_human, info.mtime_str)
+
+    console.print(table)
+    console.print(f"\n[dim]{len(dirs)} pastas, {len(files)} arquivos[/dim]")
+
+
+def cmd_remotes() -> None:
+    """Lista remotes configurados"""
+    remotes = rclone_list_remotes()
+
+    if not remotes:
+        console.print("[yellow]Nenhum remote configurado. Execute: rclone config[/yellow]")
+        return
+
+    table = Table(title="🌐 Remotes Configurados", box=box.ROUNDED)
+    table.add_column("Remote", style="green")
+    table.add_column("Status", style="white")
+
+    for remote in remotes:
+        # Testar conectividade rápida
+        try:
+            subprocess.run(
+                ["rclone", "about", remote, "--json"],
+                capture_output=True, text=True, timeout=10
+            )
+            table.add_row(remote, "[green]✓ Conectado[/green]")
+        except Exception:
+            table.add_row(remote, "[yellow]? Não verificado[/yellow]")
+
+    console.print(table)
+
+
+# ============================================================================
+# CLI
+# ============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="fzrclone - Rclone Inteligente com Dashboard TUI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Exemplos:
+  fzrclone push /local/path gdriverl:backup       # Upload local → remote
+  fzrclone pull gdriverl:backup /local/path        # Download remote → local
+  fzrclone push . gdriverl:projetos --dry-run      # Simular upload
+  fzrclone push . gdriverl: --filter "*.ts"        # Só arquivos .ts
+  fzrclone push . gdriverl: --bwlimit 1M           # Limitar bandwidth
+  fzrclone push . gdriverl: --delete-dst           # Espelhar (deletar órfãos)
+  fzrclone list gdriverl:                          # Listar remote
+  fzrclone list gdriverl:backup/projetos           # Listar subpasta
+  fzrclone remotes                                 # Listar remotes
+        """
+    )
+
+    sub = parser.add_subparsers(dest="command", help="Comando")
+
+    # push
+    push_p = sub.add_parser("push", help="Upload: local → remote")
+    push_p.add_argument("local_path", help="Diretório local")
+    push_p.add_argument("remote_path", help="Remote path (ex: gdriverl:backup)")
+    push_p.add_argument("--dry-run", "-n", action="store_true", help="Simular sem alterar")
+    push_p.add_argument("--silent", "-s", action="store_true", help="Sem dashboard")
+    push_p.add_argument("--replace", "-r", action="store_true", help="Substituir todos")
+    push_p.add_argument("--delete-dst", "-d", action="store_true", help="Deletar órfãos no destino")
+    push_p.add_argument("--filter", "-f", metavar="PATTERN", help="Filtro glob (ex: *.ts)")
+    push_p.add_argument("--bwlimit", "-b", metavar="LIMIT", help="Limitar bandwidth (ex: 1M, 500k)")
+
+    # pull
+    pull_p = sub.add_parser("pull", help="Download: remote → local")
+    pull_p.add_argument("remote_path", help="Remote path (ex: gdriverl:backup)")
+    pull_p.add_argument("local_path", help="Diretório local")
+    pull_p.add_argument("--dry-run", "-n", action="store_true", help="Simular sem alterar")
+    pull_p.add_argument("--silent", "-s", action="store_true", help="Sem dashboard")
+    pull_p.add_argument("--replace", "-r", action="store_true", help="Substituir todos")
+    pull_p.add_argument("--delete-dst", "-d", action="store_true", help="Deletar órfãos no destino")
+    pull_p.add_argument("--filter", "-f", metavar="PATTERN", help="Filtro glob (ex: *.ts)")
+    pull_p.add_argument("--bwlimit", "-b", metavar="LIMIT", help="Limitar bandwidth (ex: 1M, 500k)")
+
+    # list
+    list_p = sub.add_parser("list", help="Listar arquivos do remote")
+    list_p.add_argument("remote_path", help="Remote path (ex: gdriverl:)")
+
+    # remotes
+    sub.add_parser("remotes", help="Listar remotes configurados")
+
+    # version
+    parser.add_argument("--version", "-v", action="version", version=f"fzrclone {VERSION}")
+
+    args = parser.parse_args()
+
+    # Banner
+    console.print(Panel.fit(
+        f"[bold blue]fzrclone[/bold blue] [cyan]v{VERSION}[/cyan]\n"
+        "[dim]Rclone Inteligente com Dashboard TUI[/dim]",
+        border_style="blue"
+    ))
+
+    # Verificar rclone
+    if not rclone_installed():
+        console.print("[red]Erro: rclone não está instalado. Execute: sudo dnf install rclone[/red]")
+        return
+
+    if not args.command:
+        parser.print_help()
+        return
+
+    # Dispatch
+    if args.command == "remotes":
+        cmd_remotes()
+        return
+
+    if args.command == "list":
+        cmd_list(args.remote_path)
+        return
+
+    if args.command in ("push", "pull"):
+        direction = Direction.PUSH if args.command == "push" else Direction.PULL
+
+        rclone = FzRclone(
+            local_path=args.local_path,
+            remote_path=args.remote_path,
+            direction=direction,
+            dry_run=args.dry_run,
+            silent=args.silent,
+            replace_all=args.replace,
+            delete_dst=args.delete_dst,
+            filter_pattern=args.filter,
+            bwlimit=args.bwlimit,
+        )
+
+        try:
+            rclone.run()
+        except KeyboardInterrupt:
+            console.print("\n[yellow]Operação cancelada pelo usuário[/yellow]")
+            rclone.print_summary()
+
+
+if __name__ == "__main__":
+    main()

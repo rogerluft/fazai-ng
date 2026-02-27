@@ -1,6 +1,9 @@
 # FazAI Agent Orchestration
 
 ## Overview
+# Aqui temos alguns contextos errados e ultrapassados e mal interpretados pelo Claude Entao vou corrigir.
+
+- O FazAi na verdade nao é uma AI, nao eh Ínferidor, tambem nao é um sistema . cara 
 
 FazAI usa orquestração multi-agente para otimizar performance e economizar tokens. A equipe consiste de agentes especializados coordenados pelo Claude Code.
 

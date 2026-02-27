@@ -1,0 +1,843 @@
+#!/usr/bin/env python3
+"""
+fzrsync - Rsync Inteligente com Dashboard TUI
+Criado para Andarilho dos Véus
+"""
+
+import os
+import sys
+import argparse
+import subprocess
+import hashlib
+import shutil
+import json
+import threading
+import time
+from datetime import datetime
+from pathlib import Path
+from dataclasses import dataclass, field
+from typing import Optional, List, Dict, Callable
+from enum import Enum, auto
+
+try:
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+    from rich.layout import Layout
+    from rich.live import Live
+    from rich.text import Text
+    from rich.align import Align
+    from rich import box
+    from rich.prompt import Prompt, Confirm
+except ImportError:
+    print("Instalando dependências...")
+    subprocess.run([sys.executable, "-m", "pip", "install", "rich", "-q"])
+    from rich.console import Console
+    from rich.panel import Panel
+    from rich.table import Table
+    from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn, TimeElapsedColumn
+    from rich.layout import Layout
+    from rich.live import Live
+    from rich.text import Text
+    from rich.align import Align
+    from rich import box
+    from rich.prompt import Prompt, Confirm
+
+console = Console()
+
+# ============================================================================
+# ENUMS E DATACLASSES
+# ============================================================================
+
+class ConflictAction(Enum):
+    KEEP_OLD = auto()      # Manter antigo
+    REPLACE = auto()       # Substituir
+    REPLACE_BACKUP = auto() # Substituir mantendo backup do antigo
+    SKIP = auto()          # Pular
+
+class FileStatus(Enum):
+    PENDING = "⏳"
+    SYNCING = "🔄"
+    DONE = "✅"
+    CONFLICT = "⚠️"
+    SKIPPED = "⏭️"
+    ERROR = "❌"
+    DELETED = "🗑️"
+    DELETING = "🔥"
+
+@dataclass
+class FileInfo:
+    path: str
+    size: int
+    mtime: float
+    is_dir: bool
+    checksum: Optional[str] = None
+    
+    @property
+    def size_human(self) -> str:
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if self.size < 1024:
+                return f"{self.size:.1f} {unit}"
+            self.size /= 1024
+        return f"{self.size:.1f} PB"
+    
+    @property
+    def mtime_str(self) -> str:
+        return datetime.fromtimestamp(self.mtime).strftime("%Y-%m-%d %H:%M:%S")
+
+@dataclass
+class SyncItem:
+    rel_path: str
+    source: Optional[FileInfo] = None
+    dest: Optional[FileInfo] = None
+    status: FileStatus = FileStatus.PENDING
+    action: Optional[ConflictAction] = None
+
+@dataclass
+class SyncStats:
+    total_files: int = 0
+    synced: int = 0
+    skipped: int = 0
+    conflicts: int = 0
+    errors: int = 0
+    deleted: int = 0
+    bytes_transferred: int = 0
+    bytes_deleted: int = 0
+    start_time: Optional[float] = None
+
+    @property
+    def elapsed(self) -> str:
+        if not self.start_time:
+            return "00:00:00"
+        elapsed = time.time() - self.start_time
+        hours, remainder = divmod(int(elapsed), 3600)
+        minutes, seconds = divmod(remainder, 60)
+        return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+
+    @property
+    def bytes_deleted_human(self) -> str:
+        """Retorna tamanho deletado em formato legível"""
+        size = self.bytes_deleted
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size < 1024:
+                return f"{size:.1f} {unit}"
+            size /= 1024
+        return f"{size:.1f} PB"
+
+# ============================================================================
+# CLASSE PRINCIPAL
+# ============================================================================
+
+class FzRsync:
+    def __init__(
+        self,
+        source: str,
+        dest: str,
+        dry_run: bool = False,
+        silent: bool = False,
+        replace_all: bool = False,
+        rollback: Optional[str] = None,
+        schedule: Optional[int] = None,
+        delete_dst: bool = False
+    ):
+        self.source = Path(source).resolve()
+        self.dest = Path(dest).resolve()
+        self.dry_run = dry_run
+        self.silent = silent
+        self.replace_all = replace_all
+        self.rollback = rollback
+        self.schedule = schedule
+        self.delete_dst = delete_dst
+
+        self.items: List[SyncItem] = []
+        self.stats = SyncStats()
+        self.current_item: Optional[SyncItem] = None
+        self.global_action: Optional[ConflictAction] = None
+        self.running = False
+        self.backup_dir = self.dest / ".fzrsync_backups"
+        self.history_file = self.dest / ".fzrsync_history.json"
+        self.deleted_files: List[str] = []  # Lista de arquivos deletados para histórico
+        
+    def get_checksum(self, filepath: Path) -> str:
+        """Calcula MD5 do arquivo"""
+        hash_md5 = hashlib.md5()
+        try:
+            with open(filepath, "rb") as f:
+                for chunk in iter(lambda: f.read(8192), b""):
+                    hash_md5.update(chunk)
+            return hash_md5.hexdigest()
+        except:
+            return ""
+    
+    def get_file_info(self, filepath: Path) -> Optional[FileInfo]:
+        """Obtém informações do arquivo"""
+        try:
+            stat = filepath.stat()
+            return FileInfo(
+                path=str(filepath),
+                size=stat.st_size if not filepath.is_dir() else 0,
+                mtime=stat.st_mtime,
+                is_dir=filepath.is_dir()
+            )
+        except:
+            return None
+    
+    def scan_directories(self) -> None:
+        """Escaneia origem e destino"""
+        source_files: Dict[str, FileInfo] = {}
+        dest_files: Dict[str, FileInfo] = {}
+        
+        # Escanear origem
+        if self.source.exists():
+            for item in self.source.rglob("*"):
+                if ".fzrsync" in str(item):
+                    continue
+                rel_path = item.relative_to(self.source)
+                info = self.get_file_info(item)
+                if info:
+                    source_files[str(rel_path)] = info
+        
+        # Escanear destino
+        if self.dest.exists():
+            for item in self.dest.rglob("*"):
+                if ".fzrsync" in str(item):
+                    continue
+                rel_path = item.relative_to(self.dest)
+                info = self.get_file_info(item)
+                if info:
+                    dest_files[str(rel_path)] = info
+        
+        # Combinar listas
+        all_paths = set(source_files.keys()) | set(dest_files.keys())
+        
+        for rel_path in sorted(all_paths):
+            item = SyncItem(
+                rel_path=rel_path,
+                source=source_files.get(rel_path),
+                dest=dest_files.get(rel_path)
+            )
+            self.items.append(item)
+        
+        self.stats.total_files = len(self.items)
+    
+    def needs_sync(self, item: SyncItem) -> bool:
+        """Verifica se arquivo precisa sincronizar"""
+        if not item.source:
+            return False  # Arquivo só existe no destino
+        if not item.dest:
+            return True   # Arquivo não existe no destino
+        if item.source.is_dir or item.dest.is_dir:
+            return False  # Diretórios são criados automaticamente
+        
+        # Compara tamanho e mtime
+        if item.source.size != item.dest.size:
+            return True
+        if abs(item.source.mtime - item.dest.mtime) > 1:
+            return True
+        
+        return False
+    
+    def has_conflict(self, item: SyncItem) -> bool:
+        """Verifica se há conflito (ambos modificados)"""
+        if not item.source or not item.dest:
+            return False
+        if item.source.is_dir or item.dest.is_dir:
+            return False
+        
+        # Conflito: destino existe e é diferente
+        return item.source.size != item.dest.size or abs(item.source.mtime - item.dest.mtime) > 1
+    
+    def backup_file(self, filepath: Path) -> Path:
+        """Cria backup do arquivo com timestamp"""
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        backup_name = f"{filepath.name}.{timestamp}.bak"
+        
+        # Criar estrutura de diretórios no backup
+        rel_path = filepath.relative_to(self.dest)
+        backup_path = self.backup_dir / rel_path.parent / backup_name
+        backup_path.parent.mkdir(parents=True, exist_ok=True)
+        
+        shutil.copy2(filepath, backup_path)
+        return backup_path
+    
+    def sync_file(self, item: SyncItem) -> bool:
+        """Sincroniza um arquivo"""
+        if not item.source:
+            return False
+        
+        source_path = self.source / item.rel_path
+        dest_path = self.dest / item.rel_path
+        
+        try:
+            if self.dry_run:
+                return True
+            
+            # Criar diretório pai se necessário
+            dest_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            if item.source.is_dir:
+                dest_path.mkdir(exist_ok=True)
+            else:
+                # Fazer backup se necessário
+                if item.action == ConflictAction.REPLACE_BACKUP and dest_path.exists():
+                    self.backup_file(dest_path)
+                
+                shutil.copy2(source_path, dest_path)
+                self.stats.bytes_transferred += item.source.size
+
+            return True
+        except Exception as e:
+            console.print(f"[red]Erro ao sincronizar {item.rel_path}: {e}[/red]")
+            return False
+
+    def is_orphan(self, item: SyncItem) -> bool:
+        """Verifica se arquivo existe apenas no destino (órfão)"""
+        return item.source is None and item.dest is not None
+
+    def delete_orphan_file(self, item: SyncItem) -> bool:
+        """
+        Deleta arquivo órfão do destino.
+        Arquivos órfãos são aqueles que existem no destino mas não na origem.
+        Com --delete-dst, esses arquivos são removidos para espelhar a origem.
+
+        Nota: Diretórios órfãos são tratados de forma especial:
+        - Diretórios vazios são removidos imediatamente
+        - Diretórios com conteúdo: os filhos são removidos primeiro,
+          depois o diretório é removido quando vazio
+        """
+        if not self.is_orphan(item):
+            return False
+
+        dest_path = self.dest / item.rel_path
+
+        try:
+            if self.dry_run:
+                # Em dry-run, apenas simula (não adiciona diretórios à lista)
+                if not (item.dest and item.dest.is_dir):
+                    self.deleted_files.append(str(dest_path))
+                return True
+
+            if not dest_path.exists():
+                return False
+
+            # Diretórios órfãos: tentar remover se vazio
+            if dest_path.is_dir():
+                try:
+                    dest_path.rmdir()  # Só funciona se vazio
+                    return True
+                except OSError:
+                    # Diretório não vazio - será limpo quando filhos forem removidos
+                    # Retorna True para não contabilizar como erro
+                    return True
+
+            # Arquivos: fazer backup e deletar
+            file_size = item.dest.size if item.dest else 0
+
+            # Fazer backup antes de deletar (segurança)
+            self.backup_file(dest_path)
+
+            # Deletar arquivo
+            dest_path.unlink()
+            self.stats.bytes_deleted += file_size
+            self.deleted_files.append(str(dest_path))
+
+            # Tentar limpar diretórios pais que ficaram vazios
+            self._cleanup_empty_parents(dest_path.parent)
+
+            return True
+
+        except Exception as e:
+            console.print(f"[red]Erro ao deletar {item.rel_path}: {e}[/red]")
+            return False
+
+    def _cleanup_empty_parents(self, dir_path: Path) -> None:
+        """Remove diretórios pais vazios até chegar no destino base"""
+        try:
+            while dir_path != self.dest and dir_path.exists():
+                # Verifica se é .fzrsync (não remover)
+                if ".fzrsync" in str(dir_path):
+                    break
+                # Tenta remover se vazio
+                try:
+                    dir_path.rmdir()
+                    dir_path = dir_path.parent
+                except OSError:
+                    # Não está vazio, para aqui
+                    break
+        except Exception:
+            pass  # Ignora erros na limpeza de pais
+
+    def save_history(self) -> None:
+        """Salva histórico para rollback"""
+        history = {
+            "timestamp": datetime.now().isoformat(),
+            "source": str(self.source),
+            "dest": str(self.dest),
+            "items": [
+                {
+                    "rel_path": item.rel_path,
+                    "action": item.action.name if item.action else None,
+                    "status": item.status.name
+                }
+                for item in self.items if item.status == FileStatus.DONE
+            ]
+        }
+        
+        try:
+            self.history_file.parent.mkdir(parents=True, exist_ok=True)
+            with open(self.history_file, 'w') as f:
+                json.dump(history, f, indent=2)
+        except:
+            pass
+    
+    def do_rollback(self, target: str = "all") -> None:
+        """Executa rollback dos arquivos"""
+        if not self.backup_dir.exists():
+            console.print("[yellow]Nenhum backup encontrado para rollback[/yellow]")
+            return
+        
+        console.print(f"[cyan]Executando rollback: {target}[/cyan]")
+        
+        for backup_file in self.backup_dir.rglob("*.bak"):
+            # Extrair nome original
+            original_name = backup_file.name.rsplit('.', 2)[0]
+            rel_dir = backup_file.parent.relative_to(self.backup_dir)
+            original_path = self.dest / rel_dir / original_name
+            
+            if target != "all" and str(original_path) != target:
+                continue
+            
+            try:
+                shutil.copy2(backup_file, original_path)
+                console.print(f"[green]Restaurado: {original_path}[/green]")
+            except Exception as e:
+                console.print(f"[red]Erro ao restaurar {original_path}: {e}[/red]")
+
+    # ========================================================================
+    # DASHBOARD TUI (Compacto)
+    # ========================================================================
+
+    def make_compact_status(self) -> Text:
+        """Cria linha de status compacta"""
+        text = Text()
+
+        # Progresso
+        if self.stats.total_files > 0:
+            processed = self.stats.synced + self.stats.skipped + self.stats.deleted + self.stats.errors
+            progress = processed / self.stats.total_files * 100
+            bar_width = 30
+            filled = int(bar_width * progress / 100)
+            bar = "█" * filled + "░" * (bar_width - filled)
+            text.append(f"[{bar}] {progress:5.1f}% ", style="green")
+
+        # Contadores inline
+        text.append(f"✓{self.stats.synced}", style="green")
+        text.append(" | ")
+        text.append(f"⏭{self.stats.skipped}", style="yellow")
+        if self.delete_dst:
+            text.append(" | ")
+            text.append(f"🗑{self.stats.deleted}", style="red")
+        if self.stats.conflicts > 0:
+            text.append(" | ")
+            text.append(f"⚠{self.stats.conflicts}", style="orange1")
+        if self.stats.errors > 0:
+            text.append(" | ")
+            text.append(f"✗{self.stats.errors}", style="red")
+        text.append(f" | ⏱{self.stats.elapsed}", style="dim")
+
+        return text
+
+    def make_current_line(self) -> Text:
+        """Linha do arquivo atual sendo processado"""
+        text = Text()
+        if self.current_item:
+            text.append(f"{self.current_item.status.value} ", style="bold")
+            # Truncar path se muito longo
+            path = self.current_item.rel_path
+            max_len = 60
+            if len(path) > max_len:
+                path = "..." + path[-(max_len-3):]
+            text.append(path, style="white")
+            if self.current_item.source and not self.current_item.source.is_dir:
+                text.append(f" ({self.current_item.source.size_human})", style="dim")
+        else:
+            text.append("Aguardando...", style="dim")
+        return text
+    
+    def ask_conflict(self, item: SyncItem) -> ConflictAction:
+        """Pergunta ao usuário sobre conflito"""
+        if self.global_action:
+            return self.global_action
+        
+        if self.replace_all:
+            return ConflictAction.REPLACE
+        
+        console.print(f"\n[yellow]⚠️  Conflito detectado: {item.rel_path}[/yellow]")
+        console.print(f"   Origem:  {item.source.size_human} - {item.source.mtime_str}")
+        console.print(f"   Destino: {item.dest.size_human} - {item.dest.mtime_str}")
+        
+        choices = {
+            "1": ("Manter antigo (não sincronizar)", ConflictAction.KEEP_OLD),
+            "2": ("Substituir pelo novo", ConflictAction.REPLACE),
+            "3": ("Substituir mantendo backup", ConflictAction.REPLACE_BACKUP),
+            "4": ("Pular", ConflictAction.SKIP),
+        }
+        
+        console.print("\nOpções:")
+        for key, (desc, _) in choices.items():
+            console.print(f"  [{key}] {desc}")
+        console.print("  [A] Aplicar para todos os conflitos")
+        
+        while True:
+            choice = Prompt.ask("Escolha", default="3")
+            
+            if choice.upper() == "A":
+                sub_choice = Prompt.ask("Qual ação para todos?", choices=["1", "2", "3", "4"], default="3")
+                self.global_action = choices[sub_choice][1]
+                return self.global_action
+            
+            if choice in choices:
+                return choices[choice][1]
+            
+            console.print("[red]Opção inválida[/red]")
+    
+    def run(self) -> None:
+        """Executa sincronização"""
+        # Rollback mode
+        if self.rollback:
+            self.do_rollback(self.rollback)
+            return
+        
+        # Schedule mode
+        if self.schedule is not None:
+            self.run_scheduled()
+            return
+        
+        # Validações
+        if not self.source.exists():
+            console.print(f"[red]Erro: Origem não existe: {self.source}[/red]")
+            return
+        
+        self.dest.mkdir(parents=True, exist_ok=True)
+        
+        console.print(f"[cyan]Escaneando diretórios...[/cyan]")
+        self.scan_directories()
+        console.print(f"[green]Encontrados {len(self.items)} itens[/green]")
+        
+        self.stats.start_time = time.time()
+        self.running = True
+        
+        if self.silent:
+            self.run_silent()
+        else:
+            self.run_with_dashboard()
+        
+        self.save_history()
+        self.print_summary()
+    
+    def run_silent(self) -> None:
+        """Executa sem dashboard"""
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            BarColumn(),
+            TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
+            TimeElapsedColumn(),
+            console=console
+        ) as progress:
+            task = progress.add_task("Sincronizando...", total=len(self.items))
+            
+            for item in self.items:
+                self.process_item(item)
+                progress.advance(task)
+    
+    def make_dashboard_panel(self) -> Panel:
+        """Cria painel compacto do dashboard"""
+        from rich.console import Group
+
+        # Header compacto
+        header = Text()
+        header.append("fzrsync", style="bold blue")
+        header.append(f"  {self.source.name}", style="magenta")
+        header.append(" → ", style="dim")
+        header.append(f"{self.dest.name}", style="green")
+        if self.dry_run:
+            header.append("  [DRY-RUN]", style="bold yellow")
+        if self.delete_dst:
+            header.append("  [DELETE]", style="bold red")
+
+        # Linha de progresso + stats
+        status_line = self.make_compact_status()
+
+        # Arquivo atual
+        current_line = self.make_current_line()
+
+        content = Group(header, Text(""), status_line, current_line)
+        return Panel(content, border_style="blue", padding=(0, 1))
+
+    def run_with_dashboard(self) -> None:
+        """Executa com dashboard TUI compacto"""
+        with Live(self.make_dashboard_panel(), refresh_per_second=8, console=console) as live:
+            for item in self.items:
+                self.current_item = item
+                self.process_item(item)
+                live.update(self.make_dashboard_panel())
+    
+    def process_item(self, item: SyncItem) -> None:
+        """Processa um item"""
+        item.status = FileStatus.SYNCING
+
+        # Verificar se é arquivo órfão (só existe no destino)
+        if self.is_orphan(item):
+            if self.delete_dst:
+                item.status = FileStatus.DELETING
+                if self.delete_orphan_file(item):
+                    item.status = FileStatus.DELETED
+                    self.stats.deleted += 1
+                else:
+                    item.status = FileStatus.ERROR
+                    self.stats.errors += 1
+            else:
+                # Sem --delete-dst, apenas pula órfãos
+                item.status = FileStatus.SKIPPED
+                self.stats.skipped += 1
+            return
+
+        if not self.needs_sync(item):
+            item.status = FileStatus.SKIPPED
+            self.stats.skipped += 1
+            return
+
+        # Verificar conflito
+        if self.has_conflict(item):
+            item.status = FileStatus.CONFLICT
+            self.stats.conflicts += 1
+
+            if not self.silent:
+                action = self.ask_conflict(item)
+                item.action = action
+
+                if action in (ConflictAction.KEEP_OLD, ConflictAction.SKIP):
+                    item.status = FileStatus.SKIPPED
+                    return
+            else:
+                # Em modo silent, substituir com backup
+                item.action = ConflictAction.REPLACE_BACKUP
+        else:
+            item.action = ConflictAction.REPLACE
+
+        # Sincronizar
+        if self.sync_file(item):
+            item.status = FileStatus.DONE
+            self.stats.synced += 1
+        else:
+            item.status = FileStatus.ERROR
+            self.stats.errors += 1
+    
+    def run_scheduled(self) -> None:
+        """Executa em modo agendado"""
+        if self.schedule == -1:
+            # Perguntar frequência
+            console.print("\n[cyan]Configuração de Agendamento[/cyan]")
+            freq = Prompt.ask(
+                "Frequência",
+                choices=["hourly", "daily", "weekly"],
+                default="daily"
+            )
+            hour = int(Prompt.ask("Hora de execução (0-23)", default="18"))
+        else:
+            freq = "daily"
+            hour = self.schedule
+        
+        console.print(f"[green]Agendado: {freq} às {hour}:00[/green]")
+        
+        # Criar cron job ou systemd timer
+        self.create_schedule(freq, hour)
+    
+    def create_schedule(self, freq: str, hour: int) -> None:
+        """Cria agendamento no sistema"""
+        script_path = Path(__file__).resolve()
+        cmd = f"{sys.executable} {script_path} '{self.source}' '{self.dest}' --silent --replace"
+        
+        cron_map = {
+            "hourly": f"0 * * * * {cmd}",
+            "daily": f"0 {hour} * * * {cmd}",
+            "weekly": f"0 {hour} * * 0 {cmd}"
+        }
+        
+        cron_line = cron_map[freq]
+        
+        console.print(f"\n[yellow]Adicione ao crontab:[/yellow]")
+        console.print(f"[white]{cron_line}[/white]")
+        
+        if Confirm.ask("Adicionar automaticamente ao crontab?"):
+            try:
+                # Ler crontab atual
+                result = subprocess.run(["crontab", "-l"], capture_output=True, text=True)
+                current = result.stdout if result.returncode == 0 else ""
+                
+                # Adicionar nova linha
+                new_cron = current.rstrip() + "\n" + cron_line + "\n"
+                
+                # Salvar
+                process = subprocess.Popen(["crontab", "-"], stdin=subprocess.PIPE, text=True)
+                process.communicate(input=new_cron)
+                
+                console.print("[green]✓ Agendamento criado com sucesso![/green]")
+            except Exception as e:
+                console.print(f"[red]Erro ao criar agendamento: {e}[/red]")
+    
+    def print_summary(self) -> None:
+        """Imprime resumo final"""
+        console.print("\n")
+
+        table = Table(title="📋 Resumo da Sincronização", box=box.ROUNDED)
+        table.add_column("Métrica", style="cyan")
+        table.add_column("Valor", style="white")
+
+        table.add_row("Origem", str(self.source))
+        table.add_row("Destino", str(self.dest))
+        table.add_row("Total de arquivos", str(self.stats.total_files))
+        table.add_row("Sincronizados", f"[green]{self.stats.synced}[/green]")
+        table.add_row("Pulados", f"[yellow]{self.stats.skipped}[/yellow]")
+        table.add_row("Conflitos", f"[orange1]{self.stats.conflicts}[/orange1]")
+        if self.delete_dst:
+            table.add_row("Deletados", f"[red]{self.stats.deleted}[/red] ({self.stats.bytes_deleted_human})")
+        table.add_row("Erros", f"[red]{self.stats.errors}[/red]")
+        table.add_row("Tempo total", self.stats.elapsed)
+
+        if self.dry_run:
+            table.add_row("Modo", "[yellow]DRY-RUN (nenhuma alteração feita)[/yellow]")
+        if self.delete_dst:
+            table.add_row("Modo Delete", "[red]--delete-dst ATIVO (órfãos removidos)[/red]")
+
+        console.print(table)
+
+        # Listar arquivos deletados se houver
+        if self.delete_dst and self.deleted_files:
+            del_table = Table(title="🗑️ Arquivos Deletados", box=box.SIMPLE)
+            del_table.add_column("Arquivo", style="red")
+            for f in self.deleted_files[-20:]:  # Mostrar últimos 20
+                del_table.add_row(f)
+            if len(self.deleted_files) > 20:
+                del_table.add_row(f"... e mais {len(self.deleted_files) - 20} arquivos")
+            console.print(del_table)
+
+
+# ============================================================================
+# CLI
+# ============================================================================
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="fzrsync - Rsync Inteligente com Dashboard TUI",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Exemplos:
+  fzrsync /origem /destino                    # Sincronização interativa
+  fzrsync --dry-run /origem /destino          # Simular sem alterar
+  fzrsync --silent /origem /destino           # Sem dashboard
+  fzrsync --replace /origem /destino          # Substituir todos
+  fzrsync --delete-dst /origem /destino       # Deletar órfãos no destino
+  fzrsync -d -n /origem /destino              # Simular deleção de órfãos
+  fzrsync --rollback all /origem /destino     # Reverter todas alterações
+  fzrsync --schedule 18 /origem /destino      # Agendar para 18h
+
+Comportamento --delete-dst:
+  Se origem tem: A, B, C
+  E destino tem: A, B, C, D
+  Com --delete-dst: D será deletado (backup criado antes)
+  Sem --delete-dst: D será mantido (comportamento padrão)
+        """
+    )
+    
+    parser.add_argument("source", nargs="?", help="Diretório de origem")
+    parser.add_argument("dest", nargs="?", help="Diretório de destino")
+    
+    parser.add_argument(
+        "--dry-run", "-n",
+        action="store_true",
+        help="Simular sem fazer alterações"
+    )
+    
+    parser.add_argument(
+        "--silent", "-s",
+        action="store_true",
+        help="Executar sem dashboard (modo silencioso)"
+    )
+    
+    parser.add_argument(
+        "--replace", "-r",
+        action="store_true",
+        help="Substituir todos os arquivos no destino"
+    )
+    
+    parser.add_argument(
+        "--rollback",
+        nargs="?",
+        const="all",
+        metavar="ARQUIVO",
+        help="Reverter alterações (all = todos, ou caminho específico)"
+    )
+    
+    parser.add_argument(
+        "--schedule",
+        nargs="?",
+        const=-1,
+        type=int,
+        metavar="HORA",
+        help="Agendar execução (sem parâmetro = configurar, ou hora 0-23)"
+    )
+    
+    parser.add_argument(
+        "--delete-dst", "-d",
+        action="store_true",
+        help="Deletar arquivos órfãos no destino (que não existem na origem)"
+    )
+
+    parser.add_argument(
+        "--version", "-v",
+        action="version",
+        version="fzrsync 1.1.0"
+    )
+    
+    args = parser.parse_args()
+    
+    # Banner
+    console.print(Panel.fit(
+        "[bold blue]fzrsync[/bold blue] [cyan]v1.1.0[/cyan]\n"
+        "[dim]Rsync Inteligente com Dashboard TUI[/dim]",
+        border_style="blue"
+    ))
+    
+    # Validar argumentos
+    if not args.source and not args.rollback:
+        parser.print_help()
+        return
+    
+    if args.source and not args.dest:
+        console.print("[red]Erro: Destino não especificado[/red]")
+        return
+    
+    # Criar instância e executar
+    rsync = FzRsync(
+        source=args.source or ".",
+        dest=args.dest or ".",
+        dry_run=args.dry_run,
+        silent=args.silent,
+        replace_all=args.replace,
+        rollback=args.rollback,
+        schedule=args.schedule,
+        delete_dst=args.delete_dst
+    )
+    
+    try:
+        rsync.run()
+    except KeyboardInterrupt:
+        console.print("\n[yellow]Operação cancelada pelo usuário[/yellow]")
+        rsync.print_summary()
+
+
+if __name__ == "__main__":
+    main()
