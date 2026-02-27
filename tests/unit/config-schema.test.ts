@@ -102,9 +102,9 @@ describe("Config Schema Validation", () => {
       expect(result.success).toBe(true);
     });
 
-    it("should detect typo 'googl,eollama'", () => {
+    it("should detect typo 'google,ollama'", () => {
       const config = { 
-        PROVIDER_FALLBACK_ORDER: "googl,eollama,openrouter" 
+        PROVIDER_FALLBACK_ORDER: "google,ollama,openrouter" 
       };
       const result = validateConfig(config);
       expect(result.success).toBe(false);
