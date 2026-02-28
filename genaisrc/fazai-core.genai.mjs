@@ -53,13 +53,9 @@ defTool(
   },
   async ({ query, collections = ["memory", "learning", "kb"], limit = 3 }) => {
     try {
-      // Importa serviço de embeddings do FazAI
-      // CORRIGIDO: createEmbeddingService é async e retorna serviço já pronto
-      const { createEmbeddingService } = await import("../dist/services/embeddings.js");
-      const embeddingService = await createEmbeddingService();  // AWAIT necessário!
-      // Não precisa de .init() - serviço já vem inicializado
-
-      const embedding = await embeddingService.generate(query);  // .generate() não .embed()
+      // Importa embedder ONNX via adapter-bridge (BGE-base-en-v1.5, 768d)
+      const { embed } = await import("./tools/adapter-bridge.mjs");
+      const embedding = await embed(query);
 
       // Importa tools do Qdrant
       const { qdrantFusionSearch } = await import("./tools/qdrant-tools.mjs");
@@ -118,13 +114,10 @@ defTool(
   },
   async ({ content, category, source = "agentic_loop" }) => {
     try {
-      const { createEmbeddingService } = await import("../dist/services/embeddings.js");
+      const { embed } = await import("./tools/adapter-bridge.mjs");
       const { qdrantUpsertInsight } = await import("./tools/qdrant-tools.mjs");
 
-      // CORRIGIDO: createEmbeddingService é async e retorna serviço já pronto
-      const embeddingService = await createEmbeddingService();  // AWAIT necessário!
-      // Não precisa de .init() - serviço já vem inicializado
-      const embedding = await embeddingService.generate(content);  // .generate() não .embed()
+      const embedding = await embed(content);
 
       const result = await qdrantUpsertInsight(content, embedding, category, source);
 
@@ -241,12 +234,12 @@ defTool(
 // === EMBEDDINGS LOCAIS (Transformers.js) ===
 
 /**
- * Tool: Embeddings 100% locais com Transformers.js
- * Usa nomic-embed-text (768 dims nativo) via Ollama
+ * Tool: Embeddings ONNX locais (BGE-base-en-v1.5, 768d)
+ * Via qdrant-universal-injection — substitui Ollama
  */
 defTool(
   "local_embed",
-  "Gera embeddings 100% locais com Transformers.js (CPU only, zero custo)",
+  "Gera embeddings ONNX locais (BGE-base-en-v1.5, 768d, CPU only, cache LRU)",
   {
     type: "object",
     properties: {
@@ -264,34 +257,34 @@ defTool(
   },
   async ({ text, returnFull = false }) => {
     try {
-      const { embed, getModelInfo } = await import("./tools/transformers-embed.mjs");
+      const { embed, getEmbedderInfo } = await import("./tools/adapter-bridge.mjs");
 
       const vector = await embed(text);
-      const info = getModelInfo();
+      const info = getEmbedderInfo();
 
       return JSON.stringify({
         success: true,
         provider: info.provider,
         model: info.model,
         dimension: vector.length,
-        isLocal: true,
+        isLocal: info.isLocal,
         vector: returnFull ? vector : vector.slice(0, 5).map(v => v.toFixed(6)) + "...",
       }, null, 2);
     } catch (error) {
       return JSON.stringify({
         error: error.message,
-        fallback: "Use qdrant_multi_search que usa embedding service padrão",
+        fallback: "Use qdrant_multi_search que usa adapter-bridge",
       });
     }
   }
 );
 
 /**
- * Tool: Batch embeddings locais
+ * Tool: Batch embeddings ONNX
  */
 defTool(
   "local_embed_batch",
-  "Gera embeddings em batch com Transformers.js (mais eficiente para múltiplos textos)",
+  "Gera embeddings em batch via ONNX (mais eficiente para múltiplos textos)",
   {
     type: "object",
     properties: {
@@ -305,17 +298,17 @@ defTool(
   },
   async ({ texts }) => {
     try {
-      const { embedBatch, getModelInfo } = await import("./tools/transformers-embed.mjs");
+      const { embedBatch, getEmbedderInfo } = await import("./tools/adapter-bridge.mjs");
 
       const vectors = await embedBatch(texts);
-      const info = getModelInfo();
+      const info = getEmbedderInfo();
 
       return JSON.stringify({
         success: true,
         provider: info.provider,
         count: vectors.length,
         dimension: vectors[0]?.length || 0,
-        isLocal: true,
+        isLocal: info.isLocal,
       }, null, 2);
     } catch (error) {
       return JSON.stringify({

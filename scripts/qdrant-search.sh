@@ -2,6 +2,8 @@
 # Busca semantica no Qdrant
 # Uso: ./qdrant-search.sh "sua pergunta" [collection]
 # Collections: source, learning, kb, memory, personality, inference
+#
+# Embedder: ONNX BGE-base-en-v1.5 via qdrant-universal-injection
 
 QUERY="${1:-}"
 COLLECTION="${2:-source}"
@@ -12,25 +14,28 @@ if [ -z "$QUERY" ]; then
   exit 1
 fi
 
-# Get URLs from environment or config, with localhost defaults
-OLLAMA_URL="${OLLAMA_BASE_URL:-http://localhost:11434}"
 QDRANT_URL="${QDRANT_URL:-http://localhost:6333}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+FAZAI_NG_DIR="$(dirname "$SCRIPT_DIR")"
 
 echo "Buscando: \"$QUERY\" em fazai_$COLLECTION..."
 echo ""
 
-# Gerar embedding
-RAW_EMBED=$(curl -s -X POST "$OLLAMA_URL/api/embeddings" \
-  -H "Content-Type: application/json" \
-  -d "{\"model\":\"nomic-embed-text\",\"prompt\":\"$QUERY\"}" | jq -c '.embedding')
+# Gerar embedding via ONNX BGE-base-en-v1.5 (direto, sem adapter-bridge stdout noise)
+EMBED=$(node --input-type=module -e "
+import { getEmbedder } from 'qdrant-universal-injection';
+const e = getEmbedder();
+if (!e.isReady) await e.init();
+const v = await e.embed(process.argv[1]);
+process.stdout.write(JSON.stringify(v));
+process.exit(0);
+" "$QUERY" 2>/dev/null)
 
-if [ "$RAW_EMBED" = "null" ] || [ -z "$RAW_EMBED" ]; then
-  echo "Erro: Falha ao gerar embedding. Ollama esta rodando?"
+if [ -z "$EMBED" ] || [ "$EMBED" = "null" ]; then
+  echo "Erro: Falha ao gerar embedding ONNX."
+  echo "Verifique: npm link qdrant-universal-injection"
   exit 1
 fi
-
-# Use native 768 dimensions (nomic-embed-text)
-EMBED=$(echo "$RAW_EMBED" | jq -c '.')
 
 # Buscar no Qdrant
 curl -s -X POST "$QDRANT_URL/collections/fazai_$COLLECTION/points/search" \

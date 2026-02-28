@@ -553,23 +553,15 @@ async function indexToQdrant(discovery) {
       const opts = discovery.options[cmd] || [];
       const content = `CLI Command: fazai ${cmd}\nSubcommands: ${subs.join(", ") || "none"}\nOptions: ${opts.join(", ") || "none"}`;
 
-      // Generate embedding
+      // Generate embedding via ONNX BGE-base-en-v1.5
       try {
-        const embedRes = await fetch(`${config.ollamaUrl}/api/embeddings`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "nomic-embed-text", prompt: content }),
-        });
-        const embedData = await embedRes.json();
+        const { embed } = await import("../genaisrc/tools/adapter-bridge.mjs");
+        const vector = await embed(content);
 
-        if (embedData.embedding) {
-          // Zero-pad to 1536 (ECOA standard)
-          const vector = embedData.embedding;
-          while (vector.length < 1536) vector.push(0);
-
+        if (vector && vector.length > 0) {
           points.push({
             id: pointId++,
-            vector: vector.slice(0, 1536),
+            vector,
             payload: {
               type: "cli_completion",
               command: cmd,

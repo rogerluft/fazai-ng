@@ -2,7 +2,8 @@
 /**
  * FazAI - Teste do Embedding Service
  *
- * Testa a geração de embeddings com Ollama e OpenAI.
+ * Testa a geração de embeddings com ONNX BGE-base-en-v1.5
+ * via qdrant-universal-injection (singleton estático, 768d)
  *
  * Uso:
  *   npx tsx scripts/test-embedding-service.ts
@@ -10,7 +11,6 @@
  */
 
 import { createEmbeddingService } from "../src/services/embeddings.js";
-import { getConfigValue } from "../src/config.js";
 
 const verbose = process.argv.includes("--verbose") || process.argv.includes("-v");
 
@@ -39,13 +39,8 @@ async function main() {
   log("║         FazAI - Teste do Embedding Service                   ║", "cyan");
   log("╚══════════════════════════════════════════════════════════════╝\n", "cyan");
 
-  // Mostra configuração
-  const ollamaUrl = getConfigValue("OLLAMA_BASE_URL") || "http://192.168.0.101:11434";
-  const hasOpenAI = !!getConfigValue("OPENAI_API_KEY");
-
   log("📋 Configuração:", "blue");
-  log(`   OLLAMA_BASE_URL: ${ollamaUrl}`);
-  log(`   OPENAI_API_KEY: ${hasOpenAI ? "✅ Configurada" : "❌ Não configurada"}`);
+  log(`   Embedder: ONNX BGE-base-en-v1.5 (local, 768d)`);
 
   // Cria serviço
   log("\n🔧 Inicializando serviço de embeddings...", "blue");
@@ -128,7 +123,7 @@ async function main() {
   log(`   Tipo: ${info.isLocal ? "Local (grátis)" : "Cloud (pago)"}`);
 
   if (!info.isLocal) {
-    log("\n   ⚠️  Usando provider cloud. Considere configurar Ollama local.", "yellow");
+    log("\n   ⚠️  Esperado provider local (ONNX). Algo está errado.", "yellow");
   }
 
   log("\n");

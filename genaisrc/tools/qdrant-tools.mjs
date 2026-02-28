@@ -19,7 +19,7 @@ export const COLLECTIONS = {
   source: "fazai_source",              // Código fonte indexado
 };
 
-// Dimensão padrão (nomic-embed-text nativo)
+// Dimensão padrão (BGE-base-en-v1.5 nativo)
 const VECTOR_DIMENSION = 768;
 
 /**

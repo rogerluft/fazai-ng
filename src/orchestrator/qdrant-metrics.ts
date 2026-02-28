@@ -110,7 +110,7 @@ export async function getCollectionSize(name: string): Promise<CollectionSize> {
     // Calculate estimated size
     const vectorDimension = typeof collection.config?.params?.vectors === "object" && "size" in collection.config.params.vectors
       ? collection.config.params.vectors.size
-      : 768; // Default dimension (nomic-embed-text native)
+      : 768; // Default dimension (BGE-base-en-v1.5 native)
 
     const pointsCount = collection.points_count || 0;
     const vectorsCount = collection.vectors_count || 0;

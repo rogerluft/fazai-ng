@@ -5,7 +5,7 @@
  * eliminating zero-padding and optimizing for content type.
  *
  * Key Improvements:
- * - Native dimensions (768 for nomic-embed-text, 1024 for mxbai, 1536 for OpenAI)
+ * - Native dimensions (768 for BGE-base-en-v1.5 via ONNX)
  * - Semantic chunking (no hard truncation)
  * - Model selection by content type
  * - Preprocessing pipelines
@@ -13,16 +13,19 @@
  * @module services/embedding-strategies
  */
 
-import { getOllamaEmbedUrl } from "../config";
 import { logger } from "../logger";
 
 /**
- * Supported embedding models (Ollama local)
+ * Supported embedding models
+ *
+ * BGE-base-en-v1.5 via ONNX (qdrant-universal-injection) is the only active model.
+ * Legacy names kept for backward compat with tests and configs.
  */
 export type EmbeddingModel =
-  | "mxbai-embed-large"  // 1024 dim - Best for long context
-  | "nomic-embed-text"   // 768 dim - Best for short text
-  | "text-embedding-3-small"; // 1536 dim nativo - OpenAI fallback
+  | "BGE-base-en-v1.5"         // 768 dim - ONNX static (active)
+  | "nomic-embed-text"         // legacy alias
+  | "mxbai-embed-large"        // legacy alias
+  | "text-embedding-3-small";  // legacy alias
 
 /**
  * Collection types
@@ -186,8 +189,8 @@ const PREPROCESSING_FUNCTIONS: Record<
 export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   personality: {
     collection: "fazai_personality",
-    model: "nomic-embed-text",
-    dimension: 768, // Native nomic-embed-text
+    model: "BGE-base-en-v1.5",
+    dimension: 768, // BGE-base-en-v1.5 native
     chunking: CHUNKING_STRATEGIES.personality,
     distanceMetric: "Dot", // Better for sparse trait vectors
     preprocess: PREPROCESSING_FUNCTIONS.personality,
@@ -195,8 +198,8 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   memory: {
     collection: "fazai_memory",
-    model: "nomic-embed-text",
-    dimension: 768, // Native nomic-embed-text
+    model: "BGE-base-en-v1.5",
+    dimension: 768, // BGE-base-en-v1.5 native
     chunking: CHUNKING_STRATEGIES.memory,
     distanceMetric: "Cosine", // Good for conversational similarity
     preprocess: PREPROCESSING_FUNCTIONS.memory,
@@ -204,8 +207,8 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   learning: {
     collection: "fazai_learning",
-    model: "nomic-embed-text",
-    dimension: 768, // Native nomic-embed-text
+    model: "BGE-base-en-v1.5",
+    dimension: 768, // BGE-base-en-v1.5 native
     chunking: CHUNKING_STRATEGIES.learning,
     distanceMetric: "Dot", // Commands are more literal (magnitude matters)
     preprocess: PREPROCESSING_FUNCTIONS.learning,
@@ -214,8 +217,8 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   kb: {
     collection: "fazai_kb",
-    model: "nomic-embed-text",
-    dimension: 768, // Native nomic-embed-text
+    model: "BGE-base-en-v1.5",
+    dimension: 768, // BGE-base-en-v1.5 native
     chunking: CHUNKING_STRATEGIES.kb,
     distanceMetric: "Cosine", // Dense technical docs need direction match
     preprocess: PREPROCESSING_FUNCTIONS.kb,
@@ -223,7 +226,7 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   inference: {
     collection: "fazai_inference",
-    model: "nomic-embed-text", // Lei 768: 768d native model // Unused but required for interface
+    model: "BGE-base-en-v1.5", // Unused but required for interface
     dimension: 0, // No embeddings needed
     chunking: CHUNKING_STRATEGIES.inference,
     distanceMetric: "Dot", // Unused
@@ -374,72 +377,35 @@ export function preprocessText(
 }
 
 /**
- * Check if model is available in Ollama
+ * Check if embedding model is available
  *
- * @param model Model name
- * @param ollamaBaseUrl Ollama base URL
- * @returns True if model is available
+ * With ONNX BGE-base-en-v1.5, the model is always available locally.
+ * This function is kept for backward compatibility with tests.
+ *
+ * @param _model Model name (ignored — ONNX is always available)
+ * @param _baseUrl Base URL (ignored — no network needed)
+ * @returns Always true (ONNX model is bundled)
  */
 export async function isModelAvailable(
-  model: EmbeddingModel,
-  ollamaBaseUrl: string = getOllamaEmbedUrl()
+  _model: EmbeddingModel,
+  _baseUrl?: string
 ): Promise<boolean> {
-  try {
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
-
-    const response = await fetch(`${ollamaBaseUrl}/api/tags`, {
-      signal: controller.signal,
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      return false;
-    }
-
-    const data = await response.json();
-    const models = data.models || [];
-    const modelNames = models.map(
-      (m: any) => m.name?.split(":")[0] || m.name
-    );
-
-    return modelNames.some(
-      (name: string) => name === model || name.startsWith(model)
-    );
-  } catch (error: any) {
-    logger.debug(`Failed to check model availability: ${error.message}`);
-    return false;
-  }
+  return true;
 }
 
 /**
  * Get fallback model if preferred model is unavailable
  *
- * @param preferredModel Preferred model
- * @param ollamaBaseUrl Ollama base URL
- * @returns Available model or null
+ * With ONNX, there is no fallback needed — BGE-base-en-v1.5 is always available.
+ * Returns "BGE-base-en-v1.5" as the universal model.
+ *
+ * @param _preferredModel Preferred model (ignored)
+ * @param _baseUrl Base URL (ignored)
+ * @returns Always "BGE-base-en-v1.5"
  */
 export async function getFallbackModel(
-  preferredModel: EmbeddingModel,
-  ollamaBaseUrl: string = getOllamaEmbedUrl()
-): Promise<EmbeddingModel | null> {
-  // Priority order for fallbacks
-  const fallbackOrder: EmbeddingModel[] = [
-    "mxbai-embed-large",
-    "nomic-embed-text",
-  ];
-
-  for (const model of fallbackOrder) {
-    if (model === preferredModel) {
-      continue;
-    }
-
-    if (await isModelAvailable(model, ollamaBaseUrl)) {
-      logger.info(`Using fallback model: ${model} (preferred: ${preferredModel})`);
-      return model;
-    }
-  }
-
-  return null;
+  _preferredModel: EmbeddingModel,
+  _baseUrl?: string
+): Promise<EmbeddingModel> {
+  return "BGE-base-en-v1.5";
 }

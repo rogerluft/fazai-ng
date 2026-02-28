@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#
+# FazAI - Terminal Inteligente de Administração Linux
+# Wrapper script que executa o CLI principal
+#
+
+# Run environment setup silently in the background to not clutter the command output
+bash "$(dirname "$0")/../scripts/setup-env.sh" > /dev/null 2>&1 &
+
+set -euo pipefail
+
+# Carrega configurações do sistema (variáveis de ambiente)
+FAZAI_CONFIG="${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+if [[ -f "$FAZAI_CONFIG" ]]; then
+    # shellcheck source=/dev/null
+    set -a  # Exporta automaticamente todas as variáveis
+    source "$FAZAI_CONFIG"
+    set +a
+fi
+
+# Detecta o diretório de instalação
+INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
+APP_JS="${INSTALL_DIR}/dist/app.js"
+
+# Verifica se a aplicação existe
+if [[ ! -f "$APP_JS" ]]; then
+    echo "❌ FazAI não encontrado em: $APP_JS" >&2
+    echo "   Execute: sudo bash install.sh" >&2
+    exit 1
+fi
+
+# Executa o CLI principal com todos os argumentos
+exec node "$APP_JS" "$@"

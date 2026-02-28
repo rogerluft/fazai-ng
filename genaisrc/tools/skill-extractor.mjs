@@ -8,8 +8,19 @@
  * 4. Deduplicate skills existentes
  */
 
-import { runPrompt } from "@genaiscript/core";
 import { qdrantSearch, qdrantUpsert, COLLECTIONS } from "./qdrant-tools.mjs";
+
+// runPrompt não é exportado por @genaiscript/core — é uma global de .genai.mjs.
+// Recebemos via parâmetro ou fallback para null (caller deve fornecer).
+let _runPromptFn = null;
+
+/**
+ * Configura a função runPrompt (deve ser chamado do .genai.mjs que tem acesso à global).
+ * @param {Function} fn - A função runPrompt do contexto GenAIScript
+ */
+export function setRunPrompt(fn) {
+  _runPromptFn = fn;
+}
 
 /**
  * Template de prompt para extração de skills
@@ -90,8 +101,12 @@ Retorne APENAS o JSON, sem texto adicional.`;
 /**
  * Extrai skills de conteúdo usando LLM
  */
-export async function extractSkillsFromContent(content, metadata = {}) {
+export async function extractSkillsFromContent(content, metadata = {}, runPromptFn = null) {
   const { source = "unknown", type = "url", topic = "general", model = "anthropic:claude-sonnet-4-5-20250929" } = metadata;
+  const runPrompt = runPromptFn || _runPromptFn;
+  if (!runPrompt) {
+    return { success: false, error: "runPrompt not available — call setRunPrompt() first or pass runPromptFn" };
+  }
 
   // Trunca conteúdo se muito longo (limite do modelo)
   const maxContentLength = 100000; // ~25k tokens
@@ -107,17 +122,12 @@ export async function extractSkillsFromContent(content, metadata = {}) {
     .replace("{{TOPIC}}", topic);
 
   try {
-    // Executa LLM
-    const result = await runPrompt({
+    // Executa LLM via GenAIScript runPrompt (string + options)
+    const result = await runPrompt(prompt, {
       model,
-      temperature: 0.3, // Baixa para saída mais determinística
+      temperature: 0.3,
       maxTokens: 8192,
-      messages: [
-        {
-          role: "user",
-          content: prompt,
-        },
-      ],
+      responseType: "json",
     });
 
     // Parse JSON response
@@ -195,22 +205,11 @@ async function checkSkillDuplication(skillName, embedding) {
 }
 
 /**
- * Gera embedding de skill (usando modelo configurado)
+ * Gera embedding de skill via ONNX BGE-base-en-v1.5 (adapter-bridge)
  */
 async function generateSkillEmbedding(skillText) {
-  // TODO: Integrar com createEmbeddingService do FazAI
-  // Por enquanto, retorna vetor mock (768 dims)
-
-  // Simulação: hash simples do texto para vetor pseudo-aleatório mas determinístico
-  const hash = skillText.split("").reduce((acc, char) => {
-    return ((acc << 5) - acc) + char.charCodeAt(0);
-  }, 0);
-
-  const vector = new Array(768).fill(0).map((_, i) => {
-    return Math.sin(hash * (i + 1)) * 0.5 + 0.5;
-  });
-
-  return vector;
+  const { embed } = await import("./adapter-bridge.mjs");
+  return embed(skillText);
 }
 
 /**

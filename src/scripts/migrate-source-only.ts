@@ -8,66 +8,28 @@ import { logger } from "../logger";
 import chalk from "chalk";
 
 const TARGET_DIMENSION = 768;
-const OLLAMA_PRIMARY = "http://192.168.0.101:11434";
-const OLLAMA_FALLBACK = "http://localhost:11434";
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
 const BATCH_SIZE = 32;
 const UPSERT_BATCH_SIZE = 500;
 const COLLECTION = "fazai_source";
 
+/**
+ * Embedding service using ONNX BGE-base-en-v1.5 via qdrant-universal-injection
+ */
 class MigrationEmbeddingService {
-  private readonly primaryUrl: string;
-  private readonly fallbackUrl: string;
-  private readonly model: string = "nomic-embed-text";
+  private embedder: any = null;
   private readonly dimension: number = 768;
-  private readonly MAX_CHARS = 10000;
 
-  constructor(primaryUrl: string, fallbackUrl: string) {
-    this.primaryUrl = primaryUrl;
-    this.fallbackUrl = fallbackUrl;
-  }
-
-  private async tryEmbed(text: string, baseUrl: string): Promise<number[] | null> {
-    try {
-      const response = await fetch(`${baseUrl}/api/embeddings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: this.model,
-          prompt: text || " ",
-        }),
-      });
-
-      if (!response.ok) return null;
-
-      const data = await response.json();
-      return data.embedding;
-    } catch {
-      return null;
-    }
+  private async ensureInit(): Promise<void> {
+    if (this.embedder) return;
+    const { getEmbedder } = await import("qdrant-universal-injection");
+    this.embedder = getEmbedder();
+    if (!this.embedder.isReady) await this.embedder.init();
   }
 
   async generateBatch(texts: string[]): Promise<number[][]> {
-    const results: number[][] = [];
-
-    for (const text of texts) {
-      const truncated = text.length > this.MAX_CHARS ? text.substring(0, this.MAX_CHARS) : text;
-
-      let embedding = await this.tryEmbed(truncated, this.primaryUrl);
-
-      if (!embedding || embedding.length !== this.dimension) {
-        logger.debug(`Primary failed, trying fallback for text of ${truncated.length} chars`);
-        embedding = await this.tryEmbed(truncated, this.fallbackUrl);
-      }
-
-      if (!embedding || embedding.length !== this.dimension) {
-        throw new Error(`Both servers failed! Expected ${this.dimension}d, got ${embedding?.length}`);
-      }
-
-      results.push(embedding);
-    }
-
-    return results;
+    await this.ensureInit();
+    return this.embedder.embedBatch(texts);
   }
 }
 
@@ -77,9 +39,9 @@ async function migrateSource() {
   console.log(chalk.bold.cyan("╚══════════════════════════════════════════════════╝\n"));
 
   const client = new QdrantClient({ url: QDRANT_URL });
-  const embeddingService = new MigrationEmbeddingService(OLLAMA_PRIMARY, OLLAMA_FALLBACK);
+  const embeddingService = new MigrationEmbeddingService();
 
-  logger.info(`Primary: ${OLLAMA_PRIMARY} | Fallback: ${OLLAMA_FALLBACK}`);
+  logger.info(`Embedder: ONNX BGE-base-en-v1.5 (768d, local)`);
 
   // Check current state
   const collectionInfo = await client.getCollection(COLLECTION);

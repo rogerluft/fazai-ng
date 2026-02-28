@@ -432,8 +432,9 @@ fazai --version
 
 **Dependências RAG**:
 - @qdrant/js-client-rest (vector DB)
-- ollama (embeddings local)
+- qdrant-universal-injection (embeddings ONNX BGE-base-en-v1.5, 768d local)
 - openai (embeddings fallback)
+- ollama (LLM inference fallback — nao usado para embeddings)
 - chalk (terminal colors)
 
 ---

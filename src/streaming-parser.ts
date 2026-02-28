@@ -112,10 +112,25 @@ export async function* parseStreamingJSON(
 
       // Handle different provider response formats
       switch (sourceType) {
-        case "anthropic":
-          // Claude sends clean text chunks
-          tokenStream.push(Buffer.from(chunk, "utf-8"));
+        case "anthropic": {
+          // Claude may wrap JSON in markdown (```json ... ```)
+          // Backtick markers can split across chunks, so skip until first { or [
+          if (!jsonStarted) {
+            const jsonStart = chunk.search(/[{[]/);
+            if (jsonStart !== -1) {
+              jsonStarted = true;
+              tokenStream.push(Buffer.from(chunk.substring(jsonStart), "utf-8"));
+            }
+            // Skip non-JSON prefix (backticks, "json", whitespace)
+          } else {
+            // Strip trailing backticks from any chunk
+            const cleaned = chunk.replace(/`+\s*$/g, "");
+            if (cleaned) {
+              tokenStream.push(Buffer.from(cleaned, "utf-8"));
+            }
+          }
           break;
+        }
 
         case "google":
           // Gemini may have prefix text before JSON

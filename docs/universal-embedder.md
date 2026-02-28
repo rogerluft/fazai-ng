@@ -2,39 +2,51 @@
 
 ## Overview
 
-The Universal Local Embedder provides a unified interface for generating text embeddings using Ollama's local models with native 768-dimensional vectors (Lei 768).
+The Universal Local Embedder provides a unified interface for generating text embeddings using ONNX BGE-base-en-v1.5 with native 768-dimensional vectors (Lei 768). Embeddings run entirely on-device via the `qdrant-universal-injection` npm package — no external API or Ollama server required for embedding.
 
 ## Features
 
-- **Local Execution**: Uses Ollama (no API costs)
-- **Native 768d**: Uses nomic-embed-text native dimension (no padding needed)
+- **Local ONNX Execution**: Uses BGE-base-en-v1.5 via ONNX runtime (no API costs)
+- **Native 768d**: Uses BGE-base-en-v1.5 native dimension — no padding needed
 - **Batch Processing**: Efficient multi-text embedding generation
 - **Retry Logic**: Automatic retry on transient failures
 - **Type Safety**: Full TypeScript support with strict typing
+- **Cold Start**: ~11s for ONNX embedder initialization (subsequent calls are fast)
 
 ## Architecture
 
 ```
 Input Text
     ↓
-Ollama API (nomic-embed-text)
+qdrant-universal-injection (ONNX runtime)
+    ↓
+BGE-base-en-v1.5 model
     ↓
 Native Embedding (768 dimensions - Lei 768)
 ```
 
 ## Installation
 
-The Universal Local Embedder is built into FazAI. No additional installation required.
+The Universal Local Embedder depends on `qdrant-universal-injection`, which must be linked locally:
+
+```bash
+# 1. Build qdrant-universal-injection
+cd /home/rluft/qdrant-universal-injection
+npm install
+npm run build
+
+# 2. Link into fazai-ng
+cd /home/rluft/fazai-ng
+npm link /home/rluft/qdrant-universal-injection
+```
+
+**Note:** Ollama is no longer required for embeddings. Ollama remains in the fallback chain only for LLM inference (llama3.2, qwen, mistral, etc.).
 
 ## Requirements
 
-- Ollama server running (default: http://192.168.0.101:11434)
-- Model `nomic-embed-text` pulled in Ollama
-
-```bash
-# Pull the model
-ollama pull nomic-embed-text
-```
+- Node.js 18+
+- `qdrant-universal-injection` linked via `npm link` (see Installation above)
+- No Ollama required for embeddings
 
 ## Usage
 
@@ -45,7 +57,7 @@ import { generateUniversalEmbedding } from "./services/universal-embedder";
 
 // Generate single embedding
 const embedding = await generateUniversalEmbedding("Hello world");
-console.log(embedding.length); // 1536
+console.log(embedding.length); // 768
 ```
 
 ### Batch Embeddings
@@ -63,7 +75,7 @@ const texts = [
 
 const embeddings = await embedder.embedBatch(texts);
 console.log(embeddings.length); // 3
-console.log(embeddings[0].length); // 1536
+console.log(embeddings[0].length); // 768
 ```
 
 ### Custom Configuration
@@ -72,86 +84,16 @@ console.log(embeddings[0].length); // 1536
 import { UniversalLocalEmbedder } from "./services/universal-embedder";
 
 const embedder = new UniversalLocalEmbedder(
-  "http://localhost:11434",  // Custom Ollama URL
-  "nomic-embed-text",        // Model name
-  768,                       // Native dimension
-  1536                       // Target dimension
+  "bge-base-en-v1.5",  // Model name (ONNX)
+  768                   // Native dimension
 );
 
 const embedding = await embedder.embed("Custom configuration example");
 ```
 
-### Direct Padding Function
-
-```typescript
-import { padVector } from "./services/universal-embedder";
-
-const vec768 = new Array(768).fill(0.5);
-const vec1536 = padVector(vec768, 1536);
-
-console.log(vec1536.length); // 1536
-console.log(vec1536.slice(0, 768)); // Original values
-console.log(vec1536.slice(768));    // Zeros
-```
-
-## Zero Padding Explained
-
-Zero Padding extends a lower-dimensional vector to a higher dimension by appending zeros. This technique:
-
-1. **Preserves Semantic Information**: Original values remain unchanged
-2. **Maintains Cosine Similarity**: Similarity relationships are preserved
-3. **Enables Migration**: Allows switching between models without re-embedding
-4. **No Magnitude Bias**: Zeros don't affect vector magnitude
-
-### Mathematical Properties
-
-```
-Original Vector:  [0.1, 0.2, 0.3, ..., 0.768] (768 dimensions)
-Padded Vector:    [0.1, 0.2, 0.3, ..., 0.768, 0, 0, ..., 0] (1536 dimensions)
-
-Cosine Similarity: cos(θ) = (A·B) / (||A|| × ||B||)
-- The dot product A·B only uses non-zero components
-- Zeros don't contribute to magnitude ||A||
-- Therefore, similarity is preserved
-```
-
-## Error Handling
-
-The embedder includes robust error handling:
-
-```typescript
-import { UniversalLocalEmbedder } from "./services/universal-embedder";
-
-const embedder = new UniversalLocalEmbedder();
-
-try {
-  const embedding = await embedder.embed("Test text");
-} catch (error) {
-  // On failure, returns zero vector as fallback
-  // Check logs for detailed error information
-  console.error("Embedding failed:", error);
-}
-```
-
-## Performance
-
-### Single Embedding
-- **Latency**: ~50-200ms (depending on text length)
-- **Context Window**: 2048 characters (safe limit)
-
-### Batch Embedding
-- **Processing**: Sequential (Ollama API limitation)
-- **Progress Logging**: Every 10 items for batches > 10
-- **Recommended Batch Size**: 10-100 texts
-
-### Optimization Tips
-
-1. **Batch when possible**: Use `embedBatch()` for multiple texts
-2. **Truncate long texts**: Pre-truncate to avoid API errors
-3. **Cache embeddings**: Store in Qdrant or local cache
-4. **Use local Ollama**: Faster than cloud APIs
-
 ## Integration with Qdrant
+
+All Qdrant collections in FazAI use **768-dimensional** vectors (Lei 768) with Cosine distance:
 
 ```typescript
 import { UniversalLocalEmbedder } from "./services/universal-embedder";
@@ -160,10 +102,10 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 const embedder = new UniversalLocalEmbedder();
 const qdrant = new QdrantClient({ url: "http://localhost:6333" });
 
-// Create collection with 1536 dimensions
+// Create collection with 768 dimensions (Lei 768)
 await qdrant.createCollection("my_collection", {
   vectors: {
-    size: 1536,
+    size: 768,
     distance: "Cosine"
   }
 });
@@ -188,103 +130,98 @@ const results = await qdrant.search("my_collection", {
 });
 ```
 
-## Comparison with Other Approaches
+## Error Handling
 
-| Approach | Pros | Cons |
-|----------|------|------|
-| **Zero Padding** | Simple, preserves similarity, no re-embedding | Larger vectors (more storage) |
-| **Truncation** | Smaller vectors | Data loss, similarity distortion |
-| **PCA Projection** | Optimal compression | Requires training, complex |
-| **Re-embedding** | Native dimensions | Expensive, time-consuming |
+The embedder includes robust error handling:
+
+```typescript
+import { UniversalLocalEmbedder } from "./services/universal-embedder";
+
+const embedder = new UniversalLocalEmbedder();
+
+try {
+  const embedding = await embedder.embed("Test text");
+} catch (error) {
+  // On failure, returns zero vector as fallback
+  // Check logs for detailed error information
+  console.error("Embedding failed:", error);
+}
+```
+
+## Performance
+
+### ONNX Initialization
+- **Cold start**: ~11s (ONNX model load on first call)
+- **Subsequent calls**: fast (model stays loaded in memory)
+
+### Single Embedding
+- **Latency**: ~50-200ms after initialization (depending on text length)
+- **Context Window**: 512 tokens (BGE-base-en-v1.5 limit)
+
+### Batch Embedding
+- **Processing**: Sequential
+- **Progress Logging**: Every 10 items for batches > 10
+- **Recommended Batch Size**: 10-100 texts
+
+### Optimization Tips
+
+1. **Batch when possible**: Use `embedBatch()` for multiple texts
+2. **Truncate long texts**: Pre-truncate to 512 tokens to match model window
+3. **Cache embeddings**: Store in Qdrant or local cache to avoid re-embedding
 
 ## Troubleshooting
 
-### Ollama Connection Failed
+### qdrant-universal-injection Not Found
 
 ```bash
-# Check if Ollama is running
-curl http://192.168.0.101:11434/api/tags
+# Verify npm link is active
+ls -la /home/rluft/fazai-ng/node_modules/qdrant-universal-injection
 
-# Start Ollama
-systemctl start ollama
-
-# Check model availability
-ollama list
+# Re-link if missing
+cd /home/rluft/fazai-ng
+npm link /home/rluft/qdrant-universal-injection
 ```
 
-### Model Not Found
+### Slow Cold Start
 
-```bash
-# Pull the model
-ollama pull nomic-embed-text
-
-# Verify
-ollama list | grep nomic-embed-text
-```
+The ONNX embedder takes ~11s to initialize the first time. This is expected behavior — subsequent calls within the same process are fast.
 
 ### Dimension Mismatch
 
-If you see dimension warnings in logs:
+All FazAI Qdrant collections must use 768 dimensions (Lei 768). If you see dimension mismatch errors:
 
-1. Check the model's native dimension
-2. Verify Qdrant collection dimension
-3. Update `targetDimension` parameter if needed
-
-### Performance Issues
-
-If embeddings are slow:
-
-1. Check Ollama server resources (CPU/RAM)
-2. Reduce batch size
-3. Use local Ollama instance (avoid network latency)
-4. Consider caching frequently used embeddings
+1. Verify the collection was created with `size: 768`
+2. Run `fazai vector recreate --provider qdrant` to rebuild collections
 
 ## API Reference
 
-### `padVector(vector: number[], targetDim?: number): number[]`
-
-Pad or truncate a vector to target dimension.
-
-**Parameters:**
-- `vector`: Input vector
-- `targetDim`: Target dimension (default: 1536)
-
-**Returns:** Padded/truncated vector
-
----
-
-### `generateUniversalEmbedding(text: string, ollamaUrl?: string): Promise<number[]>`
+### `generateUniversalEmbedding(text: string): Promise<number[]>`
 
 Generate universal embedding for a single text.
 
 **Parameters:**
 - `text`: Input text
-- `ollamaUrl`: Ollama server URL (default: http://192.168.0.101:11434)
 
-**Returns:** 1536-dimensional embedding vector
+**Returns:** 768-dimensional embedding vector
 
 ---
 
 ### `class UniversalLocalEmbedder`
 
-Main embedder class.
+Main embedder class backed by ONNX BGE-base-en-v1.5 via `qdrant-universal-injection`.
 
 #### Constructor
 
 ```typescript
 constructor(
-  ollamaUrl?: string,
   model?: string,
-  nativeDimension?: number,
-  targetDimension?: number
+  nativeDimension?: number
 )
 ```
 
 **Parameters:**
-- `ollamaUrl`: Ollama server URL (default: http://192.168.0.101:11434)
-- `model`: Model name (default: nomic-embed-text)
+- `model`: Model name (default: `bge-base-en-v1.5`)
 - `nativeDimension`: Model's native dimension (default: 768)
-- `targetDimension`: Output dimension (default: 1536)
 
 #### Methods
 
@@ -295,7 +232,7 @@ Generate embedding for a single text.
 **Parameters:**
 - `text`: Input text
 
-**Returns:** 1536-dimensional embedding vector
+**Returns:** 768-dimensional embedding vector
 
 ---
 
@@ -306,7 +243,7 @@ Generate embeddings for multiple texts.
 **Parameters:**
 - `texts`: Array of input texts
 
-**Returns:** Array of 1536-dimensional embedding vectors
+**Returns:** Array of 768-dimensional embedding vectors
 
 ---
 
@@ -319,8 +256,7 @@ Get embedder configuration.
 {
   model: string;
   nativeDimension: number;
-  targetDimension: number;
-  ollamaUrl: string;
+  backend: "onnx";
 }
 ```
 
@@ -332,10 +268,20 @@ Run unit tests:
 npm test -- tests/unit/universal-embedder.test.ts
 ```
 
-Run integration tests (requires Ollama):
+Run integration tests (requires qdrant-universal-injection linked):
 
 ```bash
 npm test -- tests/integration/universal-embedder.test.ts
+```
+
+## Migration from nomic-embed-text (Ollama)
+
+If you have existing Qdrant collections created with `nomic-embed-text` (768d via Ollama), they are dimensionally compatible with BGE-base-en-v1.5 (also 768d). However, since the two models use different embedding spaces, existing vectors should be re-indexed for best similarity accuracy:
+
+```bash
+# Recreate all collections and re-index
+fazai vector recreate --provider qdrant
+fazai index --force
 ```
 
 ## License
@@ -344,6 +290,6 @@ Apache-2.0
 
 ---
 
-**Last Updated:** 2025-12-27
+**Last Updated:** 2026-02-28
 **Author:** FazAI Team
-**Version:** 3.10.0
+**Version:** 3.14.1

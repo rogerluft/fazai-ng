@@ -172,23 +172,15 @@ defTool(
       const opts = data.options[cmd] || [];
       const content = `Command: ${cmd}\nSubcommands: ${subs.join(", ")}\nOptions: ${opts.join(", ")}`;
 
-      // Generate embedding via Ollama
+      // Generate embedding via ONNX BGE-base-en-v1.5
       try {
-        const embedRes = await fetch(`${ollamaUrl}/api/embeddings`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ model: "nomic-embed-text", prompt: content }),
-        });
-        const embedData = await embedRes.json();
+        const { embed } = await import("./tools/adapter-bridge.mjs");
+        const vector = await embed(content);
 
-        if (embedData.embedding) {
-          // Truncate to 768 dimensions (nomic-embed-text native)
-          const vector = embedData.embedding;
-          // nomic-embed-text já produz 768d nativo - sem padding necessário
-
+        if (vector && vector.length > 0) {
           points.push({
             id: pointId++,
-            vector: vector.slice(0, 768),
+            vector,
             payload: {
               type: "cli_command",
               command: cmd,

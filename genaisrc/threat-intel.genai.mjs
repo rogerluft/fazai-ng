@@ -317,21 +317,9 @@ defTool(
     const collectionName = "fazai_threats";
     await ensureCollection(collectionName);
 
-    // Gerar embedding do target
-    const response = await fetch(`${ollamaUrl}/api/embeddings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "nomic-embed-text",
-        prompt: `${type}: ${target} - ${risk_level} threat. ${details}`,
-      }),
-    });
-
-    const embData = await response.json();
-    const vector = embData.embedding;
-
-    // Ensure 768 dimensions (nomic-embed-text native)
-    if (vector.length > 768) vector.length = 768;
+    // Gerar embedding via ONNX BGE-base-en-v1.5
+    const { embed } = await import("./tools/adapter-bridge.mjs");
+    const vector = await embed(`${type}: ${target} - ${risk_level} threat. ${details}`);
 
     const point = {
       id: Date.now(),
@@ -376,21 +364,9 @@ defTool(
     const collectionName = "fazai_threats";
     await ensureCollection(collectionName);
 
-    // Gerar embedding da query
-    const response = await fetch(`${ollamaUrl}/api/embeddings`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        model: "nomic-embed-text",
-        prompt: query,
-      }),
-    });
-
-    const embData = await response.json();
-    const vector = embData.embedding;
-
-    // Ensure 768 dimensions (nomic-embed-text native)
-    if (vector.length > 768) vector.length = 768;
+    // Gerar embedding via ONNX BGE-base-en-v1.5
+    const { embed } = await import("./tools/adapter-bridge.mjs");
+    const vector = await embed(query);
 
     const results = await qdrantSearch(collectionName, vector, limit);
     return JSON.stringify(results, null, 2);

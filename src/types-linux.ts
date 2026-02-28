@@ -3,8 +3,8 @@ import { z } from "zod";
 export const LinuxCommandSchema = z.object({
   explain: z.string(), // Explicação do que o comando faz
   command: z.string(), // Comando Linux a executar
-  riskLevel: z.enum(["low", "medium", "high", "critical"]), // Nível de risco
-  requiresConfirmation: z.boolean(), // Se precisa confirmação extra
+  riskLevel: z.string().transform(v => v.toLowerCase()).pipe(z.enum(["low", "medium", "high", "critical"])), // Case-insensitive
+  requiresConfirmation: z.boolean().optional().default(false), // Se precisa confirmação extra
   rollbackCommand: z.string().nullable().optional(), // Comando para reverter se possível
   safetyChecks: z.array(z.string()).nullable().optional(), // Verificações de segurança a fazer antes
   expectedOutput: z.string().nullable().optional(), // Saída esperada para validação

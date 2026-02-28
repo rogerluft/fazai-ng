@@ -13,9 +13,9 @@ FazAI now includes **Semantic Cache** - an advanced caching system that uses vec
    - Provides fast similarity search (cosine distance)
    - Supports filtering by provider/model
 
-2. **Embedding Service**: Ollama (local) or OpenAI (cloud)
+2. **Embedding Service**: ONNX BGE-base-en-v1.5 (local) or OpenAI (cloud)
    - Generates vector embeddings from text
-   - Default: Ollama `mxbai-embed-large` (1024 dim)
+   - Default: ONNX `bge-base-en-v1.5` via `qdrant-universal-injection` (768 dim)
    - Fallback: OpenAI `text-embedding-3-small` (1536 dim)
 
 3. **Cache Manager**: SemanticCache class
@@ -33,7 +33,7 @@ FazAI now includes **Semantic Cache** - an advanced caching system that uses vec
                      ▼
          ┌───────────────────────┐
          │  Generate Embedding   │
-         │  (1024 or 1536 dim)   │
+         │  (768 or 1536 dim)    │
          └───────────┬───────────┘
                      │
                      ▼
@@ -89,10 +89,11 @@ QDRANT_API_KEY=your-api-key-here  # Optional, for Qdrant Cloud
 
 The cache automatically selects the best available embedding service:
 
-1. **Ollama** (preferred - local, free)
-   - Model: `mxbai-embed-large` (1024 dimensions)
-   - Fallback: `nomic-embed-text` (768 dimensions)
-   - Configuration: `OLLAMA_BASE_URL=http://192.168.0.101:11434`
+1. **ONNX BGE-base-en-v1.5** (preferred - local, free)
+   - Package: `qdrant-universal-injection` (npm link required)
+   - Dimensions: 768 (Lei 768)
+   - Cold start: ~11s (model load on first call)
+   - No configuration variable needed
 
 2. **OpenAI** (fallback - cloud, paid)
    - Model: `text-embedding-3-small` (1536 dimensions)
@@ -259,15 +260,15 @@ if (cached) {
 |-----------|---------|-------|
 | Cache HIT | ~50ms | Qdrant search + embedding generation |
 | Cache MISS + Provider | ~2-5s | Provider call + embedding + store |
-| Embedding Generation | ~30ms | Ollama local |
+| Embedding Generation | ~50ms | ONNX BGE-base-en-v1.5 local (after cold start) |
 | Qdrant Search | ~10ms | Cosine similarity search |
 
 ### Space Usage
 
-- Embedding: 1024 floats × 4 bytes = ~4KB per entry
+- Embedding: 768 floats × 4 bytes = ~3KB per entry
 - Payload: ~2-10KB per entry (query + response)
-- **Total**: ~6-14KB per cached entry
-- **10,000 entries**: ~60-140MB RAM
+- **Total**: ~5-13KB per cached entry
+- **10,000 entries**: ~50-130MB RAM
 
 ## Similarity Threshold Guide
 
@@ -345,9 +346,11 @@ console.log({
    ```bash
    curl http://localhost:6333/collections
    ```
-2. Verify embedding service:
+2. Verify qdrant-universal-injection is linked:
    ```bash
-   curl http://192.168.0.101:11434/api/tags
+   ls -la /home/rluft/fazai-ng/node_modules/qdrant-universal-injection
+   # Re-link if missing:
+   npm link /home/rluft/qdrant-universal-injection
    ```
 3. Check logs:
    ```bash
@@ -445,7 +448,7 @@ But it DOES cache:
 ## References
 
 - **Qdrant**: https://qdrant.tech/documentation/
-- **Embeddings**: https://ollama.ai/library/mxbai-embed-large
+- **Embeddings**: BGE-base-en-v1.5 via qdrant-universal-injection (local ONNX)
 - **Cosine Similarity**: https://en.wikipedia.org/wiki/Cosine_similarity
 - **Vector Databases**: https://www.pinecone.io/learn/vector-database/
 

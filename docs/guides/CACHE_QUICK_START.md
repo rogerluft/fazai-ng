@@ -53,8 +53,8 @@ Response: (instant, from cache) "To install nginx: sudo apt install nginx" ⚡
 
 Just works with existing setup:
 - ✅ Qdrant running on localhost:6333
-- ✅ Ollama with embedding model
-- ✅ No additional setup needed
+- ✅ `qdrant-universal-injection` linked (`npm link /home/rluft/qdrant-universal-injection`)
+- ✅ No Ollama required for embeddings
 
 ### Custom Configuration (Optional)
 
@@ -64,10 +64,11 @@ Edit `/etc/fazai/fazai.conf`:
 # Qdrant
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=your-key  # Optional
+VECTOR_DIMENSION=768
 
-# Embeddings (auto-detects best available)
-OLLAMA_BASE_URL=http://192.168.0.101:11434  # Preferred
-OPENAI_API_KEY=sk-...                       # Fallback
+# Embeddings: ONNX BGE-base-en-v1.5 is used automatically via qdrant-universal-injection
+# For OpenAI fallback only:
+OPENAI_API_KEY=sk-...
 ```
 
 ## Statistics Example
@@ -135,8 +136,9 @@ Default: **0.95** (very similar queries match)
 
 **Fix:**
 1. Check Qdrant: `curl http://localhost:6333/collections`
-2. Check embeddings: `curl http://192.168.0.101:11434/api/tags`
-3. Check logs: `tail -f /var/log/fazai/$(date +%Y-%m-%d).log`
+2. Check qdrant-universal-injection link: `ls -la /home/rluft/fazai-ng/node_modules/qdrant-universal-injection`
+3. Re-link if missing: `npm link /home/rluft/qdrant-universal-injection`
+4. Check logs: `tail -f /var/log/fazai/$(date +%Y-%m-%d).log`
 
 ### High Memory Usage
 

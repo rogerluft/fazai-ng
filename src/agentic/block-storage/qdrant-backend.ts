@@ -2,7 +2,7 @@
  * Qdrant Block Storage Backend
  *
  * Backend com busca semântica via Qdrant.
- * USA embeddings nomic-embed-text (768 dim nativo - Lei 768).
+ * USA embeddings BGE-base-en-v1.5 (768 dim nativo - Lei 768).
  * Ideal para produção.
  *
  * @module agentic/block-storage/qdrant-backend
@@ -15,7 +15,7 @@ import { logger } from "../../logger";
 import { randomUUID } from "crypto";
 
 const COLLECTION_NAME = "fazai_execution_blocks";
-const VECTOR_SIZE = 768; // Native dimension (nomic-embed-text)
+const VECTOR_SIZE = 768; // Native dimension (BGE-base-en-v1.5)
 
 /**
  * Backend Qdrant - COM embeddings e busca semântica

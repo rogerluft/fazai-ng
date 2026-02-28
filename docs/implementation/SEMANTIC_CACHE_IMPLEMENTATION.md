@@ -13,7 +13,7 @@ Successfully implemented a **production-ready semantic cache system** for FazAI 
 **Features:**
 - ✅ Singleton pattern for efficient resource management
 - ✅ Qdrant-based vector similarity search (cosine distance)
-- ✅ Automatic embedding generation via Ollama or OpenAI
+- ✅ Automatic embedding generation via ONNX BGE-base-en-v1.5 (qdrant-universal-injection) or OpenAI
 - ✅ Configurable similarity threshold (default: 0.95)
 - ✅ TTL (Time-To-Live) expiration (default: 1 hour)
 - ✅ LRU (Least Recently Used) eviction when cache is full
@@ -114,7 +114,7 @@ User Query → Try Cache Lookup → [HIT] Return cached response
                      ▼
          ┌───────────────────────┐
          │  Generate Embedding   │
-         │  (Ollama/OpenAI)      │
+         │  (ONNX BGE / OpenAI)  │
          └───────────┬───────────┘
                      │
                      ▼
@@ -141,7 +141,7 @@ User Query → Try Cache Lookup → [HIT] Return cached response
 **Collection:** `fazai_semantic_cache`
 
 **Vector Configuration:**
-- Size: 1024 (Ollama mxbai-embed-large) or 1536 (OpenAI)
+- Size: 768 (ONNX BGE-base-en-v1.5 via qdrant-universal-injection) or 1536 (OpenAI)
 - Distance: Cosine
 - Indexed: Yes (HNSW algorithm)
 
@@ -174,7 +174,7 @@ User Query → Try Cache Lookup → [HIT] Return cached response
 |-----------|---------|-------|
 | Cache HIT | ~50ms | Embedding generation (30ms) + Qdrant search (10ms) |
 | Cache MISS | ~2-5s | Provider call + embedding + store |
-| Embedding | ~30ms | Ollama local (mxbai-embed-large) |
+| Embedding | ~50ms | ONNX BGE-base-en-v1.5 local (after ~11s cold start) |
 | Qdrant Search | ~10ms | Cosine similarity with HNSW index |
 | Store | ~20ms | Insert into Qdrant with payload |
 
@@ -182,7 +182,7 @@ User Query → Try Cache Lookup → [HIT] Return cached response
 
 | Component | Size per Entry | Total (10K entries) |
 |-----------|----------------|---------------------|
-| Embedding Vector | 4KB (1024 × 4 bytes) | 40MB |
+| Embedding Vector | 3KB (768 × 4 bytes) | 30MB |
 | Payload (query+response) | 2-10KB | 20-100MB |
 | Qdrant Index | ~1KB | 10MB |
 | **Total** | **7-15KB** | **70-150MB RAM** |
@@ -210,8 +210,9 @@ QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=your-api-key  # Optional, for Qdrant Cloud
 
 # Embedding Service (auto-detects best available)
-OLLAMA_BASE_URL=http://192.168.0.101:11434  # For Ollama (preferred)
-OPENAI_API_KEY=sk-...                       # For OpenAI (fallback)
+# Primary: ONNX BGE-base-en-v1.5 via qdrant-universal-injection (no env var needed)
+# Fallback: OpenAI (requires API key)
+OPENAI_API_KEY=sk-...  # For OpenAI fallback only
 ```
 
 ### Tunable Parameters
@@ -326,7 +327,7 @@ fazai> /help
 ```bash
 # Prerequisites:
 # - Qdrant running on http://localhost:6333
-# - Ollama with mxbai-embed-large model
+# - qdrant-universal-injection linked (npm link /home/rluft/qdrant-universal-injection)
 
 npx tsx tests/semantic-cache.test.ts
 ```
@@ -503,7 +504,7 @@ npm run build
 
 ### Prerequisites
 - [x] Qdrant running (localhost:6333 or cloud)
-- [x] Ollama with embedding model (mxbai-embed-large or nomic-embed-text)
+- [x] `qdrant-universal-injection` linked (`npm link /home/rluft/qdrant-universal-injection`)
 - [x] Node.js 18+
 - [x] FazAI v3.5.1-beta
 
@@ -520,9 +521,10 @@ npm run build
 1. Update `/etc/fazai/fazai.conf`:
    ```bash
    QDRANT_URL=http://localhost:6333
-   OLLAMA_BASE_URL=http://192.168.0.101:11434
+   VECTOR_DIMENSION=768
    ```
-2. Restart FazAI if running
+2. Ensure `qdrant-universal-injection` is linked (see Installation above)
+3. Restart FazAI if running
 
 ---
 

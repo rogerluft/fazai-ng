@@ -18,21 +18,33 @@ Em vez de ler arquivos fonte diretamente (gastando muitos tokens), use busca sem
 
 | Serviço | URL |
 |---------|-----|
-| Ollama (embeddings) | `http://192.168.0.101:11434` |
+| ONNX Embedder (qdrant-universal-injection) | local — sem servidor HTTP |
+| Ollama (LLM inference apenas) | `http://192.168.0.101:11434` |
 | Qdrant (vector search) | `http://localhost:6333` |
 
 ---
 
 ## Passo 1: Gerar Embedding da Pergunta
 
+Embeddings agora sao gerados localmente via ONNX (BGE-base-en-v1.5, 768d) pelo pacote `qdrant-universal-injection`. Nao ha mais endpoint HTTP de embedding — use o serviço programaticamente ou via CLI do FazAI.
+
+Para busca manual ad-hoc, voce pode usar o CLI do FazAI para obter embeddings:
+
 ```bash
-curl -s -X POST 'http://192.168.0.101:11434/api/embeddings' \
-  -H 'Content-Type: application/json' \
-  -d '{"model": "nomic-embed-text", "prompt": "como funciona o circuit breaker?"}' \
-  | jq -r '.embedding'
+# Via FazAI (recomendado)
+fazai vector embed "como funciona o circuit breaker?"
 ```
 
-**Resposta:** Array de 768 floats (será padded para 1536 pelo serviço)
+Se precisar chamar o Ollama para LLM (nao para embedding):
+
+```bash
+# Ollama e usado APENAS para inferencia LLM, nao para embeddings
+curl -s -X POST 'http://192.168.0.101:11434/api/generate' \
+  -H 'Content-Type: application/json' \
+  -d '{"model": "llama3.2", "prompt": "como funciona o circuit breaker?"}'
+```
+
+**Embedding:** Array de 768 floats nativo (BGE-base-en-v1.5, Lei 768 — sem padding)
 
 ---
 
@@ -131,9 +143,11 @@ O campo `payload.content` contém o chunk de código relevante. Use como context
 
 ```bash
 # Buscar "como funciona embeddings" e mostrar os 3 chunks mais relevantes
-QUERY="como funciona embeddings" && \
-EMBED=$(curl -s -X POST 'http://192.168.0.101:11434/api/embeddings' \
-  -d "{\"model\":\"nomic-embed-text\",\"prompt\":\"$QUERY\"}" | jq -c '.embedding') && \
+# (use fazai vector search para gerar o embedding ONNX automaticamente)
+fazai vector search "como funciona embeddings" --collection fazai_source --limit 3
+
+# Ou com curl, fornecendo o vetor 768d ja gerado:
+EMBED='[0.1, 0.2, ...]'  # vetor 768d gerado pelo qdrant-universal-injection
 curl -s -X POST 'http://localhost:6333/collections/fazai_source/points/search' \
   -d "{\"vector\":$EMBED,\"limit\":3,\"with_payload\":true}" | \
   jq -r '.result[] | "### \(.payload.path) (score: \(.score | . * 100 | floor)%)\n\(.payload.content)\n"'
@@ -148,7 +162,7 @@ curl -s -X POST 'http://localhost:6333/collections/fazai_source/points/search' \
 Antes de usar `Read`, `Glob` ou `Grep` para explorar código:
 
 1. Formule a pergunta em linguagem natural
-2. Gere embedding via Ollama API
+2. Gere embedding via `qdrant-universal-injection` (ONNX BGE-base-en-v1.5, 768d) — ou use `fazai vector search`
 3. Busque no Qdrant (fazai_source para código, fazai_kb para docs)
 4. Só leia arquivos diretamente se o Qdrant não retornar resultados úteis
 

@@ -166,8 +166,7 @@ export const configSchema = z.object({
   ANTHROPIC_OAUTH_TOKEN: oauthTokenSchema.optional(),
 
   // URLs
-  OLLAMA_BASE_URL: urlSchema.optional(),
-  OLLAMA_EMBED_URL: urlSchema.optional(),
+  OLLAMA_BASE_URL: urlSchema.optional(), // LLM inference only (not embeddings)
   QDRANT_URL: urlSchema.optional(),
   LLAMA_SERVER_URL: urlSchema.optional(),
   GEMINI_WORKER_URL: urlSchema.optional(),

@@ -191,7 +191,7 @@ export async function runSourceIndexer(options: IndexerOptions = {}): Promise<vo
           points: [
             {
               id: semanticId, // UUID format for Qdrant compatibility
-              vector: embedding, // 768 dim nativo (nomic-embed-text)
+              vector: embedding, // 768 dim nativo (BGE-base-en-v1.5)
               payload: {
                 semantic_id: semanticId,
                 path: relativePath,

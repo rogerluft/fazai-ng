@@ -14,82 +14,37 @@ import { QdrantClient } from "@qdrant/js-client-rest";
 import { logger } from "../logger";
 import chalk from "chalk";
 
-// Target dimension: nomic-embed-text native (768d)
+// Target dimension: BGE-base-en-v1.5 native (768d)
 const TARGET_DIMENSION = 768;
 
-// Use fast server 101 with aggressive truncation + fallback to localhost
-const OLLAMA_PRIMARY = "http://192.168.0.101:11434";
-const OLLAMA_FALLBACK = "http://localhost:11434";
 const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
-const BATCH_SIZE = 32; // Process 32 documents at a time for embedding
-const UPSERT_BATCH_SIZE = 500; // Upsert 500 points at a time to avoid timeout
+const BATCH_SIZE = 32;
+const UPSERT_BATCH_SIZE = 500;
 
 /**
- * Embedding service with primary/fallback servers and aggressive truncation
+ * Embedding service using ONNX BGE-base-en-v1.5 via qdrant-universal-injection
  */
 class MigrationEmbeddingService {
-  private readonly primaryUrl: string;
-  private readonly fallbackUrl: string;
-  private readonly model: string = "nomic-embed-text";
+  private embedder: any = null;
   private readonly dimension: number = 768;
-  private readonly MAX_CHARS = 10000; // Aggressive truncation to avoid 500 errors
 
-  constructor(primaryUrl: string, fallbackUrl: string) {
-    this.primaryUrl = primaryUrl;
-    this.fallbackUrl = fallbackUrl;
-  }
-
-  private async tryEmbed(text: string, baseUrl: string): Promise<number[] | null> {
-    try {
-      const response = await fetch(`${baseUrl}/api/embeddings`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          model: this.model,
-          prompt: text || " ",
-        }),
-      });
-
-      if (!response.ok) {
-        return null; // Try fallback
-      }
-
-      const data = await response.json();
-      return data.embedding;
-    } catch (e) {
-      return null;
-    }
+  private async ensureInit(): Promise<void> {
+    if (this.embedder) return;
+    const { getEmbedder } = await import("qdrant-universal-injection");
+    this.embedder = getEmbedder();
+    if (!this.embedder.isReady) await this.embedder.init();
   }
 
   async generateBatch(texts: string[]): Promise<number[][]> {
-    return Promise.all(texts.map(async (text) => {
-      // Aggressive truncation
-      const truncated = text.length > this.MAX_CHARS ? text.substring(0, this.MAX_CHARS) : text;
-
-      // Try primary (fast)
-      let embedding = await this.tryEmbed(truncated, this.primaryUrl);
-
-      // Fallback to localhost if primary fails
-      if (!embedding || embedding.length !== this.dimension) {
-        logger.debug(`Primary failed, trying fallback for text of ${truncated.length} chars`);
-        embedding = await this.tryEmbed(truncated, this.fallbackUrl);
-      }
-
-      if (!embedding || embedding.length !== this.dimension) {
-        throw new Error(`Both servers failed! Expected ${this.dimension}d, got ${embedding?.length}`);
-      }
-
-      return embedding;
-    }));
+    await this.ensureInit();
+    return this.embedder.embedBatch(texts);
   }
 
   getInfo() {
     return {
-      provider: "ollama",
-      model: this.model,
+      provider: "onnx",
+      model: "BGE-base-en-v1.5",
       dimension: this.dimension,
-      primaryUrl: this.primaryUrl,
-      fallbackUrl: this.fallbackUrl,
     };
   }
 }
@@ -127,9 +82,8 @@ async function migrateCollections() {
   const client = new QdrantClient({ url: QDRANT_URL });
 
   logger.info(chalk.gray(`Initializing embedding service:`));
-  logger.info(chalk.gray(`   Primary: ${chalk.bold(OLLAMA_PRIMARY)} (fast GPU)`));
-  logger.info(chalk.gray(`   Fallback: ${chalk.bold(OLLAMA_FALLBACK)} (stable CPU)`));
-  const embeddingService = new MigrationEmbeddingService(OLLAMA_PRIMARY, OLLAMA_FALLBACK);
+  logger.info(chalk.gray(`   Embedder: ONNX BGE-base-en-v1.5 (local)`));
+  const embeddingService = new MigrationEmbeddingService();
   const info = embeddingService.getInfo();
   logger.info(chalk.green(`✅ Embedding Service ready: ${info.provider} (${info.model}, ${info.dimension}d)`));
 

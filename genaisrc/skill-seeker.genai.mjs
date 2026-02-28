@@ -19,6 +19,7 @@ import { scrapeSource } from "./tools/web-scraper.mjs";
 import {
   extractAndSaveSkills,
   exportSkillsAsScript,
+  setRunPrompt,
 } from "./tools/skill-extractor.mjs";
 import {
   qdrantSearch,
@@ -30,15 +31,15 @@ import {
   promoteKnowledge,
 } from "./tools/knowledge-persistence.mjs";
 
-// === HELPER: Gera embedding mock (TODO: integrar com createEmbeddingService) ===
-function generateMockEmbedding(text) {
-  const hash = text.split("").reduce((acc, char) => {
-    return ((acc << 5) - acc) + char.charCodeAt(0);
-  }, 0);
+// === EMBEDDING: ONNX BGE-base-en-v1.5 via adapter-bridge ===
+import { embed as adapterEmbed } from "./tools/adapter-bridge.mjs";
 
-  return new Array(768).fill(0).map((_, i) => {
-    return Math.sin(hash * (i + 1)) * 0.5 + 0.5;
-  });
+// Injeta runPrompt global do GenAIScript no skill-extractor
+// (runPrompt só existe como global em .genai.mjs, não em módulos .mjs)
+setRunPrompt(runPrompt);
+
+async function generateEmbedding(text) {
+  return adapterEmbed(text);
 }
 
 // === TOOL 1: SCRAPE DE DOCUMENTAÇÃO ===
@@ -86,7 +87,7 @@ defTool(
       }
 
       // Salva conteúdo bruto no Qdrant (fazai_kb)
-      const embedding = generateMockEmbedding(result.content);
+      const embedding = await generateEmbedding(result.content);
 
       await upsertWithDeduplication(
         COLLECTIONS.kb,
@@ -150,7 +151,7 @@ defTool(
     try {
       // Gera embedding da query
       const queryText = `${query} ${context}`;
-      const embedding = generateMockEmbedding(queryText);
+      const embedding = await generateEmbedding(queryText);
 
       // Busca em múltiplas collections
       const kbResults = await qdrantSearch(COLLECTIONS.kb, embedding, 5);
@@ -296,7 +297,7 @@ defTool(
   async ({ skill_name, export_path = null }) => {
     try {
       // Busca skill no Qdrant
-      const embedding = generateMockEmbedding(skill_name);
+      const embedding = await generateEmbedding(skill_name);
       const results = await qdrantSearch(COLLECTIONS.kb, embedding, 5, {
         must: [
           { key: "type", match: { value: "skill" } },
@@ -353,7 +354,7 @@ defTool(
   async ({ skill_name, review_notes = "" }) => {
     try {
       // Busca skill
-      const embedding = generateMockEmbedding(skill_name);
+      const embedding = await generateEmbedding(skill_name);
       const results = await qdrantSearch(COLLECTIONS.kb, embedding, 5, {
         must: [
           { key: "type", match: { value: "skill" } },

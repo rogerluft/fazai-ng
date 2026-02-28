@@ -5,7 +5,10 @@ export default defineConfig({
   publicDir: false,
   clean: true,
   minify: true,
-  format: ["esm"], // Changed to ESM
+  format: ["esm"],
+  external: [
+    "qdrant-universal-injection",
+  ],
   banner: {
     js: `import { createRequire } from 'module';const require = createRequire(import.meta.url);`,
   },

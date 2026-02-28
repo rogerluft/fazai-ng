@@ -27,7 +27,7 @@ implementada para o projeto FazAI, com replicacao assincrona entre dois nos:
                                            | claudio_sources(RW) |
                                            +---------------------+
 
-    Dimensao vetores: 768 (nomic-embed-text-v1.5)
+    Dimensao vetores: 768 (BGE-base-en-v1.5 via qdrant-universal-injection — Lei 768)
     Metrica: Cosine
     ```
 
@@ -162,7 +162,7 @@ implementada para o projeto FazAI, com replicacao assincrona entre dois nos:
         As collections atuais usam dimensao 1536. Para migrar para 768:
 
         1. Exportar dados via scroll API
-        2. 2. Reprocessar embeddings com novo modelo (nomic-embed-text-v1.5)
+        2. 2. Reprocessar embeddings com BGE-base-en-v1.5 via qdrant-universal-injection (768d ONNX)
            3. 3. Criar novas collections com dimensao 768
               4. 4. Importar dados reprocessados
                 

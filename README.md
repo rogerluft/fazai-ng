@@ -75,8 +75,8 @@
 - **Cache semântico**: Evita re-processamento de queries similares
 
 ### 🎯 Universal Local Embedder
-- **Zero Padding Automático**: Normaliza embeddings de 768d → 1536d
-- **100% Local**: Usa Ollama nomic-embed-text (sem custos de API)
+- **Nativo 768d**: BGE-base-en-v1.5 via ONNX (sem zero-padding necessário)
+- **100% Local**: ONNX runtime local via `qdrant-universal-injection` (sem custos de API)
 - **Cache LRU**: Economia de ~70% em processamento repetido
 - **Semantic Chunking**: Separadores inteligentes para indexação
 
@@ -146,7 +146,29 @@ sudo systemctl enable --now fazai-llama
 curl http://localhost:11430/health
 ```
 
+### Instalação do qdrant-universal-injection (Embeddings ONNX)
+
+O FazAI usa o pacote `qdrant-universal-injection` para embeddings locais via ONNX (BGE-base-en-v1.5, 768d). O pacote deve ser linkado localmente:
+
+```bash
+# 1. Clonar o pacote de embeddings
+git clone https://github.com/rogerluft/qdrant-universal-injection /home/rluft/qdrant-universal-injection
+
+# 2. Instalar dependências e compilar
+cd /home/rluft/qdrant-universal-injection
+npm install
+npm run build
+
+# 3. Linkar no fazai-ng
+cd /home/rluft/fazai-ng
+npm link /home/rluft/qdrant-universal-injection
+```
+
+**Nota:** Ollama **nao e mais necessario** para embeddings. O ONNX runtime inicializa localmente em ~11s no cold start. Ollama continua sendo usado apenas como provedor de LLM (llama3.2, qwen, mistral, etc.) na fallback chain de inferência.
+
 ### Instalação do Qdrant (Vector Store)
+
+Todas as collections usam vetores de **768 dimensões** (Lei 768) com distância Cosine.
 
 **Docker (Recomendado):**
 ```bash
@@ -298,7 +320,7 @@ MODELS_GOOGLE=gemini-2.5-pro,gemini-2.5-flash,gemini-2.5-flash-lite
 VECTOR_PROVIDER=qdrant
 QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=
-VECTOR_DIMENSION=1536
+VECTOR_DIMENSION=768
 VECTOR_DISTANCE=cosine
 
 # --- Research ---

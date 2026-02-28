@@ -9,7 +9,7 @@ SkillSeeker is an automatic knowledge ingestion service for FazAI. It monitors t
 - **Real-time Monitoring**: Uses `chokidar` to watch for file changes
 - **Multi-format Support**: PDF, Markdown (.md), and plain text (.txt)
 - **Semantic Chunking**: Intelligently splits documents into chunks with context overlap
-- **Lei 768 Compliant**: Uses 768-dimensional vectors (nomic-embed-text native)
+- **Lei 768 Compliant**: Uses 768-dimensional vectors (BGE-base-en-v1.5 via qdrant-universal-injection)
 - **Duplicate Detection**: Hash-based tracking prevents re-processing unchanged files
 - **Automatic Retry**: Handles transient failures gracefully
 - **Registry Tracking**: Maintains a registry of processed files
@@ -120,7 +120,7 @@ The service automatically creates the `fazai_kb` collection if it doesn't exist:
 
 ```typescript
 Collection: fazai_kb
-Vector Size: 768 (Lei 768 / nomic-embed-text native)
+Vector Size: 768 (Lei 768 / BGE-base-en-v1.5 via qdrant-universal-injection)
 Distance Metric: Cosine
 ```
 
@@ -258,9 +258,11 @@ const context = results
 
 ### Embeddings Failing
 
-- **Check Ollama**: Ensure Ollama is running with `mxbai-embed-large`
+- **Check qdrant-universal-injection**: Ensure the npm link is active (`ls -la node_modules/qdrant-universal-injection`)
+  - Re-link if missing: `npm link /home/rluft/qdrant-universal-injection`
+- **Cold Start**: First embedding call takes ~11s for ONNX model initialization — this is normal
 - **Check OpenAI Key**: If using OpenAI fallback, verify API key
-- **Check Network**: Verify connectivity to embedding service
+- **Check Network**: Verify connectivity to Qdrant (`curl http://localhost:6333/health`)
 
 ## Performance
 

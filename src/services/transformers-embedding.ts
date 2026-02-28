@@ -1,63 +1,60 @@
+/**
+ * Transformers Embedding Service
+ *
+ * Provider: ONNX BGE-base-en-v1.5 (via qdrant-universal-injection)
+ * Replaces: @xenova/transformers (Xenova/multilingual-e5-base)
+ *
+ * Kept for backward compat — class name and exports preserved.
+ * All operations delegate to the shared ONNX embedder singleton.
+ *
+ * @module services/transformers-embedding
+ */
 
-import { pipeline, env } from '@xenova/transformers';
-import { logger } from '../logger';
-import { EmbeddingService, CollectionType } from './embeddings-refactored';
+import { getEmbedder } from "qdrant-universal-injection";
+import { logger } from "../logger";
+import type { EmbeddingService, CollectionType } from "./embeddings-refactored";
 
-// Configuration for Transformers.js
-env.allowLocalModels = true;
-env.localModelPath = 'models/';
-
-const MODEL_NAME = 'Xenova/multilingual-e5-base';
-const MODEL_DIMENSION = 768;
+export const MODEL_NAME = "BGE-base-en-v1.5";
+export const MODEL_DIMENSION = 768;
 
 class TransformersEmbeddingService implements EmbeddingService {
-  private extractor = null;
-  private model: string;
-  private dimension: number;
+  private readonly embedder = getEmbedder();
 
-  constructor(model = MODEL_NAME, dimension = MODEL_DIMENSION) {
-    this.model = model;
-    this.dimension = dimension;
-  }
-
-  private async initialize() {
-    if (this.extractor) return;
+  async generate(
+    text: string,
+    _collectionType: CollectionType
+  ): Promise<number[]> {
     try {
-      logger.info(`Initializing Transformers.js embedding model: ${this.model}`);
-      this.extractor = await pipeline('feature-extraction', this.model);
-      logger.info(`Model ${this.model} initialized successfully.`);
-    } catch (error) {
-      logger.error('Failed to initialize Transformers.js model:', error);
-      throw new Error('Could not load the embedding model.');
+      if (!this.embedder.isReady) await this.embedder.init();
+      return await this.embedder.embed(text);
+    } catch (error: any) {
+      logger.error(
+        `TransformersEmbeddingService.generate failed: ${error.message}`
+      );
+      return new Array(MODEL_DIMENSION).fill(0);
     }
   }
 
-  async generate(text: string, collectionType: CollectionType): Promise<number[]> {
-    const embeddings = await this.generateBatch([text], collectionType);
-    return embeddings[0] || [];
-  }
-
-  async generateBatch(texts: string[], collectionType: CollectionType): Promise<number[][]> {
-    await this.initialize();
-    if (!this.extractor || texts.length === 0) {
-      return [];
-    }
-
+  async generateBatch(
+    texts: string[],
+    _collectionType: CollectionType
+  ): Promise<number[][]> {
+    if (texts.length === 0) return [];
     try {
-      const embeddings = await this.extractor(texts, {
-        pooling: 'mean',
-        normalize: true,
-      });
-      return embeddings.tolist();
-    } catch (error) {
-      logger.error('Error generating embeddings with Transformers.js:', error);
-      // Return zero vectors for failed batches
-      return texts.map(() => new Array(this.dimension).fill(0));
+      if (!this.embedder.isReady) await this.embedder.init();
+      return await this.embedder.embedBatch(texts);
+    } catch (error: any) {
+      logger.error(
+        `TransformersEmbeddingService.generateBatch failed: ${error.message}`
+      );
+      return texts.map(() => new Array(MODEL_DIMENSION).fill(0));
     }
   }
 
-  async generateChunked(text: string, collectionType: CollectionType): Promise<Array<{ chunk: string; embedding: number[] }>> {
-    // Basic chunking, can be improved with semantic chunking later
+  async generateChunked(
+    text: string,
+    collectionType: CollectionType
+  ): Promise<Array<{ chunk: string; embedding: number[] }>> {
     const chunks = text.match(/.{1,512}/g) || [];
     const embeddings = await this.generateBatch(chunks, collectionType);
     return chunks.map((chunk, i) => ({
@@ -68,12 +65,12 @@ class TransformersEmbeddingService implements EmbeddingService {
 
   getInfo() {
     return {
-      provider: 'transformers.js' as const,
-      model: this.model,
-      dimension: this.dimension,
+      provider: "onnx" as const,
+      model: MODEL_NAME,
+      dimension: MODEL_DIMENSION,
       isLocal: true,
     };
   }
 }
 
-export { TransformersEmbeddingService, MODEL_DIMENSION, MODEL_NAME };
+export { TransformersEmbeddingService };

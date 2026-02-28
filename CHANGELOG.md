@@ -1,5 +1,95 @@
 # FazAI Changelog
 
+## [3.18.0] - 2026-02-28
+
+### 🚀 feat: Pipeline inteligente com Agent SDK + RAG + GPTCache (qdrant-fazai-injector)
+
+Novo pipeline agêntico integrado ao comando `fazai`. Queries em linguagem natural passam pelo injector com RAG multi-collection, cache semântico na borda e Agent SDK.
+
+#### Pipeline
+```
+FASE 0: Normaliza query
+FASE 1: Injeção AUTO (personality + memory 48h + kb)
+FASE 1.5: Injeção SOB DEMANDA (keywords → learning/inference/source)
+FASE 2: Pre-check (providers online, embedder ONNX, Qdrant pool)
+FASE 3: GPTCache check → LLM call via Agent SDK → cache store
+FASE 4: Reaprendizado automático (extrai padrões → fazai_learning)
+FASE 5: Resposta com métricas
+```
+
+#### Router (`/opt/fazai/bin/fazai`)
+- Queries em linguagem natural → qdrant-fazai-injector (Agent SDK + RAG)
+- Subcomandos (alias, ask, config, qdrant, samba, etc.) → app.js
+- `--yolo` flag: execução autônoma (bypassPermissions no Agent SDK)
+- `unset ANTHROPIC_API_KEY` antes do injector (fazai.conf tem OAuth token como API key)
+
+#### Módulos do Injector (`/home/rluft/qdrant-fazai-injector/`)
+| Módulo | Função |
+|--------|--------|
+| Provider Adapter | 3 drivers (Anthropic OAuth, OpenRouter, Ollama) + circuit breaker + fallback |
+| GPTCache | Cache semântico na borda (threshold 0.95, TTL 1h) |
+| Context Injector | AUTO + SOB DEMANDA + ECOA scoring |
+| MCP Server | 6 tools Zod v4 (inject_context, embed_text, cache_lookup, etc.) |
+| Main Agent | Pipeline completo com Agent SDK query() |
+| Logger | Logs em /var/log/fazai/fazai-injector.log (stdout limpo) |
+
+#### Testes Reais
+- RBL + nftables: 276 linhas, detectou nftables automaticamente, 154s, $0.37
+- Samba shares: testparm -s, 6 shares encontrados, 59s, $0.17
+- RAM/CPU/Disco: 40s, $0.056, bypassPermissions OK
+- Cache HIT mesma query: 6s, $0.00 (vs 154s/$0.37)
+
+#### Bugs Corrigidos
+- Cache MISS por filtro `provider:"any"` literal → filtro dinâmico
+- Cache false positive (SSH vs nginx) → threshold 0.88 → 0.95
+- OAuth health check OFFLINE → HEAD request (token scoped ao SDK)
+- `ANTHROPIC_API_KEY` com OAuth token no fazai.conf → `unset` no router
+- Logs INFO poluindo stdout → só arquivo, ERROR/WARN no stderr
+- Agent SDK subprocess pendurado → `process.exit(0)` explícito
+
+#### System Prompt Inteligente
+- Detecta ambiente automaticamente (nftables vs iptables, systemd, pkg manager)
+- Nunca hardcoda ferramentas, nunca pergunta "quer X ou Y?"
+- PT-BR informal, scripts completos sem placeholders
+
+---
+
+## [3.18.1] - 2026-02-28
+
+### 🔧 feat: Migração completa de embeddings para ONNX BGE-base-en-v1.5
+
+Todos os caminhos de embedding do fazai-ng agora usam exclusivamente o embedder estático ONNX BGE-base-en-v1.5 via `qdrant-universal-injection`. Elimina dependência do Ollama para embeddings e garante espaço semântico unificado em todas as collections.
+
+#### Arquivos Reescritos (core)
+| Arquivo | Mudança |
+|---------|---------|
+| `src/services/embeddings.ts` | `OllamaEmbeddingService` → `ONNXEmbeddingService` (getEmbedder() singleton) |
+| `src/services/embeddings-refactored.ts` | Idem, com preprocessamento por collectionType preservado |
+| `src/services/embedding-strategies.ts` | Modelo `nomic-embed-text` → `BGE-base-en-v1.5`, removido HTTP health check Ollama |
+| `src/services/universal-embedder.ts` | Delegação direta → getEmbedder() |
+| `src/services/transformers-embedding.ts` | Removido `@xenova/transformers`, delegação → getEmbedder() |
+
+#### Scripts Atualizados
+| Arquivo | Mudança |
+|---------|---------|
+| `genaisrc/completion-sync.genai.mjs` | `fetch(Ollama)` → `adapter-bridge.embed()` |
+| `genaisrc/threat-intel.genai.mjs` | 2x `fetch(Ollama)` → `adapter-bridge.embed()` |
+| `scripts/qdrant-search.sh` | `curl Ollama` → `getEmbedder()` direto |
+| `scripts/completion-sync.mjs` | `fetch(Ollama)` → `adapter-bridge.embed()` + fix padding 1536→768 |
+
+#### Fixes
+- `src/dashboard/routes/search.ts`: CollectionType `"general"` → `"kb"` (tipo inválido)
+- `src/scripts/migrate-*.ts`: MigrationEmbeddingService → ONNX
+- `src/scripts/migrate-source-only.ts`: Removido referência órfã a `OLLAMA_PRIMARY/FALLBACK`
+
+#### Impacto
+- **15+ consumidores SEM alteração** — interfaces `EmbeddingService` preservadas
+- **768d nativo** — sem padding, sem truncamento, mesmo espaço semântico
+- **Cold start ~11s** — ensureInit() idempotente, singleton compartilhado
+- **Zero dependência do Ollama** para embeddings (ainda usado para LLM local fallback)
+
+---
+
 ## [3.17.0] - 2026-02-01
 ## [3.17.1] - 2026-02-02
 

@@ -48,11 +48,8 @@ export interface VectorValidationResult {
  * PADRÃO VETORIAL ECOA (LEI 768)
  * ----------------------------------------------------------------------------
  * Definimos 768 como a dimensão padrão para TODAS as collections.
- * Motivo: Dimensão nativa do modelo `nomic-embed-text` (Ollama, local, gratuito).
- *
- * E se eu usar um modelo local (Ollama) com dimensões menores?
- * - mxbai-embed-large (1024 dim)
- * - nomic-embed-text (768 dim)
+ * Motivo: Dimensão nativa do modelo BGE-base-en-v1.5 (ONNX, local, gratuito).
+ * Embedder: qdrant-universal-injection (singleton estático, 768d)
  *
  * ARQUITETURA DE EMBEDDINGS
  * ----------------------------------------------------------------------------

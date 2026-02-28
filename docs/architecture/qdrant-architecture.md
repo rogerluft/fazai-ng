@@ -36,10 +36,10 @@ O FazAI evoluiu para um sistema baseado em **Inodes Semânticos** e **Arrays Aut
 │                               ▼                                     │
 │  ┌─────────────────────────────────────────────────────────────┐   │
 │  │                   UNIFIED EMBEDDING LAYER                    │   │
-│  │  ┌─────────────────┐         ┌─────────────────────────┐    │   │
-│  │  │ Ollama (CPU)    │ ──────► │ Zero Padding Projection │    │   │
-│  │  │ 1024/768 dim    │         │ 1536 dim (FIXED)        │    │   │
-│  │  └─────────────────┘         └─────────────────────────┘    │   │
+│  │  ┌──────────────────────────────────────────────────────┐    │   │
+│  │  │ ONNX BGE-base-en-v1.5 (qdrant-universal-injection)  │    │   │
+│  │  │ 768 dim NATIVO — Lei 768 — sem zero-padding          │    │   │
+│  │  └──────────────────────────────────────────────────────┘    │   │
 │  └──────────────────────────────────┬──────────────────────────┘   │
 │                                     │                               │
 │                                     ▼                               │
@@ -64,10 +64,10 @@ O FazAI evoluiu para um sistema baseado em **Inodes Semânticos** e **Arrays Aut
 
 ## 2. Collections do Qdrant (Inodes Semânticos)
 
-### 2.1 Padronização Vetorial (LEI 1536)
-Todas as collections operam estritamente em **1536 dimensões**.
-*   Se usar OpenAI: Nativo (1536).
-*   Se usar Ollama (CPU): O sistema aplica **Zero Padding** automático (ex: 1024 + 512 zeros) para manter a compatibilidade do índice sem quebrar o banco.
+### 2.1 Padronização Vetorial (LEI 768)
+Todas as collections operam estritamente em **768 dimensões**.
+*   Se usar ONNX BGE-base-en-v1.5 (padrão via `qdrant-universal-injection`): Nativo 768d — sem padding.
+*   Se usar OpenAI como fallback: dimensão reduzida para 768 via parâmetro `dimensions` da API.
 
 ### 2.2 Detalhamento das Collections ECOA
 
@@ -143,17 +143,17 @@ Isso cria a sensação de "intuição" ou velocidade superluminal no raciocínio
 
 ---
 
-## 4. Embedding Service (Contingência CPU)
+## 4. Embedding Service
 
-O sistema é resiliente a falhas de hardware.
+O sistema usa embeddings locais ONNX como padrão (Lei 768).
 
-| Provider | Modelo Original | Tratamento ECOA | Resultado |
-|----------|-----------------|-----------------|-----------|
-| OpenAI | `text-embedding-3-small` (1536) | Nativo | 1536 dim |
-| Ollama | `mxbai-embed-large` (1024) | **Zero Padding** | 1536 dim |
-| Ollama | `nomic-embed-text` (768) | **Zero Padding** | 1536 dim |
+| Provider | Modelo | Dimensão | Uso |
+|----------|--------|----------|-----|
+| **ONNX** (padrão) | `BGE-base-en-v1.5` via `qdrant-universal-injection` | 768 nativo | Padrão — local, sem servidor |
+| OpenAI | `text-embedding-3-small` | 768 (via parâmetro `dimensions`) | Fallback cloud pago |
+| Ollama | llama3.2, qwen, mistral, etc. | N/A | LLM inference apenas (nao embedding) |
 
-**Resultado:** Você pode migrar de Cloud para Local (CPU) e voltar sem nunca corromper o banco de dados Qdrant. A "geometria" da memória é preservada.
+**Resultado:** Embeddings 100% locais via ONNX. Cold start ~11s na primeira chamada; chamadas subsequentes sao rapidas. Ollama permanece no sistema apenas para inferencia LLM na fallback chain.
 
 ---
 

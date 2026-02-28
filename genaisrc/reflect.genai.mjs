@@ -18,10 +18,10 @@ script({
   maxTokens: 2048,
 });
 
-// Tool: Lista aprendizados recentes
+// Tool: Lista aprendizados recentes (com busca semântica via adapter)
 defTool(
   "list_recent_learnings",
-  "Lista os aprendizados mais recentes do FazAI",
+  "Lista os aprendizados mais recentes do FazAI. Pode buscar por query semântica ou scroll.",
   {
     type: "object",
     properties: {
@@ -30,9 +30,32 @@ defTool(
         description: "Número de aprendizados a listar",
         default: 10,
       },
+      query: {
+        type: "string",
+        description: "Query semântica opcional para filtrar aprendizados relevantes",
+      },
     },
   },
-  async ({ limit = 10 }) => {
+  async ({ limit = 10, query }) => {
+    if (query) {
+      // Busca semântica via adapter-bridge (ECOA scoring)
+      const { inject } = await import("./tools/adapter-bridge.mjs");
+      const result = await inject(query, {
+        collections: ["fazai_learning"],
+        topK: limit,
+        personalityAlways: false,
+      });
+      return JSON.stringify({
+        mode: "semantic_search",
+        query,
+        results: result.learning.map(c => ({
+          score: c.fusedScore.toFixed(4),
+          content: c.payload?.content,
+          category: c.payload?.category,
+        })),
+      }, null, 2);
+    }
+    // Scroll sem query (últimos N)
     const { qdrantScroll, COLLECTIONS } = await import("./tools/qdrant-tools.mjs");
     const learnings = await qdrantScroll(COLLECTIONS.learning, limit);
     return JSON.stringify(learnings, null, 2);

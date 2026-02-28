@@ -12,6 +12,7 @@ fazai.conf.*
 *.history
 .history
 
+.fzrclone*
 mandark-history.json
 
 compiled-code.txt
@@ -24,6 +25,7 @@ yarn.lock
 *.tmp
 data/*
 data
+local_cache/
 memory.json
 *.log
 *.out.js

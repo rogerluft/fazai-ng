@@ -21,7 +21,7 @@ let modelLoadPromise = null;
 // Configuração
 const MODEL_NAME = "Xenova/all-MiniLM-L6-v2";  // 384 dims, leve
 const NATIVE_DIM = 384;
-const TARGET_DIM = 768;  // nomic-embed-text native (Lei 768)
+const TARGET_DIM = 768;  // BGE-base-en-v1.5 native (Lei 768)
 
 /**
  * Obtém o embedder local (lazy loading com cache)

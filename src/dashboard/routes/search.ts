@@ -54,7 +54,7 @@ searchRouter.post(
 
     // Generate embedding for query
     const embeddingService = await createEmbeddingService();
-    const embedding = await embeddingService.generate(query, "general");
+    const embedding = await embeddingService.generate(query, "kb");
 
     // Search across collections
     const client = await getQdrantClient();
@@ -153,7 +153,7 @@ searchRouter.post(
 
     // Generate embedding
     const embeddingService = await createEmbeddingService();
-    const embedding = await embeddingService.generate(query, "general");
+    const embedding = await embeddingService.generate(query, "kb");
 
     // Search
     const client = await getQdrantClient();

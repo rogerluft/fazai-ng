@@ -14,7 +14,7 @@
  * Requirements:
  * - Qdrant rodando (localhost:6333 ou configurado em fazai.conf)
  * - Collection fazai_personality criada (768 dimensions - Lei 768)
- * - Embedding service configurado (Ollama ou OpenAI)
+ * - Embedding service configurado (ONNX BGE-base-en-v1.5 via qdrant-universal-injection)
  */
 
 import { PersonalityIngestor } from "../services/personality-ingestor";

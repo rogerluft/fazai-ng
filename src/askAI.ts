@@ -1,4 +1,3 @@
-import { Anthropic } from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { askPrompt, generalAskPrompt } from "./askPrompt";
 import { Readable } from "stream";
@@ -8,6 +7,7 @@ import { perplexityProvider } from "./providers/perplexity-provider";
 import { getLlamaProvider } from "./providers/llama";
 import { SemanticCache } from "./services/semantic-cache";
 import { logger } from "./logger";
+import { createAnthropicClient } from "./services/anthropic-auth";
 import {
   ProviderName,
   shouldFallbackToNextProvider,
@@ -223,9 +223,7 @@ async function* _askAISingleProvider(
   systemMessage: string
 ): AsyncGenerator<string, void, undefined> {
   if (provider === "anthropic") {
-    const anthropic = new Anthropic({
-      timeout: API_TIMEOUTS.anthropic,
-    });
+    const anthropic = createAnthropicClient();
 
     const stream = await anthropic.messages.create({
       messages: [{ role: "user", content: prompt }],

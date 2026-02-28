@@ -22,22 +22,26 @@ export function checkAPIKey(provider: string): boolean {
     return true; // llama.cpp sempre retorna true
   }
 
-  // For Anthropic, check both OAuth token and API key
+  // For Anthropic, check OAuth token and API key
   if (provider === "anthropic") {
-    const oauthToken = getConfigValue("ANTHROPIC_OAUTH_TOKEN");
+    // Priority: CLAUDE_CODE_OAUTH_TOKEN > ANTHROPIC_OAUTH_TOKEN > ANTHROPIC_API_KEY
+    const oauthToken =
+      process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+      getConfigValue("CLAUDE_CODE_OAUTH_TOKEN") ||
+      getConfigValue("ANTHROPIC_OAUTH_TOKEN");
     const apiKey = getConfigValue("ANTHROPIC_API_KEY");
-    
+
     if (oauthToken) {
-      process.env.ANTHROPIC_OAUTH_TOKEN = oauthToken;
-      process.env.ANTHROPIC_API_KEY = oauthToken; // Also set as API key for SDK compatibility
+      // SDK reads ANTHROPIC_AUTH_TOKEN for Bearer auth
+      process.env.ANTHROPIC_AUTH_TOKEN = oauthToken;
       return true;
     }
-    
+
     if (apiKey) {
       process.env.ANTHROPIC_API_KEY = apiKey;
       return true;
     }
-    
+
     return false;
   }
 
@@ -125,11 +129,9 @@ function saveAPIKeyToConfig(provider: string, apiKey: string): void {
 function getEnvVarName(provider: string): string {
   switch (provider) {
     case "anthropic":
-      // Support both API key and OAuth token
-      // OAuth token takes precedence if both are set
-      const oauthToken = getConfigValue("ANTHROPIC_OAUTH_TOKEN");
-      if (oauthToken) {
-        return "ANTHROPIC_OAUTH_TOKEN";
+      // OAuth (Bearer) takes precedence over API key (x-api-key)
+      if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_AUTH_TOKEN) {
+        return "ANTHROPIC_AUTH_TOKEN";
       }
       return "ANTHROPIC_API_KEY";
     case "openai":

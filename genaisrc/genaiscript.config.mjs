@@ -14,7 +14,7 @@ export default {
     // Modelos locais via Ollama (PRIORIDADE para economia)
     "local": "ollama:phi3",
     "local-large": "ollama:llama3.2",
-    "local-embed": "ollama:nomic-embed-text",
+    // "local-embed" não mais usado — embeddings via ONNX BGE-base-en-v1.5 (qdrant-universal-injection)
 
     // Premium cloud - máxima capacidade (usar com parcimônia)
     "opus": "anthropic:claude-opus-4-5-20251101",
@@ -102,11 +102,13 @@ export default {
       },
     },
 
-    // Ollama para embeddings locais
+    // ONNX embeddings locais via qdrant-universal-injection
     embeddings: {
-      provider: "ollama",
-      model: "nomic-embed-text",
-      dimension: 768, // nomic-embed-text native (Lei 768)
+      provider: "onnx",
+      model: "BGE-base-en-v1.5",
+      dimension: 768,
+      source: "qdrant-universal-injection",
+      isLocal: true,
     },
   },
 };

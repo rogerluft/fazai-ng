@@ -229,7 +229,7 @@ export class SkillSeekerService {
         logger.info(`Creating collection: ${COLLECTION_NAME}`);
         await qdrant.createCollection(COLLECTION_NAME, {
           vectors: {
-            size: 768, // Native dimension (nomic-embed-text)
+            size: 768, // Native dimension (BGE-base-en-v1.5)
             distance: "Cosine",
           },
         });

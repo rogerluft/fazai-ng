@@ -1,7 +1,6 @@
-import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { linuxAdminPrompt } from "./linux-prompt";
-import { LinuxCommandGenerator, LinuxCommand } from "./types-linux";
+import { LinuxCommandGenerator, LinuxCommand, LinuxCommandSchema } from "./types-linux";
 import { logger } from "./logger";
 import { getOllamaUrl } from "./config";
 import { withRetry } from "./utils/retry";
@@ -13,6 +12,7 @@ import { createEmbeddingService } from "./services/embeddings";
 import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
 import { SemanticCache } from "./services/semantic-cache";
 import { tryGetFallbackForRequest } from "./command-fallbacks";
+import { createAnthropicClient } from "./services/anthropic-auth";
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google" | "llama";
 
@@ -40,11 +40,12 @@ function isProviderAvailable(provider: Provider): boolean {
     case "openrouter":
       return !!(process.env.OPENROUTER_API_KEY || getConfigValue("OPENROUTER_API_KEY"));
     case "anthropic":
-      // Support both OAuth token and API key
+      // Support OAuth token (Claude Code CLI) and API key
       return !!(
-        process.env.ANTHROPIC_OAUTH_TOKEN || 
-        getConfigValue("ANTHROPIC_OAUTH_TOKEN") ||
-        process.env.ANTHROPIC_API_KEY || 
+        process.env.CLAUDE_CODE_OAUTH_TOKEN ||
+        process.env.ANTHROPIC_OAUTH_TOKEN ||
+        process.env.ANTHROPIC_AUTH_TOKEN ||
+        process.env.ANTHROPIC_API_KEY ||
         getConfigValue("ANTHROPIC_API_KEY")
       );
     case "openai":
@@ -616,15 +617,13 @@ async function* getLinuxCommandsFromClaude(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const anthropic = new Anthropic({
-    timeout: API_TIMEOUTS.anthropic,
-  });
+  const anthropic = createAnthropicClient();
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Claude (${model})...`);
 
   const tokens = model.includes("sonnet") ? 8192 : 4096;
 
-  const stream = await withRetry(
+  const response = await withRetry(
     () => anthropic.messages.create({
       messages: [
         {
@@ -634,21 +633,50 @@ async function* getLinuxCommandsFromClaude(
       ],
       model,
       max_tokens: tokens,
-      stream: true,
       temperature: 0,
       system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert with full administrative privileges. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.
 
-IMPORTANTE: Você DEVE responder APENAS com um objeto JSON válido no formato:
-{"commands": [array de comandos]}
-
-Cada comando deve ter a estrutura exata definida no prompt do usuário.`,
+IMPORTANTE: Responda APENAS com JSON puro (sem markdown, sem backticks).
+Formato: {"commands": [array de comandos]}
+Cada comando segue a estrutura definida no prompt do usuário.`,
     }),
     { provider: "anthropic" }
   );
 
-  // Use unified streaming parser
-  const { parseStreamingJSON, iterateAnthropicStream } = await import("./streaming-parser");
-  yield* parseStreamingJSON(iterateAnthropicStream(stream), "anthropic");
+  // Extract text from response
+  const text = response.content
+    .filter((b: any) => b.type === "text")
+    .map((b: any) => b.text)
+    .join("");
+
+  // Strip markdown wrappers if present
+  const jsonText = text.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
+
+  try {
+    const parsed = JSON.parse(jsonText);
+    const commands: LinuxCommand[] = parsed.commands || parsed;
+
+    for (const cmd of commands) {
+      try {
+        const validated = LinuxCommandSchema.parse(cmd);
+        yield { type: "command", command: validated };
+      } catch {
+        logger.warn(`⚠️  Comando inválido ignorado: ${JSON.stringify(cmd).slice(0, 100)}`);
+      }
+    }
+
+    const validCommands = commands.filter((c: any) => {
+      try { LinuxCommandSchema.parse(c); return true; } catch { return false; }
+    }).map((c: any) => LinuxCommandSchema.parse(c));
+
+    logger.info(`✓ ${validCommands.length} comandos válidos de ${commands.length} total`);
+    yield { type: "allcommands", commands: validCommands };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    logger.error(`❌ JSON parse failed: ${msg}`);
+    logger.debug(`Raw text: ${jsonText.slice(0, 500)}`);
+    yield { type: "error", error: `Parse failed: ${msg}` };
+  }
 }
 
 async function* getLinuxCommandsFromOpenAI(

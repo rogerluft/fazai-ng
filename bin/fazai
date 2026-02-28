@@ -1,33 +1,74 @@
 #!/usr/bin/env bash
 #
 # FazAI - Terminal Inteligente de Administração Linux
-# Wrapper script que executa o CLI principal
+# Router: queries → qdrant-fazai-injector (Agent SDK + RAG + GPTCache)
+#         subcomandos → app.js (CLI features: alias, qdrant, cloudflare, etc.)
 #
 
-# Run environment setup silently in the background to not clutter the command output
+# Run environment setup silently in the background
 bash "$(dirname "$0")/../scripts/setup-env.sh" > /dev/null 2>&1 &
 
 set -euo pipefail
 
-# Carrega configurações do sistema (variáveis de ambiente)
+# ─── Config ──────────────────────────────────────────────────
+INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
 FAZAI_CONFIG="${FAZAI_CONFIG_PATH:-/etc/fazai/fazai.conf}"
+INJECTOR_DIR="/home/rluft/qdrant-fazai-injector"
+APP_JS="${INSTALL_DIR}/dist/app.js"
+
+# Carrega configurações do sistema
 if [[ -f "$FAZAI_CONFIG" ]]; then
-    # shellcheck source=/dev/null
-    set -a  # Exporta automaticamente todas as variáveis
+    set -a
     source "$FAZAI_CONFIG"
     set +a
 fi
 
-# Detecta o diretório de instalação
-INSTALL_DIR="${FAZAI_INSTALL_DIR:-/opt/fazai}"
-APP_JS="${INSTALL_DIR}/dist/app.js"
+# Agent SDK rejeita sessions aninhadas dentro do Claude Code
+unset CLAUDECODE 2>/dev/null || true
+# fazai.conf pode ter ANTHROPIC_API_KEY com token OAuth (sk-ant-oat01-*).
+# O Agent SDK confunde com API key e rejeita. O injector usa OAuth via SDK.
+unset ANTHROPIC_API_KEY 2>/dev/null || true
 
-# Verifica se a aplicação existe
-if [[ ! -f "$APP_JS" ]]; then
-    echo "❌ FazAI não encontrado em: $APP_JS" >&2
-    echo "   Execute: sudo bash install.sh" >&2
-    exit 1
+# ─── Parse --yolo (precisa vir antes do routing) ─────────────
+YOLO=""
+ARGS=()
+for arg in "$@"; do
+    if [[ "$arg" == "--yolo" ]]; then
+        YOLO="--yolo"
+    else
+        ARGS+=("$arg")
+    fi
+done
+set -- "${ARGS[@]}"
+
+# ─── Router ──────────────────────────────────────────────────
+
+# Sem argumentos: help do app.js
+if [[ $# -eq 0 ]]; then
+    exec node "$APP_JS" --help
 fi
 
-# Executa o CLI principal com todos os argumentos
+first_arg="${1:-}"
+
+# --status vai pro injector (mostra providers + cache)
+if [[ "$first_arg" == "--status" ]]; then
+    exec node "$INJECTOR_DIR/dist/index.js" --status
+fi
+
+# Flags globais e subcomandos conhecidos vão pro app.js
+case "$first_arg" in
+    --help|-h|--version|-v|--cli|--debug|--dry-run)
+        exec node "$APP_JS" "$@"
+        ;;
+    alias|ask|config|completion|search|vector|import|ingest|qdrant|cloudflare|cf|github|sync|index|inference|agent|dashboard|samba)
+        exec node "$APP_JS" "$@"
+        ;;
+esac
+
+# Tudo o resto é query → qdrant-fazai-injector pipeline (Agent SDK + RAG)
+if [[ -f "$INJECTOR_DIR/dist/index.js" ]]; then
+    exec node "$INJECTOR_DIR/dist/index.js" $YOLO "$@"
+fi
+
+# Fallback: se injector não existe, usa app.js
 exec node "$APP_JS" "$@"
