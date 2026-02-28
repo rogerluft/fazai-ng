@@ -1,4 +1,57 @@
 # Análise da Situação Git - FazAI-NG
+**Última atualização:** 2026-02-28
+**Analista:** Claude Code (GitHub Copilot Agent)
+
+---
+
+## 🚨 Incidente Feb 28, 2026 — Push Bloqueado por Arquivo Grande
+
+### Problema
+
+O push para `master` foi rejeitado pelo GitHub com o erro:
+
+```
+remote: error: File local_cache/fast-bge-base-en-v1.5/model_optimized.onnx is 217.87 MB;
+remote: error: this exceeds GitHub's file size limit of 100.00 MB
+remote: error: GH001: Large files detected.
+! [remote rejected] master -> master (pre-receive hook declined)
+```
+
+**Causa raiz:** O diretório `local_cache/` (usado para armazenar modelos de ML baixados em cache local) não estava listado no `.gitignore`, permitindo que o arquivo `model_optimized.onnx` (217 MB) fosse rastreado pelo git acidentalmente.
+
+### Solução Aplicada
+
+Adicionadas as seguintes entradas ao `.gitignore`:
+
+```gitignore
+# LOCAL CACHE - Large model files (do not commit)
+# Files here exceed GitHub's file size limit of 100 MB
+local_cache/
+*.onnx
+*.gguf
+*.safetensors
+```
+
+- `local_cache/` — ignora o diretório inteiro de cache de modelos
+- `*.onnx`, `*.gguf`, `*.safetensors` — previne commit acidental de arquivos de pesos de modelos em qualquer lugar do projeto
+
+### Ação Necessária na Branch `master` Local
+
+O arquivo já commitado precisa ser removido do histórico git local antes do próximo push:
+
+```bash
+# Remove do índice git (mantém o arquivo local)
+git rm -r --cached local_cache/
+git commit -m "chore: remove large model files from git tracking"
+git push origin master
+```
+
+Se o arquivo foi commitado há vários commits atrás, usar o [BFG Repo Cleaner](https://rtyley.github.io/bfg-repo-cleaner/) para purgar do histórico.
+
+> **Nota:** Não é necessário Git LFS. O arquivo simplesmente não deve ser versionado.
+
+---
+
 **Data:** 2026-02-04
 **Analista:** Claude Code (GitHub Copilot Agent)
 
