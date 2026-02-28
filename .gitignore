@@ -233,3 +233,12 @@ gha-creds-*.json
 docs/restricted/
 .claude/restricted/
 restricted
+
+# ===========================================
+# LOCAL CACHE - Large model files (do not commit)
+# Files here exceed GitHub's 100 MB file size limit
+# ===========================================
+local_cache/
+*.onnx
+*.gguf
+*.safetensors
