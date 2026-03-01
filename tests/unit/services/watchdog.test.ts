@@ -9,14 +9,18 @@ vi.mock('../../../src/logger');
 
 describe('ResourceWatchdog', () => {
   let watchdog: ResourceWatchdog;
+  let originalEnv: NodeJS.ProcessEnv;
 
   beforeEach(() => {
+    originalEnv = process.env;
+    process.env = { ...originalEnv, FAZAI_WATCHDOG_MEM_MB: '1024' };
     vi.useFakeTimers();
     watchdog = new ResourceWatchdog();
     vi.clearAllMocks();
   });
 
   afterEach(() => {
+    process.env = originalEnv;
     vi.useRealTimers();
   });
 
@@ -46,7 +50,7 @@ describe('ResourceWatchdog', () => {
 
   it('should kill process if memory exceeds limit', async () => {
     const pid = 1234;
-    // Limit is 1024MB by default
+    // Limit is 1024MB as set in beforeEach
     vi.mocked(fsPromises.readFile).mockResolvedValue('VmRSS: 1572864 kB\n'); // 1536 MB
 
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true as any);
