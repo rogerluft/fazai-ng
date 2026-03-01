@@ -276,6 +276,8 @@ export class PersonalityIngestor {
               continue; // Ignorar chunk duplicado
             }
 
+            this.existingHashes.add(contentHash);
+
             chunks.push({
               id: randomUUID(),
               text: pair.text,
@@ -402,6 +404,7 @@ export class PersonalityIngestor {
           if (memoryObj.conversations_memory) {
             const contentHash = hashText(memoryObj.conversations_memory);
             if (!this.existingHashes.has(contentHash)) {
+              this.existingHashes.add(contentHash);
               chunks.push({
                 id: randomUUID(),
                 text: memoryObj.conversations_memory,
@@ -429,6 +432,7 @@ export class PersonalityIngestor {
             for (const [projectUuid, memoryText] of Object.entries(memoryObj.project_memories)) {
               const contentHash = hashText(memoryText);
               if (!this.existingHashes.has(contentHash)) {
+                this.existingHashes.add(contentHash);
                 chunks.push({
                   id: randomUUID(),
                   text: memoryText,
@@ -490,6 +494,7 @@ export class PersonalityIngestor {
           const contentHash = hashText(projectText);
 
           if (!this.existingHashes.has(contentHash)) {
+            this.existingHashes.add(contentHash);
             chunks.push({
               id: randomUUID(),
               text: projectText,
@@ -521,6 +526,7 @@ export class PersonalityIngestor {
               const docHash = hashText(docText);
 
               if (!this.existingHashes.has(docHash)) {
+                this.existingHashes.add(docHash);
                 chunks.push({
                   id: randomUUID(),
                   text: docText,
@@ -583,6 +589,7 @@ export class PersonalityIngestor {
           const contentHash = hashText(userText);
 
           if (!this.existingHashes.has(contentHash)) {
+            this.existingHashes.add(contentHash);
             chunks.push({
               id: randomUUID(),
               text: userText,

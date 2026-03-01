@@ -151,8 +151,8 @@ export class QdrantBlockStorage implements BlockStorageBackend {
       if (similar.length > 0) {
         // Verifica se algum bloco similar tem exatamente os mesmos comandos
         const exactMatch = similar.find(s => {
-          const sCmds = JSON.stringify(s.block.execution_steps || []);
-          const bCmds = JSON.stringify(block.execution_steps || []);
+          const sCmds = JSON.stringify(s.block.steps || []);
+          const bCmds = JSON.stringify(block.steps || []);
           return sCmds === bCmds;
         });
 
