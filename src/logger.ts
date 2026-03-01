@@ -39,8 +39,8 @@ function parseLogLevel(raw?: string | null): LogLevel | null {
 let currentLevel: LogLevel = "info";
 let logFilePath: string | null = null;
 let logStream: fs.WriteStream | null = null;
-let debugFilePath: string | null = null;
-let debugStream: fs.WriteStream | null = null;
+let debugLogStream: fs.WriteStream | null = null;
+let debugLogFilePath: string | null = null;
 let hasWarnedAboutLogFile = false;
 
 // Rate limiter para evitar loop infinito de logs
@@ -91,66 +91,64 @@ function closeStream(): void {
     logStream.end();
     logStream = null;
   }
-  if (debugStream) {
-    debugStream.end();
-    debugStream = null;
+}
+
+function closeDebugStream(): void {
+  if (debugLogStream) {
+    debugLogStream.end();
+    debugLogStream = null;
   }
 }
 
-function ensureStream(targetPath: string, isDebug: boolean = false): void {
-  if (!isDebug) {
-    if (logFilePath === targetPath && logStream) {
-      return;
-    }
-    if (logStream) {
-      logStream.end();
-      logStream = null;
-    }
-  } else {
-    if (debugFilePath === targetPath && debugStream) {
-      return;
-    }
-    if (debugStream) {
-      debugStream.end();
-      debugStream = null;
-    }
+function ensureDebugStream(targetPath: string): void {
+  if (debugLogFilePath === targetPath && debugLogStream) {
+    return;
   }
+
+  closeDebugStream();
 
   try {
     const dir = path.dirname(targetPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    const stream = fs.createWriteStream(targetPath, { flags: "a" });
-    stream.on("error", (error) => {
+    debugLogStream = fs.createWriteStream(targetPath, { flags: "a" });
+    debugLogStream.on("error", () => {
+      closeDebugStream();
+    });
+    debugLogFilePath = targetPath;
+  } catch {
+    closeDebugStream();
+  }
+}
+
+function ensureStream(targetPath: string): void {
+  if (logFilePath === targetPath && logStream) {
+    return;
+  }
+
+  closeStream();
+
+  try {
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    logStream = fs.createWriteStream(targetPath, { flags: "a" });
+    logStream.on("error", (error) => {
       if (!hasWarnedAboutLogFile) {
         console.warn(chalk.yellow(`⚠️  Falha ao escrever log em ${targetPath}: ${error}`));
         hasWarnedAboutLogFile = true;
       }
-      if (!isDebug) {
-        if (logStream) { logStream.end(); logStream = null; }
-      } else {
-        if (debugStream) { debugStream.end(); debugStream = null; }
-      }
+      closeStream();
     });
-
-    if (!isDebug) {
-      logStream = stream;
-      logFilePath = targetPath;
-    } else {
-      debugStream = stream;
-      debugFilePath = targetPath;
-    }
+    logFilePath = targetPath;
   } catch (error) {
     if (!hasWarnedAboutLogFile) {
       console.warn(chalk.yellow(`⚠️  Não foi possível criar diretório de log (${targetPath}): ${error}`));
       hasWarnedAboutLogFile = true;
     }
-    if (!isDebug) {
-      if (logStream) { logStream.end(); logStream = null; }
-    } else {
-      if (debugStream) { debugStream.end(); debugStream = null; }
-    }
+    closeStream();
   }
 }
 
@@ -166,12 +164,6 @@ function formatArgs(args: unknown[]): string {
 }
 
 function writeToFile(level: LogLevel, rawArgs: unknown[]): void {
-  const stream = level === 'debug' ? debugStream : logStream;
-  const filePath = level === 'debug' ? debugFilePath : logFilePath;
-
-  if (!stream || !filePath) {
-    return;
-  }
   const timestamp = new Date().toISOString();
 
   // Structured Logging Logic
@@ -182,7 +174,15 @@ function writeToFile(level: LogLevel, rawArgs: unknown[]): void {
     content = stripAnsi(formatArgs(rawArgs));
   }
 
-  stream.write(`${timestamp} [${level.toUpperCase()}] ${content}\n`);
+  const line = `${timestamp} [${level.toUpperCase()}] ${content}\n`;
+
+  if (logStream && logFilePath) {
+    logStream.write(line);
+  }
+
+  if (level === "debug" && debugLogStream && debugLogFilePath) {
+    debugLogStream.write(line);
+  }
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -257,20 +257,21 @@ export function initLogger(options: LoggerInitOptions = {}): void {
 
   // Logs em arquivo fixo (facilita tracking do estado atual e diagnóstico)
   const defaultLogPath = `/var/log/fazai/fazai.log`;
+  const defaultDebugLogPath = `/var/log/fazai/fazai-debug.log`;
   const fallbackLogPath = path.join(process.cwd(), `fazai.log`);
-  const defaultDebugPath = `/var/log/fazai/fazai-debug.log`;
-  const fallbackDebugPath = path.join(process.cwd(), `fazai-debug.log`);
-
+  const fallbackDebugLogPath = path.join(process.cwd(), `fazai-debug.log`);
   const logPathCandidate = options.logFilePathOverride ?? envLogPath ?? configLogPath ?? defaultLogPath;
 
-  ensureStream(logPathCandidate, false);
+  ensureStream(logPathCandidate);
+
   if (!logStream) {
-    ensureStream(fallbackLogPath, false);
+    ensureStream(fallbackLogPath);
   }
 
-  ensureStream(defaultDebugPath, true);
-  if (!debugStream) {
-    ensureStream(fallbackDebugPath, true);
+  ensureDebugStream(defaultDebugLogPath);
+
+  if (!debugLogStream) {
+    ensureDebugStream(fallbackDebugLogPath);
   }
 }
 
