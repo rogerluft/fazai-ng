@@ -27,6 +27,7 @@ import { showLogo } from "./ui/banner";
 import { SemanticCache } from "./services/semantic-cache";
 import { exec } from "child_process";
 import { promisify } from "util";
+import { getConfigValue } from "./config";
 
 // Memory persistence imports
 import {
@@ -278,17 +279,25 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
   rl.prompt();
 
-  let inactivityTimeout: NodeJS.Timeout;
+  let inactivityTimeout: NodeJS.Timeout | undefined;
+
+  const _parsedTimeout = parseInt(
+    getConfigValue("CLI_INACTIVITY_TIMEOUT") || process.env.FAZAI_CLI_INACTIVITY_TIMEOUT || "300000",
+    10
+  );
+  const inactivityTimeoutMs = isNaN(_parsedTimeout) ? 300000 : _parsedTimeout;
 
   const resetInactivityTimeout = () => {
-      clearTimeout(inactivityTimeout);
+      if (inactivityTimeout) {
+        clearTimeout(inactivityTimeout);
+      }
 
       // Only set timeout if running interactively
       if (process.stdin.isTTY) {
         inactivityTimeout = setTimeout(() => {
             logger.info(chalk.yellow('\nInatividade detectada, encerrando a sessão.'));
             rl.close();
-        }, 300000); // 5 minutes
+        }, inactivityTimeoutMs);
       }
   };
 
