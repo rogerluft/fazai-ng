@@ -91,6 +91,10 @@ Usage:
   fazai inference <command>                          # Gerencia conhecimento injetado pelo usuário
   fazai agent <command>                              # Executa agentes GenAIScript (loop, reflect, etc)
   fazai dashboard <command>                          # Gerencia REST API Dashboard (start, stop, status)
+  fazai daemon                                       # Inicia servidor HTTP/WS em background (estilo OpenClaw)
+  fazai install-daemon                               # Instala e configura o daemon como serviço systemd
+  fazai migrate-openclaw [sqlite_path]               # Migra memórias do OpenClaw para o Qdrant
+  fazai memory <command>                             # Busca e indexa memórias agênticas no Qdrant
   fazai samba <command>                              # Gerencia compartilhamentos Samba (list, add, del, etc)
 
 Options:
@@ -174,7 +178,7 @@ async function main() {
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
     "config", "search", "inference", "agent", "ingest",
-    "dashboard", "samba", "completion", "cleaner"
+    "dashboard", "samba", "completion", "cleaner", "daemon", "serve", "install-daemon", "migrate-openclaw", "memory"
   ];
 
   const firstArg = inputs[0];
@@ -291,6 +295,34 @@ async function main() {
     process.exit(0);
   }
 
+  // Daemon command - Always-on background server (OpenClaw style)
+  if (inputs[0] === "daemon" || inputs[0] === "serve") {
+    const { handleDaemonCommand } = await import("./commands/daemon");
+    await handleDaemonCommand(inputs.slice(1));
+    return; // Do not process.exit(0) because server must stay alive
+  }
+
+  // Install Daemon command
+  if (inputs[0] === "install-daemon") {
+    const { handleInstallDaemonCommand } = await import("./commands/install-daemon");
+    await handleInstallDaemonCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Migrate OpenClaw Memory command
+  if (inputs[0] === "migrate-openclaw") {
+    const { handleMigrateOpenClawCommand } = await import("./commands/migrate-openclaw");
+    await handleMigrateOpenClawCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Memory tools command
+  if (inputs[0] === "memory") {
+    const { handleMemoryCommand } = await import("./commands/memory-cmd");
+    await handleMemoryCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
   if (inputs[0] === "vector") {
     await handleVectorCommand(inputs.slice(1));
     process.exit(0);
@@ -298,6 +330,19 @@ async function main() {
 
   if (inputs[0] === "import") {
     await handleImportCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Handle Version command immediately before any async model logic
+  if (inputs.includes("--version") || inputs.includes("-v")) {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const pkgPath = path.join(__dirname, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    console.log(`FazAI v${pkg.version}`);
     process.exit(0);
   }
 
@@ -332,10 +377,6 @@ async function main() {
     // Aqui só remove da lista de args para o admin mode
     if (input === "--help" || input === "-h") {
       return false;
-    }
-    if (input === "--version" || input === "-v") {
-      console.log(`FazAI v${require('../package.json').version}`);
-      process.exit(0);
     }
     return true;
   });
