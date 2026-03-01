@@ -144,6 +144,7 @@ if (!userTask) throw new Error("Task required for plan mode");
 $`
 You are the SYSTEM MAESTRO for FazAI.
 Your goal is to create a robust execution plan for a Linux system.
+Read the "USER ORDER" and instructions in Portuguese, but process and think internally in English for optimal analytical performance. Respond with Portuguese descriptions in the JSON.
 
 INPUT CONTEXT:
 ${systemContext}

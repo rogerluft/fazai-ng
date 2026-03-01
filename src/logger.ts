@@ -39,6 +39,8 @@ function parseLogLevel(raw?: string | null): LogLevel | null {
 let currentLevel: LogLevel = "info";
 let logFilePath: string | null = null;
 let logStream: fs.WriteStream | null = null;
+let debugFilePath: string | null = null;
+let debugStream: fs.WriteStream | null = null;
 let hasWarnedAboutLogFile = false;
 
 // Rate limiter para evitar loop infinito de logs
@@ -89,35 +91,66 @@ function closeStream(): void {
     logStream.end();
     logStream = null;
   }
+  if (debugStream) {
+    debugStream.end();
+    debugStream = null;
+  }
 }
 
-function ensureStream(targetPath: string): void {
-  if (logFilePath === targetPath && logStream) {
-    return;
+function ensureStream(targetPath: string, isDebug: boolean = false): void {
+  if (!isDebug) {
+    if (logFilePath === targetPath && logStream) {
+      return;
+    }
+    if (logStream) {
+      logStream.end();
+      logStream = null;
+    }
+  } else {
+    if (debugFilePath === targetPath && debugStream) {
+      return;
+    }
+    if (debugStream) {
+      debugStream.end();
+      debugStream = null;
+    }
   }
-
-  closeStream();
 
   try {
     const dir = path.dirname(targetPath);
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    logStream = fs.createWriteStream(targetPath, { flags: "a" });
-    logStream.on("error", (error) => {
+    const stream = fs.createWriteStream(targetPath, { flags: "a" });
+    stream.on("error", (error) => {
       if (!hasWarnedAboutLogFile) {
         console.warn(chalk.yellow(`⚠️  Falha ao escrever log em ${targetPath}: ${error}`));
         hasWarnedAboutLogFile = true;
       }
-      closeStream();
+      if (!isDebug) {
+        if (logStream) { logStream.end(); logStream = null; }
+      } else {
+        if (debugStream) { debugStream.end(); debugStream = null; }
+      }
     });
-    logFilePath = targetPath;
+
+    if (!isDebug) {
+      logStream = stream;
+      logFilePath = targetPath;
+    } else {
+      debugStream = stream;
+      debugFilePath = targetPath;
+    }
   } catch (error) {
     if (!hasWarnedAboutLogFile) {
       console.warn(chalk.yellow(`⚠️  Não foi possível criar diretório de log (${targetPath}): ${error}`));
       hasWarnedAboutLogFile = true;
     }
-    closeStream();
+    if (!isDebug) {
+      if (logStream) { logStream.end(); logStream = null; }
+    } else {
+      if (debugStream) { debugStream.end(); debugStream = null; }
+    }
   }
 }
 
@@ -133,7 +166,10 @@ function formatArgs(args: unknown[]): string {
 }
 
 function writeToFile(level: LogLevel, rawArgs: unknown[]): void {
-  if (!logStream || !logFilePath) {
+  const stream = level === 'debug' ? debugStream : logStream;
+  const filePath = level === 'debug' ? debugFilePath : logFilePath;
+
+  if (!stream || !filePath) {
     return;
   }
   const timestamp = new Date().toISOString();
@@ -146,7 +182,7 @@ function writeToFile(level: LogLevel, rawArgs: unknown[]): void {
     content = stripAnsi(formatArgs(rawArgs));
   }
 
-  logStream.write(`${timestamp} [${level.toUpperCase()}] ${content}\n`);
+  stream.write(`${timestamp} [${level.toUpperCase()}] ${content}\n`);
 }
 
 function shouldLog(level: LogLevel): boolean {
@@ -219,16 +255,22 @@ export function initLogger(options: LoggerInitOptions = {}): void {
   const level = options.levelOverride ?? envLevel ?? configLevel ?? currentLevel;
   currentLevel = level;
 
-  // Logs organizados por data: /var/log/fazai/2025-11-17.log
-  const logDate = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const defaultLogPath = `/var/log/fazai/${logDate}.log`;
-  const fallbackLogPath = path.join(process.cwd(), `fazai-${logDate}.log`);
+  // Logs em arquivo fixo (facilita tracking do estado atual e diagnóstico)
+  const defaultLogPath = `/var/log/fazai/fazai.log`;
+  const fallbackLogPath = path.join(process.cwd(), `fazai.log`);
+  const defaultDebugPath = `/var/log/fazai/fazai-debug.log`;
+  const fallbackDebugPath = path.join(process.cwd(), `fazai-debug.log`);
+
   const logPathCandidate = options.logFilePathOverride ?? envLogPath ?? configLogPath ?? defaultLogPath;
 
-  ensureStream(logPathCandidate);
-
+  ensureStream(logPathCandidate, false);
   if (!logStream) {
-    ensureStream(fallbackLogPath);
+    ensureStream(fallbackLogPath, false);
+  }
+
+  ensureStream(defaultDebugPath, true);
+  if (!debugStream) {
+    ensureStream(fallbackDebugPath, true);
   }
 }
 
