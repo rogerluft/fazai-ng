@@ -6,6 +6,7 @@ import { getLinuxCommandsFromAI } from "./linux-admin";
 import { collectSystemInfo } from "./system-info";
 import { LinuxCommand } from "./types-linux";
 import { LinuxCommandExecutor } from "./linux-executor";
+import { getCliInactivityTimeout } from "./config";
 import { ResearchCoordinator } from "./research";
 import { ResilienceOrchestrator } from "./orchestrator/resilience-orchestrator";
 import { checkAPIKey, getAndSetAPIKey } from "./apiKeyUtils-fazai";
@@ -278,17 +279,20 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
   rl.prompt();
 
-  let inactivityTimeout: NodeJS.Timeout;
+  let inactivityTimeout: NodeJS.Timeout | undefined;
+  const timeoutMs = getCliInactivityTimeout();
 
   const resetInactivityTimeout = () => {
-      clearTimeout(inactivityTimeout);
+      if (inactivityTimeout) {
+          clearTimeout(inactivityTimeout);
+      }
 
       // Only set timeout if running interactively
       if (process.stdin.isTTY) {
         inactivityTimeout = setTimeout(() => {
-            logger.info(chalk.yellow('\nInatividade detectada, encerrando a sessão.'));
+            logger.info(chalk.yellow(`\nInatividade detectada (${timeoutMs}ms), encerrando a sessão.`));
             rl.close();
-        }, 300000); // 5 minutes
+        }, timeoutMs);
       }
   };
 
