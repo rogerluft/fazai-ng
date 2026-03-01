@@ -145,12 +145,23 @@ export class QdrantBlockStorage implements BlockStorageBackend {
     await this.ensureCollection();
 
     try {
-      // Verifica deduplicação via busca semântica
-      const similar = await this.findSimilar(block.intent, undefined, 0.90, 1);
+      // Verifica deduplicação via busca semântica e hash de comandos/código
+      const similar = await this.findSimilar(block.intent, undefined, 0.85, 5);
+
       if (similar.length > 0) {
-        logger.debug(`Block already exists (semantic): ${similar[0].block.block_id}`);
-        await this.updateStats(similar[0].block.block_id, true);
-        return similar[0].block.block_id;
+        // Verifica se algum bloco similar tem exatamente os mesmos comandos
+        const exactMatch = similar.find(s => {
+          const sCmds = JSON.stringify(s.block.execution_steps || []);
+          const bCmds = JSON.stringify(block.execution_steps || []);
+          return sCmds === bCmds;
+        });
+
+        if (exactMatch || similar[0].similarity > 0.95) {
+          const matchedBlock = exactMatch ? exactMatch.block : similar[0].block;
+          logger.debug(`Block already exists (semantic/exact match): ${matchedBlock.block_id}`);
+          await this.updateStats(matchedBlock.block_id, true);
+          return matchedBlock.block_id;
+        }
       }
 
       const blockId = randomUUID();

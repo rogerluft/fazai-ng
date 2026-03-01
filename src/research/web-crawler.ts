@@ -632,10 +632,26 @@ export class AgenticWebCrawler {
    */
   async cacheInQdrant(query: string, results: SearchResult[]): Promise<void> {
     try {
+      const client = await getQdrantClient();
       const embeddingService = await createEmbeddingService();
       const embedding = await embeddingService.generate(query);
 
-      const client = await getQdrantClient();
+      // Deduplicação semântica: buscar se já existe query muito similar
+      const similar = await client.search("fazai_kb", {
+        vector: embedding,
+        limit: 1,
+        score_threshold: 0.90, // Queries altamente similares
+        filter: {
+          must: [
+            { key: "type", match: { value: "web_search" } }
+          ]
+        }
+      });
+
+      if (similar.length > 0) {
+        logger.debug(`Skipping Qdrant cache: Query "${query}" is semantically identical to existing cache.`);
+        return;
+      }
 
       await client.upsert("fazai_kb", {
         points: [
