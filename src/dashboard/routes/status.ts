@@ -108,7 +108,7 @@ async function checkQdrantStatus() {
 
   return {
     available,
-    url: getConfigValue("QDRANT_URL") || "http://home.rogeruft.com.br:3336",
+    url: getConfigValue("QDRANT_URL") || "http://localhost:6333",
     version,
     collections: collections.map((c) => ({
       name: c.name,

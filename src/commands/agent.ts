@@ -214,7 +214,7 @@ async function handleStatus(): Promise<void> {
 
   try {
     const { QdrantClient } = await import("@qdrant/js-client-rest");
-    const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://home.rogeruft.com.br:3336" });
+    const client = new QdrantClient({ url: process.env.QDRANT_URL || "http://localhost:6333" });
     const collections = await client.getCollections();
 
     spinner.succeed("Qdrant conectado");

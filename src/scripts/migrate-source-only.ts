@@ -8,7 +8,7 @@ import { logger } from "../logger";
 import chalk from "chalk";
 
 const TARGET_DIMENSION = 768;
-const QDRANT_URL = process.env.QDRANT_URL || "http://home.rogeruft.com.br:3336";
+const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
 const BATCH_SIZE = 32;
 const UPSERT_BATCH_SIZE = 500;
 const COLLECTION = "fazai_source";

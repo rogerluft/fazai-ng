@@ -463,7 +463,7 @@ function getQdrantClient(): QdrantClient {
     return qdrantClientInstance;
   }
 
-  const url = getConfigValue("QDRANT_URL") || process.env.QDRANT_URL || "http://home.rogeruft.com.br:3336";
+  const url = getConfigValue("QDRANT_URL") || process.env.QDRANT_URL || "http://localhost:6333";
   const apiKey = getConfigValue("QDRANT_API_KEY") || process.env.QDRANT_API_KEY;
 
   qdrantClientInstance = new QdrantClient({

@@ -25,7 +25,7 @@ export class QdrantBlockStorage implements BlockStorageBackend {
   private initialized = false;
 
   constructor() {
-    const url = getConfigValue("QDRANT_URL") || "http://home.rogeruft.com.br:3336";
+    const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
     const apiKey = getConfigValue("QDRANT_API_KEY");
 
     this.client = new QdrantClient({

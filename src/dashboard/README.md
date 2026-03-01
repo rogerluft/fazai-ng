@@ -71,7 +71,7 @@ Complete system status.
   "timestamp": "2025-12-26T04:30:00.000Z",
   "qdrant": {
     "available": true,
-    "url": "http://home.rogeruft.com.br:3336",
+    "url": "http://localhost:6333",
     "collections": [...],
     "metrics": {...}
   },
@@ -315,7 +315,7 @@ DASHBOARD_LOG_REQUESTS=true
 DASHBOARD_ALLOWED_ORIGINS=*
 
 # Qdrant connection
-QDRANT_URL=http://home.rogeruft.com.br:3336
+QDRANT_URL=http://localhost:6333
 QDRANT_API_KEY=
 
 # Ollama connection
