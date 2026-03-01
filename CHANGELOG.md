@@ -1,10 +1,5 @@
 # FazAI Changelog
 
-## [Unreleased]
-
-### 🔧 Fix: Watchdog configurável e seguro
-- **ResourceWatchdog**: Agora lê o limite de memória primeiramente de `FAZAI_WATCHDOG_MEM_MB` no `/etc/fazai/fazai.conf`, fazendo fallback para a variável de ambiente. Se nenhum dos dois for encontrado (ou o valor for inválido/NaN), ele assume um padrão seguro mínimo de 8192 MB (8GB). Testes unitários também foram ajustados para não dependerem do valor padrão da classe, mas sim configurar e restaurar as variáveis explicitamente.
-
 ## [3.19.0] - 2026-03-01
 
 ### 🚀 feat: Integração de memória, daemon mode e pre-injection bridge
@@ -15,7 +10,7 @@ Adicionadas ferramentas avançadas para manter o Fazai ativo continuamente e exp
 * **Daemon Mode (`fazai daemon`)**: Novo comando que inicializa um servidor HTTP/WS persistente em background. Isso permite que agentes remotos, UIs externas e plugins enviem e recebam dados via WebSocket.
 * **Instalação Systemd (`fazai install-daemon`)**: Utilitário que gera e ativa o daemon do Fazai automaticamente no `systemd` do Linux, garantindo inicialização no boot.
 * **Memory Bridge Plugin (`fazai-memory-bridge`)**: Plugin externo desenhado para interceptar e redirecionar buscas nativas de memória de sistemas cliente para a nossa engine local vetorial no Qdrant, utilizando nossa técnica de pré-injeção ao invés de manipulação bruta de prompts.
-* **Migração de Memória (`fazai migrate-sqlite`)**: Script para extrair e migrar blocos de memória baseados em SQLite para a infraestrutura do Fazai (collection `fazai_memory`), re-processando todos os textos com embeddings ONNX 768d e adicionando metadados de RAG (`role`, `sessionId`, `timestamp`).
+* **Migração de Memória (`fazai migrate-openclaw`)**: Script para extrair e migrar blocos de memória baseados em SQLite para a infraestrutura do Fazai (collection `fazai_memory`), re-processando todos os textos com embeddings ONNX 768d e adicionando metadados de RAG (`role`, `sessionId`, `timestamp`).
 * **Busca via CLI (`fazai memory search`)**: Adicionado subcomando para buscar e ler memórias semânticas de forma programática.
 
 #### Correções
