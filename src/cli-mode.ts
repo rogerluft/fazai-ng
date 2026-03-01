@@ -217,6 +217,7 @@ function getPrompt(): string {
 }
 
 export async function runCliMode(semanticSearchEnabled: boolean = false): Promise<void> {
+  logger.info("[ETAPA] Iniciando modo CLI interativo (runCliMode)");
   const defaultModel = models[0];
 
   // Track pending async operations to prevent premature exit on EOF
@@ -235,6 +236,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
     )
   );
 
+  logger.debug(`[ETAPA] Verificando chave da API para provedor ${defaultModel.provider}`);
   if (!checkAPIKey(defaultModel.provider)) {
     await getAndSetAPIKey(defaultModel.provider);
   }
@@ -243,6 +245,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   // Load personality from Qdrant
   let personality: PersonalityTraits | null = null;
   try {
+    logger.debug("[ETAPA] Iniciando carregamento de personalidade do Qdrant");
     logger.info(chalk.cyan("🧠 Loading personality from Qdrant..."));
     personality = await loadPersonalityFromQdrant();
     logger.info(chalk.green(`✅ Personality loaded: ${personality.traits.length} traits, ${personality.expertise.length} expertise areas`));
@@ -291,6 +294,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   resetInactivityTimeout();
 
   const handleChat = async (message: string) => {
+    logger.debug("[ETAPA] handleChat: Processando mensagem do usuário");
     const timestamp = new Date().toISOString();
 
     // 1. Add to local conversation history
@@ -313,6 +317,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
     });
 
     // 3. Load relevant memories from Qdrant (semantic search)
+    logger.debug("[ETAPA] handleChat: Carregando memórias relevantes (Qdrant)");
     let memoryContext = "";
     try {
       const relevantMemories = await loadRelevantMemories(message, {
@@ -331,6 +336,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
     }
 
     // 4. Build enhanced prompt with memory context
+    logger.debug("[ETAPA] handleChat: Construindo prompt para o modelo");
     let prompt = buildChatPrompt(conversationHistory);
     if (memoryContext) {
       prompt = `${memoryContext}\n\n${prompt}`;
@@ -346,6 +352,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
     let response = "";
     try {
+      logger.debug("[ETAPA] handleChat: Chamando askAI para stream de resposta");
       const stream = askAI(
         personalityContext, // Pass personality as fileContent (used in system message)
         prompt,
@@ -385,6 +392,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         sessionId,
         context: message.substring(0, 200), // Store user message as context
       };
+      logger.debug("[ETAPA] handleChat: Salvando resposta do assistente no Qdrant");
       storeMemoryInQdrant(assistantMemoryEntry).catch((err) => {
         logger.debug(`Failed to store assistant memory: ${err.message}`);
       });
@@ -392,6 +400,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   };
 
   const handleExec = async (task: string) => {
+    logger.debug("[ETAPA] handleExec: Iniciando execução de comandos Linux");
     if (!task) {
       logger.warn(chalk.yellow("Forneça uma instrução após /exec. Ex: /exec limpar /tmp"));
       return;
@@ -401,6 +410,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
     pendingOperations++;
     try {
+      logger.debug("[ETAPA] handleExec: Obtendo comandos da AI (getLinuxCommandsFromAI)");
       const commandStream = getLinuxCommandsFromAI(
         systemInfo,
         task,
@@ -464,6 +474,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
     const isWebSearch = searchIntents.some((pattern) => pattern.test(line));
 
     if (isWebSearch) {
+      logger.debug("[ETAPA] Intenção de busca web detectada");
       // Extrai query removendo o prefixo de intenção
       const query = line
         .replace(/^(pesquis|busqu|procur|encontr)(e|a|ar)( sobre| na internet| web| informações sobre)?/i, "")
@@ -480,6 +491,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
       logger.info(chalk.cyan(`\n🚀 Executando com fluxo de resiliência: "${query}"\n`));
 
       try {
+        logger.debug("[ETAPA] Executando busca web com ResilienceOrchestrator");
         const orchestrator = new ResilienceOrchestrator();
         const result = await orchestrator.executeTaskWithResilience(query);
 
@@ -507,6 +519,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
     }
 
     if (line.startsWith("/")) {
+      logger.debug(`[ETAPA] Processando comando especial: ${line}`);
       if (line === "/help") {
         logger.info(chalk.cyan("\nComandos disponíveis:"));
         logger.info("/help              Mostra esta ajuda");
@@ -705,6 +718,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   });
 
   rl.on("close", () => {
+    logger.debug("[ETAPA] readline.on('close'): Encerrando sessão CLI");
     // Detect if running interactively or from pipe
     const isInteractive = process.stdin.isTTY;
 

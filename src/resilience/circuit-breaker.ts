@@ -144,11 +144,14 @@ export class CircuitBreaker {
    * @throws Any error thrown by the operation
    */
   async execute<T>(operation: () => Promise<T>): Promise<T> {
+    logger.debug(`[ETAPA] [CircuitBreaker] Iniciando execução da operação para "${this.config.serviceName}"`);
+
     // Check if circuit should transition from OPEN to HALF_OPEN
     this.checkForReset();
 
     // FAIL FAST: Reject immediately if circuit is OPEN
     if (this.state === CircuitState.OPEN) {
+      logger.debug(`[ETAPA] [CircuitBreaker] Estado está OPEN. Rejeitando operação rapidamente.`);
       this.totalRejections++;
       logger.warn(
         `[CircuitBreaker] FAIL FAST: Operação rejeitada para "${this.config.serviceName}" ` +
@@ -162,6 +165,7 @@ export class CircuitBreaker {
 
     // HALF_OPEN: Only allow ONE test operation at a time
     if (this.state === CircuitState.HALF_OPEN) {
+      logger.debug(`[ETAPA] [CircuitBreaker] Estado está HALF_OPEN. Verificando se teste já está em progresso.`);
       if (this.halfOpenTestInProgress) {
         this.totalRejections++;
         logger.warn(
@@ -179,14 +183,17 @@ export class CircuitBreaker {
     }
 
     try {
+      logger.debug(`[ETAPA] [CircuitBreaker] Executando operação original com timeout de ${this.config.operationTimeout}ms.`);
       // Execute operation with timeout
       const result = await this.executeWithTimeout(operation);
 
+      logger.debug(`[ETAPA] [CircuitBreaker] Operação concluída com sucesso.`);
       // Success: Reset failures and potentially close circuit
       this.onSuccess();
 
       return result;
     } catch (error) {
+      logger.debug(`[ETAPA] [CircuitBreaker] Operação falhou. Registrando erro.`);
       // Failure: Increment counter and potentially open circuit
       this.onFailure(error);
       throw error;
@@ -241,7 +248,9 @@ export class CircuitBreaker {
     operation: () => Promise<T>
   ): Promise<T> {
     return new Promise<T>((resolve, reject) => {
+      logger.debug(`[ETAPA] [CircuitBreaker] Configurando timer de timeout (${this.config.operationTimeout}ms).`);
       const timeoutId = setTimeout(() => {
+        logger.debug(`[ETAPA] [CircuitBreaker] Timeout estourou para a operação.`);
         reject(
           new CircuitBreakerTimeoutError(
             this.config.serviceName,
