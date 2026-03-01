@@ -1,0 +1,19 @@
+{
+  "id": "fazai-memory-bridge",
+  "name": "Fazai Memory Bridge",
+  "description": "Substitui a busca nativa de memória do OpenClaw pela busca vetorial no Qdrant via Fazai.",
+  "kind": "memory",
+  "version": "1.0.0",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "fazaiExecutable": { "type": "string", "default": "fazai" },
+      "maxResults": { "type": "integer", "default": 5, "minimum": 1, "maximum": 50 }
+    }
+  },
+  "uiHints": {
+    "fazaiExecutable": { "label": "Comando Fazai CLI", "placeholder": "fazai" },
+    "maxResults": { "label": "Max results" }
+  }
+}

@@ -94,6 +94,7 @@ Usage:
   fazai daemon                                       # Inicia servidor HTTP/WS em background (estilo OpenClaw)
   fazai install-daemon                               # Instala e configura o daemon como serviço systemd
   fazai migrate-openclaw [sqlite_path]               # Migra memórias do OpenClaw para o Qdrant
+  fazai memory <command>                             # Busca e indexa memórias agênticas no Qdrant
   fazai samba <command>                              # Gerencia compartilhamentos Samba (list, add, del, etc)
 
 Options:
@@ -177,7 +178,7 @@ async function main() {
     "qdrant", "vector", "ask", "import", "alias",
     "cloudflare", "cf", "github", "index", "sync",
     "config", "search", "inference", "agent", "ingest",
-    "dashboard", "samba", "completion", "cleaner", "daemon", "serve", "install-daemon", "migrate-openclaw"
+    "dashboard", "samba", "completion", "cleaner", "daemon", "serve", "install-daemon", "migrate-openclaw", "memory"
   ];
 
   const firstArg = inputs[0];
@@ -312,6 +313,13 @@ async function main() {
   if (inputs[0] === "migrate-openclaw") {
     const { handleMigrateOpenClawCommand } = await import("./commands/migrate-openclaw");
     await handleMigrateOpenClawCommand(inputs.slice(1));
+    process.exit(0);
+  }
+
+  // Memory tools command
+  if (inputs[0] === "memory") {
+    const { handleMemoryCommand } = await import("./commands/memory-cmd");
+    await handleMemoryCommand(inputs.slice(1));
     process.exit(0);
   }
 
