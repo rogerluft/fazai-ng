@@ -399,6 +399,9 @@ export async function* askAI(
         // Also prepare the injected context for the user prompt
         injectedPromptContext = `=== REGRAS DE PERSONALIDADE (PRIORIDADE ALTA) ===\n${personalityContext}\n\n=== MEMÓRIAS E CONTEXTO ===\n${combinedContext}`;
 
+        // IMPORTANT: Assign ragContext so ECOA follow-up calls don't lose context
+        ragContext = ragResult || "";
+
     } catch (error: any) {
         logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
         ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";

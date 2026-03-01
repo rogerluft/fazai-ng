@@ -1,5 +1,10 @@
 # FazAI Changelog
 
+## [Unreleased]
+
+### 🔧 Fix: Watchdog configurável e seguro
+- **ResourceWatchdog**: Agora lê o limite de memória primeiramente de `FAZAI_WATCHDOG_MEM_MB` no `/etc/fazai/fazai.conf`, fazendo fallback para a variável de ambiente. Se nenhum dos dois for encontrado (ou o valor for inválido/NaN), ele assume um padrão seguro mínimo de 8192 MB (8GB). Testes unitários também foram ajustados para não dependerem do valor padrão da classe, mas sim configurar e restaurar as variáveis explicitamente.
+
 ## [3.18.0] - 2026-02-28
 
 ### 🚀 feat: Pipeline inteligente com Agent SDK + RAG + GPTCache (qdrant-fazai-injector)

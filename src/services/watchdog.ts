@@ -1,5 +1,6 @@
 import { readFile } from "fs/promises";
 import { logger } from "../logger";
+import { getConfigValue } from "../config";
 
 /**
  * Watchdog Service
@@ -7,8 +8,15 @@ import { logger } from "../logger";
  */
 export class ResourceWatchdog {
   private timer: NodeJS.Timeout | null = null;
-  private readonly MAX_MEM_MB = parseInt(process.env.FAZAI_WATCHDOG_MEM_MB || "204800", 10); // Default 200GB for high RAM capacity
+  private readonly MAX_MEM_MB: number;
   private readonly CHECK_INTERVAL_MS = 2000;
+
+  constructor() {
+    const configValue = getConfigValue("FAZAI_WATCHDOG_MEM_MB");
+    const envValue = process.env.FAZAI_WATCHDOG_MEM_MB;
+    const parsedValue = parseInt(configValue || envValue || "8192", 10);
+    this.MAX_MEM_MB = isNaN(parsedValue) ? 8192 : parsedValue; // Default 8GB minimum safe limit
+  }
 
   start(pid: number) {
     logger.debug(`🐕 Watchdog started for PID ${pid} (Limit: ${this.MAX_MEM_MB}MB)`);
