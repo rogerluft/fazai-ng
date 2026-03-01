@@ -129,9 +129,9 @@ export class SemanticCache {
 
   // Configuration
   private readonly DEFAULT_SIMILARITY_THRESHOLD = 0.90;
-  private readonly DEFAULT_TTL = 60 * 60 * 1000; // 1 hour
-  private readonly MAX_CACHE_SIZE = 500; // Max entries
-  private readonly CLEANUP_INTERVAL = 10 * 60 * 1000; // 10 minutes
+  private readonly DEFAULT_TTL = 7 * 24 * 60 * 60 * 1000; // 7 days (leveraging high RAM)
+  private readonly MAX_CACHE_SIZE = 500000; // 500k entries (~10-20GB depending on response sizes)
+  private readonly CLEANUP_INTERVAL = 60 * 60 * 1000; // 1 hour
 
   // Metrics
   private metrics = {

@@ -7,7 +7,7 @@ import { logger } from "../logger";
  */
 export class ResourceWatchdog {
   private timer: NodeJS.Timeout | null = null;
-  private readonly MAX_MEM_MB = parseInt(process.env.FAZAI_WATCHDOG_MEM_MB || "1024", 10);
+  private readonly MAX_MEM_MB = parseInt(process.env.FAZAI_WATCHDOG_MEM_MB || "204800", 10); // Default 200GB for high RAM capacity
   private readonly CHECK_INTERVAL_MS = 2000;
 
   start(pid: number) {

@@ -46,8 +46,8 @@ describe('ResourceWatchdog', () => {
 
   it('should kill process if memory exceeds limit', async () => {
     const pid = 1234;
-    // Limit is 1024MB by default
-    vi.mocked(fsPromises.readFile).mockResolvedValue('VmRSS: 1572864 kB\n'); // 1536 MB
+    // Limit is 204800MB by default
+    vi.mocked(fsPromises.readFile).mockResolvedValue('VmRSS: 314572800 kB\n'); // ~300GB
 
     const killSpy = vi.spyOn(process, 'kill').mockImplementation(() => true as any);
     const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => undefined as any);

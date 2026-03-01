@@ -372,9 +372,52 @@ export async function* askAI(
   isGeneralQuestion: boolean = false,
   semanticSearchEnabled: boolean = true
 ): AsyncGenerator<string, void, undefined> {
-  const prompt = isGeneralQuestion ? generalAskPrompt(question) : askPrompt(question);
+  // First, calculate the system/RAG context so we can inject it into the prompt itself.
+  let systemMessage: string = "";
+  let ragContext: string = "";
+  let injectedPromptContext: string = "";
 
-  // Try semantic cache first
+  if (isGeneralQuestion) {
+    try {
+        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
+        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
+
+        const [personality, memories, ragResult] = await Promise.all([
+            loadPersonalityFromQdrant(),
+            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
+            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
+        ]);
+
+        const personalityContext = buildPersonalitySystemPrompt(personality);
+        const memoriesContext = summarizeMemories(memories);
+
+        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
+
+        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
+        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
+
+        // Also prepare the injected context for the user prompt
+        injectedPromptContext = `=== REGRAS DE PERSONALIDADE (PRIORIDADE ALTA) ===\n${personalityContext}\n\n=== MEMÓRIAS E CONTEXTO ===\n${combinedContext}`;
+
+    } catch (error: any) {
+        logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
+        ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+        systemMessage = SYSTEM_MESSAGES.general(fileContent, ragContext);
+        injectedPromptContext = `=== CONTEXTO ADICIONAL ===\n${ragContext}`;
+    }
+  } else {
+      ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
+      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
+      injectedPromptContext = `=== CONTEXTO TÉCNICO ===\n${ragContext}`;
+  }
+
+  // Inject the gathered context explicitly inside the final user prompt.
+  // This guarantees the AI adheres to the rules even if it ignores the system message.
+  const prompt = isGeneralQuestion
+    ? generalAskPrompt(question, injectedPromptContext)
+    : askPrompt(question, injectedPromptContext);
+
+  // Try semantic cache first (GPTCache concept)
   if (semanticSearchEnabled) {
     try {
       const cache = await SemanticCache.getInstance();
@@ -388,43 +431,6 @@ export async function* askAI(
     } catch (error: any) {
       logger.debug(`Cache lookup failed: ${error.message}`);
     }
-  }
-
-  // NEW: Comprehensive context enrichment
-  let systemMessage: string;
-  let ragContext: string = "";
-
-  if (isGeneralQuestion) {
-    try {
-        const { loadPersonalityFromQdrant, buildPersonalitySystemPrompt } = await import("./services/personality-loader");
-        const { loadRelevantMemories, summarizeMemories } = await import("./services/memory-loader");
-
-        // Parallelize context fetching
-        const [personality, memories, ragResult] = await Promise.all([
-            loadPersonalityFromQdrant(),
-            loadRelevantMemories(question, { limit: 5, minScore: 0.5 }),
-            semanticSearchEnabled ? enrichWithRAG(question) : Promise.resolve(""),
-        ]);
-
-        const personalityContext = buildPersonalitySystemPrompt(personality);
-        const memoriesContext = summarizeMemories(memories);
-
-        logger.info(`✨ Context enriched: ${memories.length} memories, ${ragResult ? (ragResult.match(/\n/g) || []).length + 1 : 0} RAG items`);
-
-        // Combine memory and RAG context
-        const combinedContext = [memoriesContext, ragResult].filter(Boolean).join("\n\n");
-
-        systemMessage = SYSTEM_MESSAGES.general(personalityContext, combinedContext);
-
-    } catch (error: any) {
-        logger.warn(`Context enrichment failed: ${error.message}. Continuing without personality/memory context.`);
-        const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
-        systemMessage = SYSTEM_MESSAGES.general(fileContent, ragContext); // Fallback to original behavior
-    }
-  } else {
-      // For code analysis, keep it simple but include RAG
-      const ragContext = semanticSearchEnabled ? await enrichWithRAG(question) : "";
-      systemMessage = SYSTEM_MESSAGES.codeAnalysis(fileContent, "", ragContext);
   }
 
   let currentProvider: ProviderName = provider as ProviderName;
