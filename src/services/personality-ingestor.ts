@@ -170,6 +170,7 @@ const BATCH_SIZE = 50; // Inserir em lotes para melhor performance
  */
 export class PersonalityIngestor {
   private stats: IngestionStats;
+  private existingHashes: Set<string> = new Set();
 
   constructor() {
     this.stats = {
@@ -184,6 +185,41 @@ export class PersonalityIngestor {
   }
 
   /**
+   * Inicializa o set de hashes existentes no banco para deduplicação
+   */
+  private async loadExistingHashes(): Promise<void> {
+    try {
+      const client = await getQdrantClient();
+      logger.info("🔍 Loading existing hashes for deduplication...");
+
+      let offset: string | number | undefined = undefined;
+      let hasNextPage = true;
+
+      while (hasNextPage) {
+        const scrollResult = await client.scroll(COLLECTION_NAME, {
+          limit: 10000,
+          offset,
+          with_payload: ["content_hash"],
+        });
+
+        for (const point of scrollResult.points) {
+          if (point.payload && typeof point.payload.content_hash === "string") {
+            this.existingHashes.add(point.payload.content_hash);
+          }
+        }
+
+        offset = scrollResult.next_page_offset;
+        hasNextPage = offset !== null && offset !== undefined;
+      }
+
+      logger.info(`✅ Loaded ${this.existingHashes.size} existing hashes`);
+    } catch (error) {
+      // Coleção ainda não existe ou vazia
+      logger.debug("No existing hashes found (new collection?)");
+    }
+  }
+
+  /**
    * Ingere todos os 4 arquivos JSON de um diretório
    */
   async ingestAll(dataDir: string): Promise<IngestionStats> {
@@ -191,6 +227,9 @@ export class PersonalityIngestor {
     this.stats.startTime = new Date();
 
     try {
+      // Carregar hashes para deduplicação antes de inserir novos
+      await this.loadExistingHashes();
+
       // Processar em paralelo (arquivos independentes)
       await Promise.all([
         this.ingestConversations(`${dataDir}/conversations.json`),
@@ -233,6 +272,12 @@ export class PersonalityIngestor {
 
           for (const pair of pairs) {
             const contentHash = hashText(pair.text);
+            if (this.existingHashes.has(contentHash)) {
+              continue; // Ignorar chunk duplicado
+            }
+
+            this.existingHashes.add(contentHash);
+
             chunks.push({
               id: randomUUID(),
               text: pair.text,
@@ -358,52 +403,58 @@ export class PersonalityIngestor {
           // Conversations memory
           if (memoryObj.conversations_memory) {
             const contentHash = hashText(memoryObj.conversations_memory);
-            chunks.push({
-              id: randomUUID(),
-              text: memoryObj.conversations_memory,
-              embedding: [],
-              payload: {
-                type: "fact",
-                source_file: "memories.json",
-                ingestion_version: INGESTION_VERSION,
-                ingested_at: new Date().toISOString(),
-                context: "memory",
-                importance: 1.0,
-                content_hash: contentHash,
-                metadata: {
-                  memory_type: "conversations",
-                  account_uuid: memoryObj.account_uuid,
-                },
-              },
-            });
-            this.stats.memories.chunks++;
-          }
-
-          // Project memories
-          if (memoryObj.project_memories) {
-            for (const [projectUuid, memoryText] of Object.entries(memoryObj.project_memories)) {
-              const contentHash = hashText(memoryText);
+            if (!this.existingHashes.has(contentHash)) {
+              this.existingHashes.add(contentHash);
               chunks.push({
                 id: randomUUID(),
-                text: memoryText,
+                text: memoryObj.conversations_memory,
                 embedding: [],
                 payload: {
                   type: "fact",
                   source_file: "memories.json",
-                  source_uuid: projectUuid,
                   ingestion_version: INGESTION_VERSION,
                   ingested_at: new Date().toISOString(),
                   context: "memory",
                   importance: 1.0,
                   content_hash: contentHash,
                   metadata: {
-                    memory_type: "project",
-                    project_uuid: projectUuid,
+                    memory_type: "conversations",
                     account_uuid: memoryObj.account_uuid,
                   },
                 },
               });
               this.stats.memories.chunks++;
+            }
+          }
+
+          // Project memories
+          if (memoryObj.project_memories) {
+            for (const [projectUuid, memoryText] of Object.entries(memoryObj.project_memories)) {
+              const contentHash = hashText(memoryText);
+              if (!this.existingHashes.has(contentHash)) {
+                this.existingHashes.add(contentHash);
+                chunks.push({
+                  id: randomUUID(),
+                  text: memoryText,
+                  embedding: [],
+                  payload: {
+                    type: "fact",
+                    source_file: "memories.json",
+                    source_uuid: projectUuid,
+                    ingestion_version: INGESTION_VERSION,
+                    ingested_at: new Date().toISOString(),
+                    context: "memory",
+                    importance: 1.0,
+                    content_hash: contentHash,
+                    metadata: {
+                      memory_type: "project",
+                      project_uuid: projectUuid,
+                      account_uuid: memoryObj.account_uuid,
+                    },
+                  },
+                });
+                this.stats.memories.chunks++;
+              }
             }
           }
         } catch (error: unknown) {
@@ -442,55 +493,62 @@ export class PersonalityIngestor {
           const projectText = `Project: ${proj.name}\n\nDescription: ${proj.description}`;
           const contentHash = hashText(projectText);
 
-          chunks.push({
-            id: randomUUID(),
-            text: projectText,
-            embedding: [],
-            payload: {
-              type: "technical_context",
-              source_file: "projects.json",
-              source_uuid: proj.uuid,
-              created_at: proj.created_at,
-              ingestion_version: INGESTION_VERSION,
-              ingested_at: new Date().toISOString(),
-              project: "fazai",
-              content_hash: contentHash,
-              metadata: {
-                project_name: proj.name,
-                is_private: proj.is_private,
-                creator_name: proj.creator.full_name,
-                creator_uuid: proj.creator.uuid,
+          if (!this.existingHashes.has(contentHash)) {
+            this.existingHashes.add(contentHash);
+            chunks.push({
+              id: randomUUID(),
+              text: projectText,
+              embedding: [],
+              payload: {
+                type: "technical_context",
+                source_file: "projects.json",
+                source_uuid: proj.uuid,
+                created_at: proj.created_at,
+                ingestion_version: INGESTION_VERSION,
+                ingested_at: new Date().toISOString(),
+                project: "fazai",
+                content_hash: contentHash,
+                metadata: {
+                  project_name: proj.name,
+                  is_private: proj.is_private,
+                  creator_name: proj.creator.full_name,
+                  creator_uuid: proj.creator.uuid,
+                },
               },
-            },
-          });
-          this.stats.projects.chunks++;
+            });
+            this.stats.projects.chunks++;
+          }
 
           // Project docs (se existir)
           if (proj.docs && proj.docs.length > 0) {
             for (const doc of proj.docs) {
               const docText = `Document: ${doc.filename}\n\n${doc.content}`;
               const docHash = hashText(docText);
-              chunks.push({
-                id: randomUUID(),
-                text: docText,
-                embedding: [],
-                payload: {
-                  type: "technical_context",
-                  source_file: "projects.json",
-                  source_uuid: doc.uuid,
-                  created_at: doc.created_at,
-                  ingestion_version: INGESTION_VERSION,
-                  ingested_at: new Date().toISOString(),
-                  project: "fazai",
-                  content_hash: docHash,
-                  metadata: {
-                    project_uuid: proj.uuid,
-                    project_name: proj.name,
-                    document_filename: doc.filename,
+
+              if (!this.existingHashes.has(docHash)) {
+                this.existingHashes.add(docHash);
+                chunks.push({
+                  id: randomUUID(),
+                  text: docText,
+                  embedding: [],
+                  payload: {
+                    type: "technical_context",
+                    source_file: "projects.json",
+                    source_uuid: doc.uuid,
+                    created_at: doc.created_at,
+                    ingestion_version: INGESTION_VERSION,
+                    ingested_at: new Date().toISOString(),
+                    project: "fazai",
+                    content_hash: docHash,
+                    metadata: {
+                      project_uuid: proj.uuid,
+                      project_name: proj.name,
+                      document_filename: doc.filename,
+                    },
                   },
-                },
-              });
-              this.stats.projects.chunks++;
+                });
+                this.stats.projects.chunks++;
+              }
             }
           }
         } catch (error: unknown) {
@@ -530,26 +588,29 @@ export class PersonalityIngestor {
           }`;
           const contentHash = hashText(userText);
 
-          chunks.push({
-            id: randomUUID(),
-            text: userText,
-            embedding: [],
-            payload: {
-              type: "social_context",
-              source_file: "users.json",
-              source_uuid: user.uuid,
-              ingestion_version: INGESTION_VERSION,
-              ingested_at: new Date().toISOString(),
-              relation: true,
-              content_hash: contentHash,
-              metadata: {
-                full_name: user.full_name,
-                email_address: user.email_address,
-                verified_phone: user.verified_phone_number,
+          if (!this.existingHashes.has(contentHash)) {
+            this.existingHashes.add(contentHash);
+            chunks.push({
+              id: randomUUID(),
+              text: userText,
+              embedding: [],
+              payload: {
+                type: "social_context",
+                source_file: "users.json",
+                source_uuid: user.uuid,
+                ingestion_version: INGESTION_VERSION,
+                ingested_at: new Date().toISOString(),
+                relation: true,
+                content_hash: contentHash,
+                metadata: {
+                  full_name: user.full_name,
+                  email_address: user.email_address,
+                  verified_phone: user.verified_phone_number,
+                },
               },
-            },
-          });
-          this.stats.users.chunks++;
+            });
+            this.stats.users.chunks++;
+          }
         } catch (error: unknown) {
           const err = error instanceof Error ? error : new Error(String(error));
           logger.warn(`Failed to process user ${user.uuid}: ${err.message}`);

@@ -281,3 +281,45 @@ function chunkFile(content: string, type: "code" | "doc"): string[] {
   const config = type === "code" ? CODE_CHUNKING : DOC_CHUNKING;
   return semanticChunk(content, config);
 }
+
+/**
+ * Perform a semantic search on the indexed source code.
+ */
+export async function searchSourceIndex(query: string, limit = 5): Promise<void> {
+  const chalk = (await import("chalk")).default;
+  logger.info(`🔍 Searching source index for: "${query}"...`);
+
+  try {
+    const qdrant = await getQdrantClient();
+    const embedService = await createEmbeddingService();
+    const embedding = await embedService.generate(query);
+
+    const results = await qdrant.search("fazai_source", {
+      vector: embedding,
+      limit,
+      with_payload: true,
+    });
+
+    if (results.length === 0) {
+      console.log(chalk.yellow("\nNenhum resultado encontrado no código-fonte."));
+      return;
+    }
+
+    console.log(chalk.bold.cyan(`\nResultados encontrados na collection fazai_source:\n`));
+
+    for (const result of results) {
+      const payload = result.payload as any;
+      const score = (result.score * 100).toFixed(1);
+
+      const file = payload?.path || "Unknown file";
+      const category = payload?.category || "unknown";
+      const snippet = (payload?.content || "").replace(/\n/g, " ").substring(0, 150);
+
+      console.log(`${chalk.green(`[${score}%]`)} ${chalk.bold.yellow(file)} ${chalk.gray(`(${category})`)}`);
+      console.log(`  ${snippet}...`);
+      console.log("");
+    }
+  } catch (err: any) {
+    logger.error(`❌ Search failed: ${err.message}`);
+  }
+}

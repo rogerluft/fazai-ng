@@ -226,13 +226,12 @@ export const EMBEDDING_STRATEGIES: Record<CollectionType, EmbeddingStrategy> = {
   },
   inference: {
     collection: "fazai_inference",
-    model: "BGE-base-en-v1.5", // Unused but required for interface
-    dimension: 0, // No embeddings needed
+    model: "BGE-base-en-v1.5",
+    dimension: 768, // BGE-base-en-v1.5 native
     chunking: CHUNKING_STRATEGIES.inference,
-    distanceMetric: "Dot", // Unused
+    distanceMetric: "Cosine", // Good for conversational similarity and docs
     preprocess: PREPROCESSING_FUNCTIONS.inference,
-    requiresEmbedding: false,
-    // NOTE: Should migrate to payload-only collection or PostgreSQL
+    requiresEmbedding: true,
   },
 };
 

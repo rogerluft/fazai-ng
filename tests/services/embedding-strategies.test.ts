@@ -192,7 +192,7 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("personality");
 
       expect(strategy.collection).toBe("fazai_personality");
-      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.model).toBe("BGE-base-en-v1.5");
       expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
@@ -203,7 +203,7 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("memory");
 
       expect(strategy.collection).toBe("fazai_memory");
-      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.model).toBe("BGE-base-en-v1.5");
       expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
@@ -214,7 +214,7 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("kb");
 
       expect(strategy.collection).toBe("fazai_kb");
-      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.model).toBe("BGE-base-en-v1.5");
       expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Cosine");
       expect(strategy.requiresEmbedding).toBe(true);
@@ -225,7 +225,7 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("learning");
 
       expect(strategy.collection).toBe("fazai_learning");
-      expect(strategy.model).toBe("nomic-embed-text");
+      expect(strategy.model).toBe("BGE-base-en-v1.5");
       expect(strategy.dimension).toBe(768);
       expect(strategy.distanceMetric).toBe("Dot");
       expect(strategy.requiresEmbedding).toBe(true);
@@ -236,9 +236,10 @@ describe("Embedding Strategies", () => {
       const strategy = getEmbeddingStrategy("inference");
 
       expect(strategy.collection).toBe("fazai_inference");
-      expect(strategy.model).toBe("nomic-embed-text"); // Unused but present
-      expect(strategy.dimension).toBe(0);
-      expect(strategy.requiresEmbedding).toBe(false);
+      expect(strategy.model).toBe("BGE-base-en-v1.5");
+      expect(strategy.dimension).toBe(768);
+      expect(strategy.distanceMetric).toBe("Cosine");
+      expect(strategy.requiresEmbedding).toBe(true);
       expect(strategy.chunking.maxChunkSize).toBe(0);
     });
 
