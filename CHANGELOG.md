@@ -1,5 +1,54 @@
 # FazAI Changelog
 
+## [3.14.9] - 2026-03-01
+
+### 🔧 fix(logger): corrige caminho do arquivo de log e adiciona log de debug separado
+
+O caminho padrão do arquivo de log estava fora do diretório permitido pela unit systemd (`ReadWritePaths=/var/log/fazai`), causando falha silenciosa de escrita em ambientes com hardening (`ProtectSystem=strict`).
+
+#### Mudanças
+
+- **Caminho corrigido**: `defaultLogPath` alterado de `/var/log/fazai.log` → `/var/log/fazai/fazai.log`, dentro do diretório configurado no `ReadWritePaths` da unit systemd.
+- **Arquivo de debug separado**: Adicionado stream exclusivo para logs de nível `debug` em `/var/log/fazai/fazai-debug.log` (fallback: `fazai-debug.log` no diretório de trabalho). Entradas `[DEBUG]` são gravadas neste arquivo independentemente do nível de log configurado para o console, já que a escrita em arquivo ocorre antes do filtro de nível.
+
+---
+
+### 🐛 fix(circuit-breaker): corrige flag `halfOpenTestInProgress` travada após transição HALF_OPEN → CLOSED
+
+A flag `halfOpenTestInProgress` ficava presa como `true` para sempre após uma operação de teste bem-sucedida no estado HALF_OPEN, bloqueando todos os testes futuros nesse estado.
+
+#### Problema
+
+O bloco `finally` só resetava a flag quando `this.state === CircuitState.HALF_OPEN`. Porém, `onSuccess()` transiciona o estado para `CLOSED` **antes** do `finally` executar — fazendo com que a condição nunca fosse verdadeira no caminho de sucesso.
+
+```
+HALF_OPEN → operação bem-sucedida → onSuccess() seta state = CLOSED
+→ finally: state === HALF_OPEN? NÃO → flag permanece true
+→ próxima chamada em HALF_OPEN: halfOpenTestInProgress === true → rejeita imediatamente
+```
+
+#### Solução
+
+O reset da flag agora é incondicional: verifica apenas se `halfOpenTestInProgress` é `true`, sem depender do estado atual do circuito.
+
+```typescript
+// Antes — flag nunca limpa após teste HALF_OPEN bem-sucedido
+} finally {
+  if (this.state === CircuitState.HALF_OPEN) {
+    this.halfOpenTestInProgress = false;
+  }
+}
+
+// Depois — reset incondicional
+} finally {
+  if (this.halfOpenTestInProgress) {
+    this.halfOpenTestInProgress = false;
+  }
+}
+```
+
+---
+
 ## [3.18.0] - 2026-02-28
 
 ### 🚀 feat: Pipeline inteligente com Agent SDK + RAG + GPTCache (qdrant-fazai-injector)
