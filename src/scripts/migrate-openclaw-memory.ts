@@ -66,13 +66,22 @@ async function migrate() {
       const vector = await embedder.embed(row.text);
 
       const payload = {
+        // Campos requeridos pelo FazAI Memory Loader
+        content: row.text,
+        timestamp: new Date(row.updated_at).toISOString(),
+        role: 'user', // Default genérico para memórias de migração
+        sessionId: 'migrated-memory',
+        tags: ['migration'],
+
+        // Campos originais para rastreabilidade
         openclaw_id: row.id,
-        path: row.path,
-        source: row.source,
-        start_line: row.start_line,
-        end_line: row.end_line,
-        text: row.text,
-        updated_at: row.updated_at,
+        openclaw_path: row.path,
+        openclaw_source: row.source,
+        openclaw_start_line: row.start_line,
+        openclaw_end_line: row.end_line,
+        openclaw_text: row.text,
+        openclaw_updated_at: row.updated_at,
+
         migrated_at: Date.now(),
         type: 'openclaw_migration'
       };

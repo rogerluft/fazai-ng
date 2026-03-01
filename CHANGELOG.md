@@ -1,5 +1,23 @@
 # FazAI Changelog
 
+## [3.19.0] - 2026-03-01
+
+### 🚀 feat: Integração de memória, daemon mode e pre-injection bridge
+
+Adicionadas ferramentas avançadas para manter o Fazai ativo continuamente e expor sua arquitetura de memória (Qdrant) para clientes e interfaces externas, consolidando-o como um motor agêntico híbrido e autônomo.
+
+#### Novidades
+* **Daemon Mode (`fazai daemon`)**: Novo comando que inicializa um servidor HTTP/WS persistente em background. Isso permite que agentes remotos, UIs externas e plugins enviem e recebam dados via WebSocket.
+* **Instalação Systemd (`fazai install-daemon`)**: Utilitário que gera e ativa o daemon do Fazai automaticamente no `systemd` do Linux, garantindo inicialização no boot.
+* **Memory Bridge Plugin (`fazai-memory-bridge`)**: Plugin externo desenhado para interceptar e redirecionar buscas nativas de memória de sistemas cliente para a nossa engine local vetorial no Qdrant, utilizando nossa técnica de pré-injeção ao invés de manipulação bruta de prompts.
+* **Migração de Memória (`fazai migrate-openclaw`)**: Script para extrair e migrar blocos de memória baseados em SQLite para a infraestrutura do Fazai (collection `fazai_memory`), re-processando todos os textos com embeddings ONNX 768d e adicionando metadados de RAG (`role`, `sessionId`, `timestamp`).
+* **Busca via CLI (`fazai memory search`)**: Adicionado subcomando para buscar e ler memórias semânticas de forma programática.
+
+#### Correções
+* **ESM Compatibility**: Resolvido crash crítico causado pela ausência do `require` na verificação de versão (`fazai --version`), adaptando para `fs.readFileSync` no ambiente Node 18.
+* **Resiliência do Daemon**: Adicionado bloco `try...catch` no resolvedor de caminhos (`which fazai`) para prevenir falhas de inicialização em sistemas não padronizados.
+* **Limpeza de Código**: Removidas variáveis não utilizadas para manter compatibilidade com as regras de qualidade do projeto.
+
 ## [3.18.0] - 2026-02-28
 
 ### 🚀 feat: Pipeline inteligente com Agent SDK + RAG + GPTCache (qdrant-fazai-injector)

@@ -9,7 +9,6 @@ export async function handleInstallDaemonCommand(args: string[]) {
 
   // Caminho do executável global do fazai (se instalado via npm install -g fazai)
   // ou fallback para o binário atual executando
-  const execPath = process.execPath;
   let fazaiBin = '';
   try {
     fazaiBin = execSync('which fazai', { stdio: 'pipe' }).toString().trim();

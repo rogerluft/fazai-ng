@@ -335,8 +335,14 @@ async function main() {
 
   // Handle Version command immediately before any async model logic
   if (inputs.includes("--version") || inputs.includes("-v")) {
-    const pkg = await import("../package.json", { with: { type: "json" } });
-    console.log(`FazAI v${pkg.default.version}`);
+    const fs = await import("fs");
+    const path = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = path.dirname(__filename);
+    const pkgPath = path.join(__dirname, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    console.log(`FazAI v${pkg.version}`);
     process.exit(0);
   }
 
