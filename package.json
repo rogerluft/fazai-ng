@@ -92,7 +92,7 @@
     "tsup": "^8.5.1",
     "tsx": "^4.0.0",
     "typescript": "^5.5.3",
-    "vitest": "^4.0.15"
+    "vitest": "^4.0.18"
   },
   "lint-staged": {
     "*.{ts,tsx}": "echo 'TypeScript files staged for commit'"
