@@ -15,6 +15,13 @@
  */
 
 /**
+ * Function to remove accents from strings for matching against stopwords
+ */
+function removeDiacritics(str: string): string {
+  return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+/**
  * Portuguese stopwords to remove during normalization
  * Includes: articles, prepositions, conjunctions, common pronouns
  */
@@ -53,7 +60,7 @@ const PT_STOPWORDS = new Set([
   "posso", "pode", "poder",
   "quero", "quer", "querer",
   "preciso", "precisa", "precisar",
-]);
+].map(removeDiacritics));
 
 /**
  * Normalize query for semantic cache lookup
@@ -85,10 +92,13 @@ export function normalizeQuery(query: string): string {
   let normalized = query
     // Step 1: Lowercase
     .toLowerCase()
-    // Step 2: Trim
+    // Step 2: Remove accents/diacritics for robust matching
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    // Step 3: Trim
     .trim();
 
-  // Step 3: Remove duplicate punctuation (!!! → !, ??? → ?, ... → .)
+  // Step 4: Remove duplicate punctuation (!!! → !, ??? → ?, ... → .)
   normalized = normalized
     .replace(/!+/g, "!")
     .replace(/\?+/g, "?")
@@ -96,7 +106,7 @@ export function normalizeQuery(query: string): string {
     .replace(/,+/g, ",")
     .replace(/-+/g, "-");
 
-  // Step 4: Remove stopwords
+  // Step 5: Remove stopwords
   // Split by word boundaries, filter stopwords, rejoin
   const words = normalized
     .split(/\s+/)
@@ -114,9 +124,9 @@ export function normalizeQuery(query: string): string {
       return !PT_STOPWORDS.has(cleanWord);
     })
     // Remove punctuation from individual words for cleaner cache keys
-    .map((word) => word.replace(/[^\wáàâãéèêíìîóòôõúùûç-]/gi, ""));
+    .map((word) => word.replace(/[^\w-]/gi, ""));
 
-  // Step 5: Join with single spaces
+  // Step 6: Join with single spaces
   normalized = words.join(" ");
 
   // Final cleanup: remove any remaining multiple spaces

@@ -64,7 +64,7 @@ describe("normalizeQuery", () => {
     it("should remove Portuguese prepositions", () => {
       expect(normalizeQuery("backup do servidor")).toBe("backup servidor");
       expect(normalizeQuery("conectar na rede")).toBe("conectar rede");
-      expect(normalizeQuery("script para automação")).toBe("script automação");
+      expect(normalizeQuery("script para automação")).toBe("script automacao");
     });
 
     it("should remove common verbs/auxiliaries", () => {
@@ -100,7 +100,7 @@ describe("normalizeQuery", () => {
 
     it("should normalize complex query 4", () => {
       const input = "Me explica como que eu crio um script para automação?";
-      const expected = "explica crio script automação";
+      const expected = "explica crio script automacao";
       expect(normalizeQuery(input)).toBe(expected);
     });
 
@@ -134,7 +134,7 @@ describe("normalizeQuery", () => {
     });
 
     it("should handle accented characters", () => {
-      expect(normalizeQuery("configuração do serviço")).toBe("configuração serviço");
+      expect(normalizeQuery("configuração do serviço")).toBe("configuracao servico");
     });
   });
 });
