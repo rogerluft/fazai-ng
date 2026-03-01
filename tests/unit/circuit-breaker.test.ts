@@ -143,10 +143,28 @@ describe("CircuitBreaker", () => {
     expect(breaker.getState()).toBe(CircuitState.OPEN);
   });
 
-  // TODO: Teste 6 removido - problema com fake timers e async rejection
-  // Precisa ser reescrito com abordagem diferente para testar timeout
+  it("6. Deve falhar com CircuitBreakerTimeoutError após o operationTimeout", async () => {
+    // A test operation that takes longer than operationTimeout
+    const slowOperation = () => new Promise<string>((resolve) => {
+      setTimeout(() => resolve("Too late"), defaultConfig.operationTimeout + 100);
+    });
 
-  it("6. O reset manual deve funcionar e fechar o circuito", async () => {
+    const promise = breaker.execute(slowOperation);
+
+    // Advance timers so the timeout is triggered
+    vi.advanceTimersByTime(defaultConfig.operationTimeout + 10);
+
+    // allow microtasks to flush
+    await Promise.resolve();
+
+    await expect(promise).rejects.toThrow(CircuitBreakerTimeoutError);
+
+    // Ensure metrics account for the timeout as a failure
+    expect(breaker.getMetrics().consecutiveFailures).toBe(1);
+    expect(breaker.getMetrics().totalFailures).toBe(1);
+  });
+
+  it("7. O reset manual deve funcionar e fechar o circuito", async () => {
     const failureError = new Error("Operation failed");
     mockOperation.mockRejectedValue(failureError);
 
