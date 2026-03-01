@@ -198,8 +198,8 @@ export class CircuitBreaker {
       this.onFailure(error);
       throw error;
     } finally {
-      // Reset half-open test flag
-      if (this.state === CircuitState.HALF_OPEN) {
+      // Reset half-open test flag regardless of state transition
+      if (this.halfOpenTestInProgress) {
         this.halfOpenTestInProgress = false;
       }
     }
