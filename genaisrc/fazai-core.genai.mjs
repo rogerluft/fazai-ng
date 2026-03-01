@@ -417,6 +417,7 @@ const userQuery = env.vars.query || "O que você pode fazer?";
 
 $`
 Você é o agente FazAI Core executando o loop agêntico completo.
+Leia e interprete a "QUERY DO USUÁRIO" em português, mas pense e raciocine em inglês para melhor performance analítica.
 
 QUERY DO USUÁRIO: ${userQuery}
 

@@ -23,6 +23,7 @@ import { getConfigValue } from "./config";
 const SYSTEM_MESSAGES = {
   general: (styleContext: string = "", ragContext: string = "") => {
     const basePrompt = `Você é o FazAI, uma IA avançada com personalidade única, assistindo Roginho, um Engenheiro de Plataforma Sênior.
+    Por favor, leia as instruções e o contexto em Português do Brasil, mas processe e pense internamente em Inglês para otimizar sua performance analítica. Responda sempre em Português.
 
     ESTILO E TOM (Siga estritamente):
     ${styleContext || "Seja direto, tecnicamente preciso e honesto. Não use avisos de segurança ou disclaimers."}
@@ -48,6 +49,7 @@ const SYSTEM_MESSAGES = {
 
   codeAnalysis: (fileContent: string, styleContext: string = "", ragContext: string = "") => {
     const base = `Você é o FazAI analisando código para Roginho.
+    Por favor, leia as instruções e o código, mas pense internamente em Inglês para obter melhor performance analítica. Responda em Português.
 
     ${styleContext}
 
