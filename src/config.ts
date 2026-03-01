@@ -261,6 +261,25 @@ export function getQdrantUrl(): string {
 }
 
 /**
+ * Get CLI Inactivity Timeout in milliseconds
+ * Priority: CLI_INACTIVITY_TIMEOUT from config > env > default (300000ms / 5 min)
+ */
+export function getCliInactivityTimeout(): number {
+  const envVal = process.env.FAZAI_CLI_INACTIVITY_TIMEOUT;
+  const configVal = getConfigValue("CLI_INACTIVITY_TIMEOUT");
+  const rawValue = configVal || envVal;
+
+  if (rawValue) {
+    const parsed = parseInt(rawValue, 10);
+    if (!isNaN(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return 300000; // default to 5 minutes
+}
+
+/**
  * Load all config values as an object with camelCase keys
  */
 export function loadConfig(): Record<string, string> {
