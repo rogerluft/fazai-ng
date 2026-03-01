@@ -315,7 +315,7 @@ async function validateQdrantCollections(options: QdrantValidationContext): Prom
 }
 
 function resolveQdrantUrl(explicit?: string): string {
-  const candidate = explicit ?? process.env.QDRANT_URL ?? getConfigValue("QDRANT_URL") ?? "http://localhost:6333";
+  const candidate = explicit ?? process.env.QDRANT_URL ?? getConfigValue("QDRANT_URL") ?? "http://home.rogeruft.com.br:3336";
   if (!candidate.startsWith("http://") && !candidate.startsWith("https://")) {
     return `http://${candidate}`;
   }

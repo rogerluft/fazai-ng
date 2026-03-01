@@ -256,7 +256,7 @@ export function getQdrantUrl(): string {
   return (
     getConfigValue("QDRANT_URL") ||
     process.env.QDRANT_URL ||
-    "http://127.0.0.1:6333"
+    "http://home.rogeruft.com.br:3336"
   );
 }
 

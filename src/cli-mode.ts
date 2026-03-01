@@ -282,10 +282,14 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
   const resetInactivityTimeout = () => {
       clearTimeout(inactivityTimeout);
-      inactivityTimeout = setTimeout(() => {
-          logger.info(chalk.yellow('\nInatividade detectada, encerrando a sessão.'));
-          rl.close();
-      }, 300000); // 5 minutes
+
+      // Only set timeout if running interactively
+      if (process.stdin.isTTY) {
+        inactivityTimeout = setTimeout(() => {
+            logger.info(chalk.yellow('\nInatividade detectada, encerrando a sessão.'));
+            rl.close();
+        }, 300000); // 5 minutes
+      }
   };
 
   resetInactivityTimeout();

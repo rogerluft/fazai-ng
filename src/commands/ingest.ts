@@ -365,7 +365,7 @@ async function undoLastIngest(): Promise<void> {
 
     // Nota: Qdrant não tem restore via SDK, precisa ser feito via API REST ou CLI
     console.log(chalk.yellow("\n⚠️  Para restaurar, execute manualmente:"));
-    console.log(chalk.gray(`  curl -X POST 'http://localhost:6333/collections/${COLLECTION_NAME}/snapshots/recover'`));
+    console.log(chalk.gray(`  curl -X POST 'http://home.rogeruft.com.br:3336/collections/${COLLECTION_NAME}/snapshots/recover'`));
     console.log(chalk.gray(`       -H 'Content-Type: application/json'`));
     console.log(chalk.gray(`       -d '{"location": "file:///path/to/${latestSnapshot.name}"}'`));
   } catch (error: unknown) {

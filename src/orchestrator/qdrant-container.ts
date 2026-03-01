@@ -449,7 +449,7 @@ export function followQdrantContainerLogs(
  */
 export async function healthCheckQdrant(): Promise<boolean> {
   try {
-    const url = getConfigValue("QDRANT_URL") || "http://localhost:6333";
+    const url = getConfigValue("QDRANT_URL") || "http://home.rogeruft.com.br:3336";
     const response = await fetch(`${url}/healthz`);
     return response.ok;
   } catch {

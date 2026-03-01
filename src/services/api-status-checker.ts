@@ -75,7 +75,7 @@ export async function checkAllAPIs(): Promise<APICheckResult[]> {
   const results: APICheckResult[] = [];
 
   // Qdrant
-  const qdrantUrl = getConfigValue("QDRANT_URL") || "http://localhost:6333";
+  const qdrantUrl = getConfigValue("QDRANT_URL") || "http://home.rogeruft.com.br:3336";
   results.push(await checkAPI("Qdrant", `${qdrantUrl}/health`));
 
   // Ollama

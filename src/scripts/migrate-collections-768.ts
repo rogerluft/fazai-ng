@@ -17,7 +17,7 @@ import chalk from "chalk";
 // Target dimension: BGE-base-en-v1.5 native (768d)
 const TARGET_DIMENSION = 768;
 
-const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
+const QDRANT_URL = process.env.QDRANT_URL || "http://home.rogeruft.com.br:3336";
 const BATCH_SIZE = 32;
 const UPSERT_BATCH_SIZE = 500;
 

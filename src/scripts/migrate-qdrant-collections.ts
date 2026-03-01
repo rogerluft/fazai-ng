@@ -33,7 +33,7 @@ import { createEmbeddingService } from "../services/embeddings-refactored";
 const QDRANT_URL =
   getConfigValue("QDRANT_URL") ||
   process.env.QDRANT_URL ||
-  "http://localhost:6333";
+  "http://home.rogeruft.com.br:3336";
 
 interface MigrationConfig {
   dryRun: boolean;

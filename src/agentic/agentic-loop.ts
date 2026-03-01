@@ -7,7 +7,7 @@
 import { QdrantClient } from "@qdrant/js-client-rest";
 import { createEmbeddingService } from "../services/embeddings.js";
 
-const QDRANT_URL = process.env.QDRANT_URL || "http://localhost:6333";
+const QDRANT_URL = process.env.QDRANT_URL || "http://home.rogeruft.com.br:3336";
 
 // Collections do FazAI
 const COLLECTIONS = {
