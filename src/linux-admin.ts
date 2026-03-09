@@ -2,7 +2,7 @@ import OpenAI from "openai";
 import { linuxAdminPrompt } from "./linux-prompt";
 import { LinuxCommandGenerator, LinuxCommand, LinuxCommandSchema } from "./types-linux";
 import { logger } from "./logger";
-import { getOllamaUrl } from "./config";
+import { getOllamaUrl, getConfigValue } from "./config";
 import { withRetry } from "./utils/retry";
 import { API_TIMEOUTS } from "./config/timeouts";
 import chalk from "chalk";
@@ -852,7 +852,7 @@ async function* getLinuxCommandsFromGemini(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY || getConfigValue("GOOGLE_API_KEY") || getConfigValue("GEMINI_API_KEY");
 
   if (!apiKey) {
     throw new Error("GOOGLE_API_KEY ou GEMINI_API_KEY não configurada. Configure no /etc/fazai/fazai.conf");

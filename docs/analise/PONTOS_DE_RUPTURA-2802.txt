@@ -1,0 +1,185 @@
+ANALISE TECNICA - PONTOS DE RUPTURA (2802)
+Escopo: circuit breaker + fluxo geral de execucao (DAG, fallback, pool, retries)
+Base: src/resilience/circuit-breaker.ts, src/database/qdrant-pool.ts, src/utils/provider-fallback.ts, src/agentic/dag-executor.ts
+
+============================================================
+1) FLUXO NATURAL ATUAL (LINGUAGEM NATURAL)
+============================================================
+1. Usuario envia tarefa.
+2. Sistema decompõe em subtarefas.
+3. DAG executa em ordem de dependencia.
+4. Cada subtask executa comando direto ou pede comandos para IA.
+5. Chamadas de IA usam retry/fallback por provider.
+6. Qdrant entra no fluxo para memoria, metricas e blocos de execucao.
+7. Se Qdrant falha repetidamente, circuit breaker abre e entra em fail-fast.
+
+Resumo: a arquitetura esta correta em intencao (fail-fast + fallback + aprendizagem), mas ha rupturas de estado e de observabilidade que geram falhas intermitentes difíceis de diagnosticar.
+
+============================================================
+2) PONTOS DE RUPTURA CRITICOS
+============================================================
+[R1] qdrant-pool: erro de concorrencia tratado como erro funcional
+Arquivo: src/database/qdrant-pool.ts
+Sintoma:
+- getClient() retorna erro "Qdrant initialization already in progress" quando ha concorrencia.
+Ruptura:
+- Chamadores podem tratar isso como indisponibilidade real e disparar fallback indevido.
+Impacto:
+- Ruido operacional, tentativas desnecessarias e aumento de latencia.
+
+[R2] health-check invalida client sem alimentar estado de resiliencia
+Arquivo: src/database/qdrant-pool.ts
+Sintoma:
+- Em falha no health check, client vira null e state='disconnected', mas sem passar no circuit breaker.
+Ruptura:
+- Estado do pool e estado do breaker podem divergir.
+Impacto:
+- Oscilacao entre tentativas sem diagnostico uniforme.
+
+[R3] timeout do breaker nao cancela operacao subjacente
+Arquivo: src/resilience/circuit-breaker.ts
+Sintoma:
+- executeWithTimeout rejeita por tempo, mas o operation() pode continuar rodando por baixo.
+Ruptura:
+- Trabalho fantasma, consumo de recurso e efeitos tardios.
+Impacto:
+- comportamento nao deterministico apos timeout.
+
+[R4] DAG sem detector explicito de ciclo/dependencia impossivel
+Arquivo: src/agentic/dag-executor.ts
+Sintoma:
+- Loop para quando nao ha progresso (hasChanges=false), mas nao emite diagnostico formal de ciclo/dependencia quebrada.
+Ruptura:
+- Retorno final pode ser "failed" sem causa estrutural clara.
+Impacto:
+- baixa rastreabilidade do erro de orquestracao.
+
+[R5] instalacao falha e fluxo segue sem classificacao de severidade
+Arquivo: src/agentic/dag-executor.ts
+Sintoma:
+- installResult falha e sistema "tenta continuar" sempre.
+Ruptura:
+- Falhas nao opcionais podem virar efeito cascata.
+Impacto:
+- erros tardios mais caros de debugar.
+
+[R6] falha ao salvar bloco ECOA e silenciosamente degradada
+Arquivo: src/agentic/dag-executor.ts
+Sintoma:
+- saveExecutionBlock falha e apenas debug log.
+Ruptura:
+- perda de aprendizado sem alarme funcional.
+Impacto:
+- regressao invisivel de capacidade evolutiva.
+
+============================================================
+3) FLUXO ASCII - ATUAL (COM RUPTURAS)
+============================================================
+[USER TASK]
+    |
+    v
+[DECOMPOSE]
+    |
+    v
+[DAG EXECUTOR] --(deps faltantes/ciclo?)--> [PARA SEM DIAGNOSTICO FORTE]   <-- R4
+    |
+    +--> [INSTALL STEP] --(falha)--> [CONTINUA SEM POLITICA]                 <-- R5
+    |
+    +--> [RUN COMMAND / AI]
+             |
+             v
+      [PROVIDER RETRY/FALLBACK]
+             |
+             v
+        [QDRANT POOL]
+             |
+             +--> (init concorrente) erro "in progress"                      <-- R1
+             |
+             +--> (health fail) client=null, breaker sem alinhamento          <-- R2
+             |
+             v
+      [CIRCUIT BREAKER]
+             |
+             +--> timeout sem cancelamento do job real                         <-- R3
+             v
+      [RESULT + LEARNING]
+             |
+             +--> saveExecutionBlock falha silenciosa                          <-- R6
+
+============================================================
+4) FLUXO ASCII - ALVO (ENDURECIDO)
+============================================================
+[USER TASK]
+    |
+    v
+[DECOMPOSE + VALIDATE DAG]
+    |--(ciclo/dependencia invalida)--> [ERRO ESTRUTURAL EXPLICITO]
+    v
+[EXECUTE NODE]
+    |-- install optional? --> [POLITICA: CONTINUA]
+    |-- install mandatory? -> [ABORTA NODE COM CAUSA]
+    v
+[CALL PROVIDER]
+    v
+[QDRANT ACCESS LAYER]
+    |-- init concorrente --> [AGUARDA PROMISE UNICA / JOIN INIT]
+    |-- health fail -------> [ALIMENTA BREAKER + METRICA]
+    v
+[CIRCUIT BREAKER]
+    |-- timeout -----------> [CANCELA operacao + FAIL FAST]
+    v
+[RESULT]
+    |-- learning save fail --> [WARN ALTO + CONTADOR DE DEGRADACAO]
+    v
+[OBSERVABILIDADE CONSISTENTE]
+
+============================================================
+5) PROMPTS PRONTOS PARA CORRIGIR (COPIAR/COLAR)
+============================================================
+Prompt A - Circuit Breaker (timeout cancelavel)
+"Refatore src/resilience/circuit-breaker.ts para suportar cancelamento cooperativo:
+- Execute operation com AbortSignal quando disponivel.
+- Em timeout, cancele o operation e retorne CircuitBreakerTimeoutError.
+- Preserve CLOSED/OPEN/HALF_OPEN atuais.
+- Adicione testes cobrindo: timeout cancela operacao, HALF_OPEN sucesso/falha, OPEN fail-fast."
+
+Prompt B - Qdrant Pool (concorrencia e estado)
+"Corrija src/database/qdrant-pool.ts para evitar ruptura de concorrencia:
+- Troque isInitializing+throw por initPromise compartilhada (single flight).
+- Se init em andamento, novos callers aguardam a mesma Promise.
+- Em health-check failure, alimente circuito com erro classificado e mantenha estado coerente entre metrics.state e CircuitState.
+- Adicione testes para 20 chamadas simultaneas em getClient()."
+
+Prompt C - DAG Robustez Estrutural
+"Fortaleça src/agentic/dag-executor.ts:
+- Detecte ciclo/dependencia inexistente antes da execucao e retorne erro estrutural claro.
+- Diferencie installCommand opcional vs obrigatorio (falha obrigatoria aborta subtask).
+- Em saveExecutionBlock failure, registre warning operacional com contador e detalhe da subtask.
+- Adicione resumo final com causas por subtask (failed_reason)."
+
+Prompt D - Politica de Fallback Unificada
+"Harmonize fallback/retry:
+- Em erros de configuracao local (ex: provider in progress/invalid state), nao acione fallback de cloud automaticamente.
+- Em erro transiente real (network/timeout/503), mantenha fallback atual.
+- Documente tabela de decisao erro->acao em src/utils/provider-fallback.ts."
+
+Prompt E - Observabilidade anti-ruptura
+"Crie um contrato de observabilidade:
+- IDs de correlacao por task/subtask.
+- Eventos: dag_validation_failed, pool_init_joined, breaker_opened, timeout_cancelled, learning_save_degraded.
+- Exponha no dashboard status e contadores de degradacao."
+
+============================================================
+6) ORDEM RECOMENDADA DE EXECUCAO (MENOR RISCO)
+============================================================
+1. Prompt B (pool concorrencia/estado)
+2. Prompt A (breaker cancelavel)
+3. Prompt C (DAG estrutural)
+4. Prompt D (fallback policy)
+5. Prompt E (observabilidade)
+
+Resultado esperado apos correcao:
+- Menos falha intermitente.
+- Menos fallback indevido.
+- Diagnostico objetivo quando quebrar.
+- Evolucao ECOA sem perda silenciosa.

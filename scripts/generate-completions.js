@@ -274,6 +274,9 @@ function parseGlobalOptions(appContent) {
     "--semantic",
     "--help",
     "-h",
+    "--version",
+    "-v",
+    "--status",
   ];
 
   for (const opt of essentialOptions) {
@@ -529,7 +532,11 @@ function generateZshCompletion(data) {
                         ? "Skip confirmations (dangerous!)"
                         : o === "--semantic"
                           ? "Enable semantic search"
-                          : "";
+                          : o === "--version" || o === "-v"
+                            ? "Show FazAI version"
+                            : o === "--status"
+                              ? "Show provider and cache status"
+                              : "";
       return `'${o}:${desc}'`;
     })
     .join("\n        ");

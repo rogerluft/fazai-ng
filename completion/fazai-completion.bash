@@ -24,10 +24,10 @@ _fazai_completion() {
     prev="${COMP_WORDS[COMP_CWORD-1]}"
 
     # Main commands (auto-discovered from SUBCOMMANDS_WITH_HELP)
-    commands="qdrant vector ask import alias cloudflare cf github index sync config search inference agent ingest dashboard samba completion cleaner"
+    commands="qdrant vector ask import alias cloudflare cf github index sync config search inference agent ingest dashboard samba completion cleaner daemon serve install-daemon migrate-openclaw memory"
 
     # Options/flags (auto-discovered from app.ts)
-    opts="--dry-run --cli --debug --verbose --log-file --auto-research --yolo --semantic --help -y -h"
+    opts="--dry-run --cli --debug --verbose --log-file --auto-research --yolo --semantic --help -y -h --version -v --status"
 
     # AI models (loaded dynamically from /etc/fazai/fazai.conf)
     if [[ -z "$FAZAI_MODELS_CACHE" ]]; then

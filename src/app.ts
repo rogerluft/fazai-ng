@@ -24,6 +24,37 @@ import { handleCompletionCommand } from "./commands/completion";
 import { getConfigValue } from "./config";
 import { normalizeTask } from "./utils/task-normalizer";
 
+
+/**
+ * Resolve o caminho do qdrant-fazai-injector.
+ * Prioridade: INJECTOR_DIR (fazai.conf) > path relativo > default
+ */
+function resolveInjectorPath(): string | null {
+  const fs = require('fs');
+  const path = require('path');
+
+  // 1. Variável de configuração
+  const configDir = process.env.INJECTOR_DIR || getConfigValue('INJECTOR_DIR');
+  if (configDir) {
+    const entry = path.join(configDir, 'dist', 'index.js');
+    if (fs.existsSync(entry)) return entry;
+  }
+
+  // 2. Sibling do repo (../qdrant-fazai-injector)
+  const { fileURLToPath } = require('url');
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const siblingDir = path.resolve(__dirname, '..', '..', 'qdrant-fazai-injector', 'dist', 'index.js');
+  if (fs.existsSync(siblingDir)) return siblingDir;
+
+  // 3. Path home do usuario
+  const homeDir = process.env.HOME || '/root';
+  const homePath = path.join(homeDir, 'qdrant-fazai-injector', 'dist', 'index.js');
+  if (fs.existsSync(homePath)) return homePath;
+
+  return null;
+}
+
 function displayHelp() {
   const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
 
@@ -166,6 +197,35 @@ async function main() {
 
   let inputs = process.argv.slice(2);
   const semanticSearchEnabled = inputs.includes('--semantic');
+
+  // --version / -v: tratado ANTES de qualquer routing
+  if (inputs.includes("--version") || inputs.includes("-v")) {
+    const fs = await import("fs");
+    const path = await import("path");
+    const { fileURLToPath } = await import("url");
+    const __fn = fileURLToPath(import.meta.url);
+    const __dn = path.dirname(__fn);
+    const pkgPath = path.join(__dn, '..', 'package.json');
+    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+    console.log(`FazAI v${pkg.version}`);
+    process.exit(0);
+  }
+
+  // --status: delega pro injector (mostra providers + cache)
+  if (inputs.includes("--status")) {
+    const injectorPath = resolveInjectorPath();
+    if (injectorPath) {
+      const { spawnSync } = await import("child_process");
+      const result = spawnSync("node", [injectorPath, "--status"], {
+        stdio: "inherit",
+        env: process.env,
+      });
+      process.exit(result.status ?? 1);
+    } else {
+      logger.error("Injector (qdrant-fazai-injector) not found. Configure INJECTOR_DIR em fazai.conf");
+      process.exit(1);
+    }
+  }
 
   if (inputs.includes("--cli")) {
     await runCliMode(semanticSearchEnabled);
@@ -333,18 +393,6 @@ async function main() {
     process.exit(0);
   }
 
-  // Handle Version command immediately before any async model logic
-  if (inputs.includes("--version") || inputs.includes("-v")) {
-    const fs = await import("fs");
-    const path = await import("path");
-    const { fileURLToPath } = await import("url");
-    const __filename = fileURLToPath(import.meta.url);
-    const __dirname = path.dirname(__filename);
-    const pkgPath = path.join(__dirname, '..', 'package.json');
-    const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
-    console.log(`FazAI v${pkg.version}`);
-    process.exit(0);
-  }
 
   let dryRun = false;
   let yoloMode = false;
@@ -446,7 +494,21 @@ async function main() {
     }
   }
 
-  // Admin Mode (DEFAULT!)
+  // Pipeline: tenta injector (Agent SDK + RAG) antes do Admin Mode
+  const injectorPath = resolveInjectorPath();
+  if (injectorPath) {
+    const { spawnSync } = await import("child_process");
+    const injectorArgs: string[] = [];
+    if (yoloMode) injectorArgs.push("--yolo");
+    injectorArgs.push(...inputs);
+    const result = spawnSync("node", [injectorPath, ...injectorArgs], {
+      stdio: "inherit",
+      env: process.env,
+    });
+    process.exit(result.status ?? 0);
+  }
+
+  // Admin Mode (fallback quando injector nao existe)
   logger.info(chalk.cyan("\n🖥️  FAZAI - MODO ADMINISTRADOR LINUX"));
   logger.info(chalk.gray("Administração inteligente de sistemas Linux\n"));
 

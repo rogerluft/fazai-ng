@@ -41,6 +41,11 @@ _fazai() {
         'samba:Gerencia compartilhamentos Samba (list, add, del, etc)'
         'completion:Print available CLI completions'
         'cleaner:Semantic file cleaner (archive orphan/deprecated files)'
+        'daemon:Inicia servidor HTTP/WS em background (estilo OpenClaw)'
+        'serve:serve command'
+        'install-daemon:install-daemon command'
+        'migrate-openclaw:migrate-openclaw command'
+        'memory:Busca e indexa memórias agênticas no Qdrant'
     )
 
     # Load models dynamically (cached)
@@ -61,6 +66,9 @@ _fazai() {
         '--help:Show help message'
         '-y:Skip confirmations (dangerous!)'
         '-h:Show help message'
+        '--version:Show FazAI version'
+        '-v:Show FazAI version'
+        '--status:Show provider and cache status'
     )
 
     _arguments \
