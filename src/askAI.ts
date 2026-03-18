@@ -10,6 +10,7 @@ import { logger } from "./logger";
 import { createAnthropicClient } from "./services/anthropic-auth";
 import {
   ProviderName,
+  FallbackError,
   shouldFallbackToNextProvider,
   getNextProvider,
   getEquivalentModel,
@@ -286,7 +287,8 @@ async function* _askAISingleProvider(
       yield content;
     }
   } else if (provider === "ollama") {
-    const baseUrl = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    const baseUrl = getConfigValue("OLLAMA_BASE_URL") || process.env.OLLAMA_BASE_URL || "http://localhost:11434";
+    logger.debug(`[Ollama] Conectando em ${baseUrl}/v1 com modelo ${model}`);
     const openai = new OpenAI({
       baseURL: `${baseUrl}/v1`,
       apiKey: "ollama",
@@ -329,8 +331,36 @@ async function* _askAISingleProvider(
       yield chunk;
     }
   } else if (provider === "google") {
-    // Google provider support (if needed in future)
-    throw new Error(`Provider ${provider} not yet implemented in askAI`);
+    const apiKey =
+      getConfigValue("GEMINI_API_KEY") ||
+      getConfigValue("GOOGLE_API_KEY") ||
+      process.env.GEMINI_API_KEY ||
+      process.env.GOOGLE_API_KEY;
+
+    if (!apiKey) {
+      throw new Error(
+        "GEMINI_API_KEY ou GOOGLE_API_KEY não configurada. Configure no /etc/fazai/fazai.conf"
+      );
+    }
+
+    logger.debug(`[Gemini] Iniciando stream com modelo ${model}`);
+
+    const { GoogleGenerativeAI } = await import("@google/generative-ai");
+    const genAI = new GoogleGenerativeAI(apiKey);
+    const geminiModel = genAI.getGenerativeModel({ model });
+
+    const chat = geminiModel.startChat({
+      history: [{ role: "user", parts: [{ text: systemMessage }] }, { role: "model", parts: [{ text: "Entendido." }] }],
+    });
+
+    const result = await chat.sendMessageStream(prompt);
+
+    for await (const chunk of result.stream) {
+      const text = chunk.text();
+      if (text) {
+        yield text;
+      }
+    }
   } else {
     throw new Error(`Unknown provider: ${provider}`);
   }
@@ -358,7 +388,7 @@ function detectEcoaTags(response: string): { hasTag: boolean; command: string | 
 /**
  * Main askAI function with provider fallback chain and ECOA tool execution
  *
- * Fallback order: ollama → openrouter → anthropic → openai → google
+ * Fallback order: Loaded from PROVIDER_FALLBACK_ORDER in fazai.conf
  *
  * - First attempt: Full streaming (optimal UX)
  * - Fallback: Buffered response (acceptable trade-off)
@@ -474,7 +504,7 @@ export async function* askAI(
       // Break out of fallback loop on success
       break;
     } catch (error: unknown) {
-      const err = error as { message: string; code?: string; status?: number };
+      const err = error as FallbackError;
 
       // Check if we should fallback
       if (!shouldFallbackToNextProvider(err)) {

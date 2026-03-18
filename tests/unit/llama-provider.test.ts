@@ -25,7 +25,7 @@ vi.mock('../../src/config.js', () => ({
       LLAMA_RETRIES: '3',
       LLAMA_TEMPERATURE: '0.7',
       LLAMA_MAX_TOKENS: '2048',
-      MODELS_LLAMA: 'phi3-mini',
+      MODELS_LLAMA: 'phi3:latest',
     };
     return config[key];
   }),
@@ -65,7 +65,7 @@ describe('LlamaProvider (Unit Tests)', () => {
       const provider = new LlamaProvider();
 
       const models = provider.getAvailableModels();
-      expect(models).toContain('phi3-mini');
+      expect(models).toContain('phi3:latest');
     });
   });
 
@@ -220,7 +220,7 @@ describe('LlamaProvider (Unit Tests)', () => {
       const chunks: string[] = [];
       for await (const chunk of provider.query({
         messages: [{ role: 'user', content: 'Test' }],
-        model: 'phi3-mini',
+        model: 'phi3:latest',
         stream: true,
       })) {
         chunks.push(chunk);
@@ -239,7 +239,7 @@ describe('LlamaProvider (Unit Tests)', () => {
 
       const generator = provider.query({
         messages: [{ role: 'user', content: 'Test' }],
-        model: 'phi3-mini',
+        model: 'phi3:latest',
       });
 
       await expect(async () => {
@@ -263,7 +263,7 @@ describe('LlamaProvider (Unit Tests)', () => {
 
       const generator = provider.query({
         messages: [{ role: 'user', content: 'Test' }],
-        model: 'phi3-mini',
+        model: 'phi3:latest',
       });
 
       await expect(async () => {

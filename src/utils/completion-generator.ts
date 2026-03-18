@@ -48,8 +48,8 @@ function parseModelsTS(modelsPath: string): Array<{ name: string; provider: stri
     { name: "llama-3-sonar-large-32k-online", provider: "perplexity" },
     { name: "gpt-4o-mini", provider: "openai" },
     { name: "gpt-4o", provider: "openai" },
-    { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
-    { name: "claude-3-haiku-20240307", provider: "anthropic" },
+    { name: "claude-sonnet-4-5", provider: "anthropic" },
+    { name: "claude-haiku-4-5", provider: "anthropic" },
   ];
 }
 
@@ -199,7 +199,7 @@ _fazai_completion() {
 
     # Fallback if models not available
     if [ -z "$models" ]; then
-        models="gpt-4o gpt-4o-mini claude-3-5-sonnet-latest claude-3-5-haiku-latest gemini-3.0-pro-latest gemini-1.5-flash qwen2.5:7b"
+        models="gpt-4o gpt-4o-mini claude-sonnet-4-5 claude-haiku-4-5 gemini-2.5-pro gemini-2.5-flash qwen3:8b"
     fi
 
     # First argument (command)

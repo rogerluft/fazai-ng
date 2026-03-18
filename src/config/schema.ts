@@ -64,7 +64,7 @@ const timeoutSchema = z
  * Examples:
  * - "gpt-4o-mini,gpt-4o"
  * - "qwen2.5:7b,tinyllama:1b"
- * - "claude-opus-4-5-20251101,claude-sonnet-4-5-20250929,claude-3-5-haiku-latest"
+ * - "claude-sonnet-4-5,claude-haiku-4-5"
  */
 const modelListSchema = z
   .string()

@@ -1,5 +1,62 @@
 # FazAI Changelog
 
+## [3.20.0] - 2026-03-13
+
+### 🔧 fix: Eliminação de hardcodes + Provider Gemini + Fallback unificado
+
+Remoção completa de providers/modelos hardcoded em 15+ arquivos. Tudo agora lê
+de `/etc/fazai/fazai.conf` via `PROVIDER_FALLBACK_ORDER` e `MODELS_*`. O conf é lei.
+
+#### Hardcodes eliminados (15+ arquivos)
+- `src/askAI.ts`: Implementado provider Google/Gemini (antes: `throw Error("not yet implemented")`)
+- `src/askAI.ts`: Ollama URL agora lê `getConfigValue("OLLAMA_BASE_URL")` (antes: só `process.env`)
+- `src/askAI.ts`: Import `FallbackError` + cast correto no catch do fallback
+- `src/linux-admin.ts`: `buildFallbackChain()` dinâmico via `PROVIDER_FALLBACK_ORDER` (antes: dict estático)
+- `src/linux-admin.ts`: `isRecoverableError()` percorre `error.cause` chain (antes: só checava `message`)
+- `src/linux-admin.ts`: `getDefaultModel()` atualizado: `claude-sonnet-4-5`, `qwen3:8b`, `gemini-2.5-flash`
+- `src/models.ts`: Built-in defaults atualizados (claude-haiku-4-5, gemini-3-pro, etc.)
+- `src/app.ts`: Help/providerOrder lê do config; injector condicionado ao `PROVIDER_FALLBACK_ORDER`
+- `src/providers/llama.ts`: `phi3-mini` → `phi3:latest`
+- `src/research.ts`: Perplexity model lê do config
+- `src/utils/provider-fallback.ts`: `ERR_INVALID_URL` adicionado; `getEquivalentModel()` simplificado
+- `src/utils/completion-generator.ts`, `src/config/schema.ts`, `src/types/provider.ts`: Models atualizados
+- `src/commands/agent.ts`: Help text model atualizado
+- `scripts/generate-completions.js`: `claude-sonnet-4-5`
+- `genaisrc/genaiscript.config.mjs`, `genaisrc/fazai-core.genai.mjs`: Aliases atualizados
+- `docker/brain/entrypoint.sh`: `phi3:mini` → `phi3:latest`
+- `tests/unit/llama-provider.test.ts`, `tests/call-ai.manual.ts`: Models atualizados
+
+#### Provider Google/Gemini implementado
+- `src/askAI.ts`: Streaming via `@google/generative-ai` SDK (`sendMessageStream`)
+- `src/linux-admin.ts`: `getLinuxCommandsFromGemini()` com streaming JSON parser
+- API keys: `GEMINI_API_KEY` ou `GOOGLE_API_KEY` do fazai.conf
+- Modelos: `MODELS_GOOGLE=gemini-2.5-flash,gemini-2.5-pro`
+
+#### Injector (qdrant-fazai-injector) corrigido
+- `provider-adapter.ts`: Chain lê de `PROVIDER_FALLBACK_ORDER` (antes: hardcoded `anthropic-oauth → openrouter → ollama`)
+- `provider-adapter.ts`: Modelos leem de `MODELS_*` via env (antes: hardcoded `phi3`, `hermes-3-llama`)
+- `provider-adapter.ts`: Driver Google/Gemini adicionado (REST API)
+- `types.ts`: `ProviderName` inclui `"google"`
+- `app.ts`: Injector só ativa se primeiro provider = `anthropic` (Agent SDK é exclusivo Anthropic)
+
+#### Fallback chain unificada
+- `fazai ask`: `askAI.ts` + `provider-fallback.ts` → respeita `PROVIDER_FALLBACK_ORDER`
+- `fazai "tarefa"` (primeiro != anthropic): `linux-admin.ts` + `buildFallbackChain()` → respeita conf
+- `fazai "tarefa"` (primeiro = anthropic): injector Agent SDK → usa Anthropic OAuth
+- `isRecoverableError()`: Percorre `error.cause` chain (Node fetch wrappa ECONNREFUSED no cause)
+
+#### Testes executados (reais, não simulados)
+| Teste | Modo | Chain | Resultado |
+|-------|------|-------|-----------|
+| ask ollama→gemini | ask | ollama(fail)→google | ✅ Gemini respondeu |
+| ask ollama→anthropic | ask | ollama(fail)→anthropic | ✅ Claude respondeu |
+| ask ollama→openrouter | ask | ollama(fail)→openrouter | ⚠️ 429 (sem crédito) |
+| tarefa ollama→google | tarefa | ollama(fail)→google | ✅ Gemini gerou comandos |
+| tarefa ollama→anthropic | tarefa | ollama(fail)→anthropic | ✅ Claude gerou comandos |
+| tarefa ollama→openrouter | tarefa | ollama(fail)→openrouter | ⚠️ 429 (sem crédito) |
+
+Método: `OLLAMA_BASE_URL=http://127.0.0.1:59999` (forçar ECONNREFUSED) + alternância do segundo provider.
+
 ## [3.19.0] - 2026-03-01
 
 ### 🚀 feat: Integração de memória, daemon mode e pre-injection bridge

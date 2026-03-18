@@ -76,7 +76,7 @@ init_ollama_models() {
     local ollama_url="http://${OLLAMA_HOST:-ollama}:${OLLAMA_PORT:-11434}"
 
     # Lista de modelos necessários (do conf)
-    local models="${OLLAMA_MODELS:-phi3:mini,nomic-embed-text}"
+    local models="${OLLAMA_MODELS:-phi3:latest,nomic-embed-text}"
 
     echo "[FazAI Brain] Verificando modelos Ollama..."
 

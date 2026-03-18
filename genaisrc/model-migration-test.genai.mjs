@@ -26,7 +26,7 @@ const EXPECTED_MODELS = {
   anthropic: {
     opus: "claude-opus-4-5-20251101",
     sonnet: "claude-sonnet-4-5-20250929",
-    haiku: "claude-3-5-haiku-latest",
+    haiku: "claude-haiku-4-5",
   },
   google: {
     pro: "gemini-2.5-pro",
@@ -41,8 +41,8 @@ const EXPECTED_ALIASES = {
   sonnet: "anthropic:claude-sonnet-4-5-20250929",
   fast: "anthropic:claude-sonnet-4-5-20250929",
   smart: "anthropic:claude-sonnet-4-5-20250929",
-  small: "anthropic:claude-3-5-haiku-latest",
-  haiku: "anthropic:claude-3-5-haiku-latest",
+  small: "anthropic:claude-haiku-4-5",
+  haiku: "anthropic:claude-haiku-4-5",
   gemini: "google:gemini-2.5-pro",
   "gemini-fast": "google:gemini-2.5-flash",
   local: "ollama:phi3",
@@ -291,7 +291,7 @@ defTool(
 |------|---------------|-------------|
 | Premium | claude-3-5-sonnet-latest | claude-opus-4-5-20251101 |
 | Balanced | claude-3-5-sonnet-latest | claude-sonnet-4-5-20250929 |
-| Fast | claude-3-haiku-20240307 | claude-3-5-haiku-latest |
+| Fast | claude-3-haiku-20240307 | claude-haiku-4-5 |
 
 ## Gemini Updates
 | Modelo Antigo | Modelo Novo |

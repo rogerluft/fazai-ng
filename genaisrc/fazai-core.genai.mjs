@@ -10,7 +10,7 @@ script({
   title: "FazAI Agentic Core",
   description: "Loop agêntico com reflexão, memória Qdrant multi-collection e auto-evolução",
   model: "ollama:phi3", // Local prioritário para DL380
-  // model: "anthropic:claude-3-5-sonnet-latest", // Fallback cloud
+  // model: "anthropic:claude-sonnet-4-5", // Fallback cloud
   temperature: 0.7,
   maxTokens: 4096,
 });

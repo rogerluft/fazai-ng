@@ -10,7 +10,7 @@ const testCode = fs.readFileSync(path.join(__dirname, "test-code.txt"), "utf8");
   const res = await getAIEdits(
     testCode,
     "Add support for openai and progress bars for everything",
-    "claude-3-haiku-20240307",
+    "claude-haiku-4-5",
     2
   );
 

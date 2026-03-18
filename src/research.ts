@@ -218,7 +218,8 @@ export class ResearchCoordinator {
 
   private async tryPerplexity(query: string, reason: string, trigger: ResearchTrigger): Promise<ResearchResult | null> {
     const provider = "perplexity";
-    const model = "llama-3-sonar-large-32k-online";
+    const perplexityModels = getConfigValue("MODELS_PERPLEXITY");
+    const model = perplexityModels ? perplexityModels.split(",")[0].trim() : "llama-3-sonar-large-32k-online";
 
     try {
       const stream = askAI("", query, model, provider, true);

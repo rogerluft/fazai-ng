@@ -35,7 +35,7 @@ export interface ProviderQueryOptions {
   /** Array of chat messages (system prompt + conversation history) */
   messages: ChatMessage[];
 
-  /** AI model to use (e.g., "gpt-4o", "claude-3-5-sonnet-latest") */
+  /** AI model to use (e.g., "gpt-4o", "claude-sonnet-4-5") */
   model: string;
 
   /** Maximum tokens to generate (default: 2048) */

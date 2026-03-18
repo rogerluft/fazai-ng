@@ -2,7 +2,7 @@
  * Provider Fallback System
  *
  * Automatic fallback chain for AI providers when one fails.
- * Order: ollama → openrouter → anthropic → openai → google
+ * Order: Loaded from PROVIDER_FALLBACK_ORDER in fazai.conf
  *
  * Features:
  * - Auto-detection of recoverable errors
@@ -73,7 +73,7 @@ function loadFallbackChain(): ProviderName[] {
 /**
  * Fallback chain loaded from PROVIDER_FALLBACK_ORDER config
  *
- * Priority: llama → ollama → openrouter → anthropic → openai → google → perplexity
+ * Priority: Loaded from PROVIDER_FALLBACK_ORDER config (or defaults if not set)
  * Providers without API keys are skipped automatically at runtime.
  */
 export const FALLBACK_CHAIN: ProviderName[] = loadFallbackChain();
@@ -99,7 +99,8 @@ export function shouldFallbackToNextProvider(error: FallbackError): boolean {
       currentError.code === "ECONNREFUSED" ||
       currentError.code === "ETIMEDOUT" ||
       currentError.code === "ENOTFOUND" ||
-      currentError.code === "ECONNRESET"
+      currentError.code === "ECONNRESET" ||
+      currentError.code === "ERR_INVALID_URL"
     ) {
       return true;
     }
@@ -194,104 +195,16 @@ export function getDefaultModelForProvider(provider: ProviderName): string | nul
 
 /**
  * Get equivalent model for different provider (best effort)
+ *
+ * Uses config-loaded models via getDefaultModelForProvider() instead of
+ * hardcoded model names. Falls back to first configured model for provider.
  */
 export function getEquivalentModel(
-  originalModel: string,
+  _originalModel: string,
   targetProvider: ProviderName
 ): string | null {
-  // Try to find similar model
-  const originalLower = originalModel.toLowerCase();
-
-  // Model mapping heuristics
-  // Updated for Claude 4.x family (Opus 4.5, Sonnet 4.5) + Gemini 2.x
-  const mappings: Record<string, Partial<Record<ProviderName, string>>> = {
-    // Premium/Flagship models (deep reasoning)
-    opus: {
-      openai: "gpt-4o",
-      openrouter: "anthropic/claude-opus-4.5",
-      google: "gemini-2.5-pro",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    "gpt-4": {
-      anthropic: "claude-opus-4-5-20251101",
-      openrouter: "anthropic/claude-opus-4.5",
-      google: "gemini-2.5-pro",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    // Balanced models (fast + capable)
-    sonnet: {
-      openai: "gpt-4o",
-      openrouter: "anthropic/claude-sonnet-4.5",
-      google: "gemini-2.5-flash",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    "gemini": {
-      openai: "gpt-4o",
-      anthropic: "claude-sonnet-4-5-20250929",
-      openrouter: "google/gemini-2.5-pro",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    // Fast models
-    "gpt-4o-mini": {
-      anthropic: "claude-3-5-haiku-latest",
-      openrouter: "anthropic/claude-3.5-haiku",
-      google: "gemini-2.5-flash-lite",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    haiku: {
-      openai: "gpt-4o-mini",
-      openrouter: "anthropic/claude-3.5-haiku",
-      google: "gemini-2.5-flash-lite",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    flash: {
-      openai: "gpt-4o-mini",
-      anthropic: "claude-3-5-haiku-latest",
-      openrouter: "google/gemini-2.5-flash",
-      ollama: "llama3.2:latest",
-      llama: "phi3-mini",
-    },
-    // Ollama models
-    llama: {
-      openai: "gpt-4o-mini",
-      anthropic: "claude-3-5-haiku-latest",
-      openrouter: "meta-llama/llama-3.1-8b-instruct",
-      google: "gemini-1.5-flash-latest",
-    },
-    qwen: {
-      openai: "gpt-4o-mini",
-      anthropic: "claude-3-5-haiku-latest",
-      openrouter: "qwen/qwen-2.5-coder-32b-instruct",
-      google: "gemini-1.5-flash-latest",
-      llama: "phi3-mini",
-    },
-    // Phi-3 (llama.cpp local)
-    phi3: {
-      openai: "gpt-4o-mini",
-      anthropic: "claude-3-5-haiku-latest",
-      openrouter: "microsoft/phi-3-mini-128k-instruct:free",
-      google: "gemini-1.5-flash-latest",
-      ollama: "phi3:mini",
-    },
-  };
-
-  // Find matching mapping
-  for (const [key, mapping] of Object.entries(mappings)) {
-    if (originalLower.includes(key)) {
-      const equivalentModel = mapping[targetProvider];
-      if (equivalentModel) {
-        return equivalentModel;
-      }
-    }
-  }
-
-  // No mapping found, return default for target provider
+  // Always use the first configured model for the target provider.
+  // This respects MODELS_* from fazai.conf instead of hardcoded values.
   return getDefaultModelForProvider(targetProvider);
 }
 
@@ -306,8 +219,8 @@ export function getEquivalentModel(
  * @example
  * const result = await withProviderFallback(
  *   async (provider, model) => askAI("", prompt, model, provider),
- *   "ollama",
- *   "llama3.2:latest"
+ *   "anthropic",
+ *   "claude-sonnet-4-5"
  * );
  */
 export async function withProviderFallback<T>(

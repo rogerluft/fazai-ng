@@ -26,8 +26,8 @@ export default {
     "smart": "anthropic:claude-sonnet-4-5-20250929",
 
     // Efficient cloud - custo otimizado
-    "small": "anthropic:claude-3-5-haiku-latest",
-    "haiku": "anthropic:claude-3-5-haiku-latest",
+    "small": "anthropic:claude-haiku-4-5",
+    "haiku": "anthropic:claude-haiku-4-5",
 
     // Gemini alternatives
     "gemini": "google:gemini-2.5-pro",

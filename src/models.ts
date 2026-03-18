@@ -45,7 +45,7 @@ function loadModelsFromConfig(): Model[] {
 
   try {
     // Lei 768: Respeita PROVIDER_FALLBACK_ORDER do config para ordenar providers
-    const fallbackOrder = getConfigValue("PROVIDER_FALLBACK_ORDER") || "anthropic,ollama,openrouter,google,openai,llama,perplexity";
+    const fallbackOrder = getConfigValue("PROVIDER_FALLBACK_ORDER") || "anthropic,openrouter,ollama,google,openai,llama,perplexity";
     const providerOrder = fallbackOrder.split(",").map(p => p.trim());
 
     // Provider configurations (max 3 models each)
@@ -212,9 +212,9 @@ function getBuiltInModels(): Model[] {
       description: "Claude Sonnet 4.5 (balanced, fast)",
     },
     {
-      name: "claude-3-5-haiku-latest",
+      name: "claude-haiku-4-5",
       provider: "anthropic",
-      description: "Claude 3.5 Haiku (fastest, efficient)",
+      description: "Claude Haiku 4.5 (fastest, efficient)",
     }
   );
 

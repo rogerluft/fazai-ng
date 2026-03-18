@@ -10,7 +10,7 @@
  *   LLAMA_RETRIES=3
  *   LLAMA_TEMPERATURE=0.7
  *   LLAMA_MAX_TOKENS=2048
- *   MODELS_LLAMA=phi3-mini
+ *   MODELS_LLAMA=phi3:latest
  *
  * @see https://github.com/ggerganov/llama.cpp
  */
@@ -260,7 +260,7 @@ export class LlamaProvider extends BaseProvider {
     if (modelsStr) {
       return modelsStr.split(",").map((m) => m.trim()).filter((m) => m.length > 0);
     }
-    return ["phi3-mini"]; // Default
+    return ["phi3:latest"]; // Default (matches MODELS_LLAMA in fazai.conf)
   }
 
   /**

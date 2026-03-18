@@ -16,16 +16,15 @@ import { createAnthropicClient } from "./services/anthropic-auth";
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google" | "llama";
 
-// Fallback chains for each provider
-// Prefer Ollama (faster) over llama.cpp (slower)
-const FALLBACK_CHAINS: Record<Provider, Provider[]> = {
-  ollama: ["openrouter", "anthropic", "openai", "google", "llama"],
-  llama: ["ollama", "openrouter", "anthropic", "openai", "google"],
-  openrouter: ["ollama", "anthropic", "openai", "google", "llama"],
-  anthropic: ["ollama", "openai", "google", "openrouter", "llama"],
-  openai: ["ollama", "google", "openrouter", "anthropic", "llama"],
-  google: ["ollama", "openrouter", "anthropic", "openai", "llama"],
-};
+// Build fallback chain from PROVIDER_FALLBACK_ORDER config
+// For a given primary provider, fallback = remaining providers in config order
+function buildFallbackChain(primary: Provider): Provider[] {
+  const configOrder = getConfigValue("PROVIDER_FALLBACK_ORDER");
+  const allProviders: Provider[] = configOrder
+    ? configOrder.split(",").map(p => p.trim()).filter(Boolean) as Provider[]
+    : ["anthropic", "openrouter", "ollama", "google", "openai", "llama"];
+  return allProviders.filter(p => p !== primary);
+}
 
 // Check if a provider is configured
 function isProviderAvailable(provider: Provider): boolean {
@@ -80,20 +79,20 @@ function getDefaultModel(provider: Provider): string {
     }
   }
 
-  // Fallback defaults
+  // Fallback defaults (only used if MODELS_* is empty in fazai.conf)
   switch (provider) {
     case "llama":
-      return "phi3-mini";
+      return "phi3:latest";
     case "ollama":
-      return "llama3.2:latest";
+      return "qwen3:8b";
     case "openrouter":
       return "qwen/qwen3-coder:free";
     case "anthropic":
-      return "claude-3-5-sonnet-latest";
+      return "claude-sonnet-4-5";
     case "openai":
       return "gpt-4o-mini";
     case "google":
-      return "gemini-1.5-flash";
+      return "gemini-2.5-flash";
     default:
       return "";
   }
@@ -101,24 +100,26 @@ function getDefaultModel(provider: Provider): string {
 
 
 // Check if error is recoverable (should try fallback)
+// Checa message + cause chain (fetch errors guardam ECONNREFUSED no cause)
 function isRecoverableError(error: any): boolean {
-  const message = error?.message?.toLowerCase() || "";
-  const status = error?.status;
+  // Percorre cause chain pra pegar erros aninhados (ex: fetch failed → ECONNREFUSED)
+  let current = error;
+  while (current) {
+    const message = current?.message?.toLowerCase() || "";
+    const code = String(current?.code || "").toLowerCase();
+    const status = current?.status;
 
-  // Memory errors from Ollama
-  if (message.includes("memory") || message.includes("alloc")) return true;
+    if (message.includes("memory") || message.includes("alloc")) return true;
+    if (status === 429 || current?.code === 429) return true;
+    if (message.includes("timeout") || message.includes("timed out") || message.includes("abort") || current?.name === "AbortError") return true;
+    if (code === "econnrefused" || code === "enotfound" || code === "econnreset" || code === "etimedout" || code === "err_invalid_url") return true;
+    if (message.includes("econnrefused") || message.includes("enotfound") || message.includes("connection refused")) return true;
+    if (message.includes("fetch failed")) return true;
+    if (message.includes("not found") || status === 404) return true;
+    if (status === 401 || status === 403 || status === 503 || status === 504) return true;
 
-  // Rate limits
-  if (status === 429 || error?.code === 429) return true;
-
-  // Timeout / Abort (OpenAI SDK) - "timeout", "timed out", "abort"
-  if (message.includes("timeout") || message.includes("timed out") || message.includes("abort") || error?.name === "AbortError") return true;
-
-  // Connection errors
-  if (message.includes("econnrefused") || message.includes("enotfound")) return true;
-
-  // Model not found
-  if (message.includes("not found") || status === 404) return true;
+    current = current?.cause;
+  }
 
   return false;
 }
@@ -505,9 +506,9 @@ export async function* getLinuxCommandsFromAI(
   // Build provider chain: primary + fallbacks
   const providerChain: { provider: Provider; model: string }[] = [
     { provider, model },
-    ...FALLBACK_CHAINS[provider]
-      .filter(p => isProviderAvailable(p) && p !== provider)
-      .map(p => ({ provider: p, model: getDefaultModel(p) }))
+    ...buildFallbackChain(provider)
+      .filter((p: Provider) => isProviderAvailable(p))
+      .map((p: Provider) => ({ provider: p, model: getDefaultModel(p) }))
   ];
 
   for (const { provider: currentProvider, model: currentModel } of providerChain) {

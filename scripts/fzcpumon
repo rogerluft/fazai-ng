@@ -1,0 +1,145 @@
+#!/usr/bin/env bash
+#══════════════════════════════════════════════════════════════
+# fzcpumon - Monitor de CPU com alerta
+# Autor: FazAI-NG / Dr. Roger Luft
+# Uso: fzcpumon [--threshold 90] [--interval 5] [--log /tmp/fzcpumon.log]
+#══════════════════════════════════════════════════════════════
+
+set -euo pipefail
+
+# ── Defaults ──
+THRESHOLD=90
+INTERVAL=5
+LOGFILE="/tmp/fzcpumon.log"
+ALERT_COOLDOWN=60  # segundos entre alertas repetidos
+LAST_ALERT=0
+
+# ── Parse args ──
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --threshold|-t) THRESHOLD="$2"; shift 2 ;;
+        --interval|-i)  INTERVAL="$2";  shift 2 ;;
+        --log|-l)       LOGFILE="$2";   shift 2 ;;
+        --help|-h)
+            echo "Uso: fzcpumon [--threshold 90] [--interval 5] [--log /tmp/fzcpumon.log]"
+            echo ""
+            echo "Opções:"
+            echo "  -t, --threshold  Percentual de CPU pra disparar alerta (default: 90)"
+            echo "  -i, --interval   Segundos entre cada checagem (default: 5)"
+            echo "  -l, --log        Arquivo de log (default: /tmp/fzcpumon.log)"
+            exit 0
+            ;;
+        *) echo "❌ Flag desconhecida: $1"; exit 1 ;;
+    esac
+done
+
+# ── Cores ──
+RED='\033[0;31m'
+YEL='\033[1;33m'
+GRN='\033[0;32m'
+CYN='\033[0;36m'
+RST='\033[0m'
+
+# ── Funções ──
+log_msg() {
+    local msg="$1"
+    local ts
+    ts=$(date '+%Y-%m-%d %H:%M:%S')
+    echo "[$ts] $msg" >> "$LOGFILE"
+}
+
+get_cpu_usage() {
+    # Lê /proc/stat duas vezes com 1s de intervalo pra calcular uso real
+    local cpu1 cpu2
+    cpu1=($(head -1 /proc/stat | awk '{print $2,$3,$4,$5,$6,$7,$8}'))
+    sleep 1
+    cpu2=($(head -1 /proc/stat | awk '{print $2,$3,$4,$5,$6,$7,$8}'))
+
+    local idle1=${cpu1[3]} idle2=${cpu2[3]}
+    local total1=0 total2=0
+
+    for v in "${cpu1[@]}"; do total1=$((total1 + v)); done
+    for v in "${cpu2[@]}"; do total2=$((total2 + v)); done
+
+    local diff_idle=$((idle2 - idle1))
+    local diff_total=$((total2 - total1))
+
+    if [[ $diff_total -eq 0 ]]; then
+        echo "0"
+        return
+    fi
+
+    # Percentual de uso (inteiro)
+    echo $(( (1000 * (diff_total - diff_idle) / diff_total + 5) / 10 ))
+}
+
+get_top_procs() {
+    ps aux --sort=-%cpu | head -6 | tail -5 | awk '{printf "  %-8s %5s%% %s\n", $1, $3, $11}'
+}
+
+send_alert() {
+    local usage="$1"
+    local now
+    now=$(date +%s)
+
+    # Cooldown pra não spammar
+    if (( now - LAST_ALERT < ALERT_COOLDOWN )); then
+        return
+    fi
+    LAST_ALERT=$now
+
+    local top_procs
+    top_procs=$(get_top_procs)
+
+    echo -e "${RED}╔══════════════════════════════════════════╗${RST}"
+    echo -e "${RED}║  ⚠️  ALERTA: CPU em ${usage}%! (limite: ${THRESHOLD}%)  ${RST}"
+    echo -e "${RED}╠══════════════════════════════════════════╣${RST}"
+    echo -e "${YEL}║  Top processos:${RST}"
+    echo "$top_procs"
+    echo -e "${RED}╚══════════════════════════════════════════╝${RST}"
+
+    log_msg "ALERTA: CPU=${usage}% (threshold=${THRESHOLD}%) | Top: $(ps aux --sort=-%cpu | awk 'NR==2{print $11, $3"%"}')"
+
+    # Se tiver notify-send (desktop), manda notificação
+    if command -v notify-send &>/dev/null; then
+        notify-send -u critical "🔥 CPU em ${usage}%" "Limite de ${THRESHOLD}% ultrapassado!"
+    fi
+
+    # Se tiver wall, avisa todos os terminais
+    if command -v wall &>/dev/null; then
+        echo "⚠️ ALERTA fzcpumon: CPU em ${usage}% (limite: ${THRESHOLD}%)" | wall 2>/dev/null || true
+    fi
+}
+
+# ── Main Loop ──
+echo -e "${CYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RST}"
+echo -e "${CYN}  fzcpumon | Threshold: ${THRESHOLD}% | Intervalo: ${INTERVAL}s${RST}"
+echo -e "${CYN}  Log: ${LOGFILE}${RST}"
+echo -e "${CYN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RST}"
+log_msg "START: threshold=${THRESHOLD}% interval=${INTERVAL}s"
+
+trap 'echo -e "\n${YEL}fzcpumon encerrado.${RST}"; log_msg "STOP"; exit 0' INT TERM
+
+while true; do
+    CPU_USAGE=$(get_cpu_usage)
+
+    # Cor baseada no uso
+    if (( CPU_USAGE >= THRESHOLD )); then
+        COLOR="$RED"
+        send_alert "$CPU_USAGE"
+    elif (( CPU_USAGE >= 70 )); then
+        COLOR="$YEL"
+    else
+        COLOR="$GRN"
+    fi
+
+    # Status inline
+    local_ts=$(date '+%H:%M:%S')
+    BAR_LEN=$(( CPU_USAGE / 5 ))
+    BAR=$(printf '█%.0s' $(seq 1 $BAR_LEN 2>/dev/null) 2>/dev/null || true)
+    EMPTY=$(printf '░%.0s' $(seq 1 $((20 - BAR_LEN)) 2>/dev/null) 2>/dev/null || true)
+
+    printf "\r${COLOR}[${local_ts}] CPU: %3d%% [${BAR}${EMPTY}]${RST}  " "$CPU_USAGE"
+
+    sleep "$INTERVAL"
+done

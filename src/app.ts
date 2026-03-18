@@ -69,16 +69,20 @@ function displayHelp() {
 
   let modelsHelpText = '\nAvailable Models (use exact model names):\n';
 
-  // Display models grouped by provider
-  const providerOrder: Array<{ key: string; name: string }> = [
-    { key: 'ollama', name: 'Ollama (local models)' },
-    { key: 'openrouter', name: 'OpenRouter (free tier available)' },
-    { key: 'perplexity', name: 'Perplexity (search-enabled AI)' },
-    { key: 'google', name: 'Google Gemini' },
-    { key: 'openai', name: 'OpenAI' },
-    { key: 'anthropic', name: 'Anthropic Claude' },
-  ];
-
+  // Display order follows PROVIDER_FALLBACK_ORDER from config
+  const configOrder = getConfigValue("PROVIDER_FALLBACK_ORDER");
+  const providerNames: Record<string, string> = {
+    llama: 'LLaMA (local llama.cpp)',
+    ollama: 'Ollama (local models)',
+    openrouter: 'OpenRouter (free tier available)',
+    perplexity: 'Perplexity (search-enabled AI)',
+    google: 'Google Gemini',
+    openai: 'OpenAI',
+    anthropic: 'Anthropic Claude',
+  };
+  const providerOrder: Array<{ key: string; name: string }> = configOrder
+    ? configOrder.split(",").map(p => p.trim()).filter(Boolean).map(p => ({ key: p, name: providerNames[p] || p }))
+    : Object.entries(providerNames).map(([key, name]) => ({ key, name }));
   for (const { key, name } of providerOrder) {
     const providerModels = modelsByProvider[key];
     if (providerModels && providerModels.length > 0) {
@@ -494,18 +498,28 @@ async function main() {
     }
   }
 
-  // Pipeline: tenta injector (Agent SDK + RAG) antes do Admin Mode
-  const injectorPath = resolveInjectorPath();
-  if (injectorPath) {
-    const { spawnSync } = await import("child_process");
-    const injectorArgs: string[] = [];
-    if (yoloMode) injectorArgs.push("--yolo");
-    injectorArgs.push(...inputs);
-    const result = spawnSync("node", [injectorPath, ...injectorArgs], {
-      stdio: "inherit",
-      env: process.env,
-    });
-    process.exit(result.status ?? 0);
+  // Pipeline: injector só roda se anthropic estiver no topo do PROVIDER_FALLBACK_ORDER
+  // Motivo: o injector usa Claude Agent SDK que é exclusivo Anthropic.
+  // Se o conf diz outro provider primeiro, respeita e vai pro linux-admin.
+  const fallbackOrder = getConfigValue("PROVIDER_FALLBACK_ORDER") || "";
+  const firstProvider = fallbackOrder.split(",")[0]?.trim().toLowerCase() || "";
+  const useInjector = firstProvider === "anthropic" || firstProvider === "";
+
+  if (useInjector) {
+    const injectorPath = resolveInjectorPath();
+    if (injectorPath) {
+      const { spawnSync } = await import("child_process");
+      const injectorArgs: string[] = [];
+      if (yoloMode) injectorArgs.push("--yolo");
+      injectorArgs.push(...inputs);
+      const result = spawnSync("node", [injectorPath, ...injectorArgs], {
+        stdio: "inherit",
+        env: process.env,
+      });
+      process.exit(result.status ?? 0);
+    }
+  } else {
+    logger.debug(`[Pipeline] Injector bypassed: primeiro provider é "${firstProvider}" (não anthropic)`);
   }
 
   // Admin Mode (fallback quando injector nao existe)
@@ -550,8 +564,8 @@ async function main() {
   if (!selectedModel) {
     const previewEnabled = getConfigValue('ENABLE_PREVIEW_FEATURES') === 'true';
     if (previewEnabled) {
-      selectedModel = models.find(m => m.name === 'gemini-3.0-pro-latest');
-      logger.info('🤖 Auto-selecting preview model: Gemini 3.0 Pro');
+      selectedModel = models.find(m => m.name === 'gemini-3-pro-preview');
+      logger.info('🤖 Auto-selecting preview model: Gemini 3 Pro Preview');
     }
     // If preview not enabled or gemini3 not found, fallback to the absolute default
     if (!selectedModel) {

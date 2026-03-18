@@ -31,7 +31,7 @@ ${chalk.bold("EXAMPLES:")}
 
 ${chalk.bold("OPTIONS:")}
   --verbose, -v       Mostra output detalhado
-  --model, -m         Modelo a usar (ex: ollama:phi3, anthropic:claude-3-5-sonnet-latest)
+  --model, -m         Modelo a usar (ex: ollama:phi3, anthropic:claude-sonnet-4-5)
   --iterations, -i    Número máximo de iterações (default: 5)
 `;
 

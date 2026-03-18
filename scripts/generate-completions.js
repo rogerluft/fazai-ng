@@ -235,7 +235,7 @@ function parseModelsTS(modelsPath) {
     { name: "gemini-2.5-flash", provider: "google" },
     { name: "qwen2.5:7b", provider: "ollama" },
     { name: "gpt-4o-mini", provider: "openai" },
-    { name: "claude-3-5-sonnet-latest", provider: "anthropic" },
+    { name: "claude-sonnet-4-5", provider: "anthropic" },
   ];
 }
 
