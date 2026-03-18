@@ -1,17 +1,31 @@
 # FazAI Services Documentation
 
-Este documento explica como usar os serviços systemd do FazAI v3.1-beta.
+Este documento explica como usar os serviços systemd do FazAI v3.20+.
+
+> **Documentação relacionada:**
+> - [Arquitetura de Servidores](../architecture/SERVERS_ARCHITECTURE.md) — visão geral dos 3 servidores
+> - [Daemon](DAEMON.md) — gateway HTTP/WS para integração externa
+> - [Dashboard](DASHBOARD.md) — API REST para gerenciamento
+> - [Web UI](WEB_UI.md) — interface visual Next.js
 
 ## 📦 Serviços Disponíveis
 
 ### 1. **fazai.service** - CLI Agent (Terminal Interativo)
 Executa o FazAI em modo CLI (`--cli`) como daemon systemd.
 
-### 2. **fazai-web.service** - Web Interface (Next.js)
-Executa a interface web Next.js em modo produção (porta 3000).
+### 2. **fazai-daemon.service** - Daemon HTTP/WS
+Gateway HTTP/WebSocket para integração com clientes externos (Telegram, OpenClaw).
+Porta padrão: 18789. Instalação via `sudo fazai install-daemon`.
 
-### 3. **qdrant.service** - Vector Database
+### 3. **fazai-web@.service** - Web Interface (Next.js)
+Executa a interface web Next.js em modo produção (porta 3300).
+Template service — suporta múltiplos usuários (`fazai-web@user`).
+
+### 4. **qdrant.service** - Vector Database
 Executa o Qdrant vector database (criado automaticamente pelo install.sh).
+
+> **Nota**: O Dashboard (`fazai dashboard start`) **não** possui service systemd.
+> Roda via CLI diretamente. Veja [DASHBOARD.md](DASHBOARD.md).
 
 ---
 
@@ -32,7 +46,10 @@ O instalador irá:
 ```bash
 # Copiar arquivos de serviço
 sudo cp etc/fazai/fazai.service /etc/systemd/system/
-sudo cp etc/fazai/fazai-web.service /etc/systemd/system/
+sudo cp etc/fazai/fazai-web@.service /etc/systemd/system/
+
+# Instalar daemon (gera service automaticamente)
+sudo fazai install-daemon
 
 # Recarregar systemd
 sudo systemctl daemon-reload
@@ -75,7 +92,45 @@ sudo systemctl disable fazai@rluft
 
 ---
 
-### **fazai-web.service** (Web Interface)
+### **fazai-daemon.service** (HTTP/WS Gateway)
+
+#### Instalar
+```bash
+# Instalação automática (gera service, habilita e inicia)
+sudo fazai install-daemon
+```
+
+#### Gerenciar
+```bash
+# Status
+systemctl status fazai-daemon
+
+# Iniciar/Parar/Reiniciar
+sudo systemctl start fazai-daemon
+sudo systemctl stop fazai-daemon
+sudo systemctl restart fazai-daemon
+
+# Habilitar/Desabilitar no boot
+sudo systemctl enable fazai-daemon
+sudo systemctl disable fazai-daemon
+```
+
+#### Logs
+```bash
+journalctl -u fazai-daemon -f
+journalctl -u fazai-daemon -n 100
+```
+
+#### Verificar
+```bash
+curl http://localhost:18789/health
+```
+
+> **Detalhes completos**: Veja [DAEMON.md](DAEMON.md)
+
+---
+
+### **fazai-web@.service** (Web Interface)
 
 #### Habilitar e Iniciar
 ```bash
@@ -102,9 +157,11 @@ sudo journalctl -u fazai-web@rluft -n 50
 
 #### Acessar Interface
 ```bash
-# Abrir no navegador
-http://localhost:3000
+# Abrir no navegador (porta padrão 3300, configurável via WEB_PORT)
+http://localhost:3300
 ```
+
+> **Detalhes completos**: Veja [WEB_UI.md](WEB_UI.md)
 
 #### Parar e Desabilitar
 ```bash
@@ -145,37 +202,47 @@ fazai vector validate
 
 ### Variáveis de Ambiente
 
-Os serviços carregam variáveis de:
-```bash
-/home/USERNAME/.config/fazai/fazai.conf
-```
+Os serviços carregam variáveis de `/etc/fazai/fazai.conf` (configuração centralizada).
 
-**Exemplo de fazai.conf:**
+**Variáveis relevantes para serviços:**
 ```ini
-# OpenRouter (recomendado)
+# Provider fallback chain
+PROVIDER_FALLBACK_ORDER=google,ollama,openrouter,anthropic
+
+# API Keys
+ANTHROPIC_API_KEY=sk-ant-xxxxx
+GEMINI_API_KEY=AIzaSy-xxxxx
 OPENROUTER_API_KEY=sk-or-v1-xxxxx
 
-# Ou APIs diretas
-OPENAI_API_KEY=sk-xxxxx
-ANTHROPIC_API_KEY=sk-ant-xxxxx
-
-# Modelos configuráveis
-DEFAULT_MODEL=openai/gpt-4o-mini
-COMPLEX_MODEL=anthropic/claude-3.5-sonnet
-FAST_MODEL=anthropic/claude-3-haiku
-LOCAL_MODEL=ollama/llama3.2
-PREFER_LOCAL=false
+# Modelos por provider
+MODELS_OLLAMA=qwen2.5:7b
+MODELS_GOOGLE=gemini-2.5-flash,gemini-2.5-pro
+MODELS_ANTHROPIC=claude-sonnet-4-5
 
 # Qdrant
 QDRANT_URL=http://localhost:6333
+
+# Daemon
+FAZAI_DAEMON_PORT=18789
+
+# Dashboard (não é systemd, mas relevante)
+DASHBOARD_PORT=3000
+DASHBOARD_HOST=localhost
+
+# Web UI
+WEB_HOST=0.0.0.0
+WEB_PORT=3300
+WEB_UI_USERNAME=admin
+WEB_UI_PASSWORD=senha_segura
 ```
 
 ### Editar Configuração
 ```bash
-nano ~/.config/fazai/fazai.conf
+sudo nano /etc/fazai/fazai.conf
 
 # Reiniciar serviços após mudanças
 sudo systemctl restart fazai@$USER
+sudo systemctl restart fazai-daemon
 sudo systemctl restart fazai-web@$USER
 ```
 
@@ -310,6 +377,7 @@ systemd-cgtop
 
 # Uso específico
 systemctl status fazai@$USER | grep Memory
+systemctl status fazai-daemon | grep Memory
 systemctl status fazai-web@$USER | grep Memory
 ```
 
@@ -317,6 +385,7 @@ systemctl status fazai-web@$USER | grep Memory
 ```bash
 # Tempo desde último start
 systemctl show fazai@$USER -p ActiveEnterTimestamp
+systemctl show fazai-daemon -p ActiveEnterTimestamp
 systemctl show fazai-web@$USER -p ActiveEnterTimestamp
 ```
 
@@ -362,9 +431,13 @@ sudo systemctl restart fazai-web@$USER
 
 ## 📚 Referências
 
+- **Arquitetura de Servidores:** [SERVERS_ARCHITECTURE.md](../architecture/SERVERS_ARCHITECTURE.md)
+- **Daemon:** [DAEMON.md](DAEMON.md)
+- **Dashboard:** [DASHBOARD.md](DASHBOARD.md)
+- **Web UI:** [WEB_UI.md](WEB_UI.md)
 - **FazAI README:** [README.md](../README.md)
-- **Quick Start:** [QUICK-START.md](../QUICK-START.md)
-- **OpenRouter Models:** [OPENROUTER_MODELS.md](../OPENROUTER_MODELS.md)
+- **Quick Start:** [QUICK-START.md](QUICK-START.md)
+- **OpenRouter Models:** [OPENROUTER_MODELS.md](OPENROUTER_MODELS.md)
 - **systemd Docs:** https://www.freedesktop.org/software/systemd/man/
 
 ---
@@ -402,13 +475,14 @@ sudo systemctl enable fazai-web@user2
 ### Como desinstalar?
 
 ```bash
-# Parar e desabilitar
-sudo systemctl stop fazai@$USER fazai-web@$USER
-sudo systemctl disable fazai@$USER fazai-web@$USER
+# Parar e desabilitar todos os serviços
+sudo systemctl stop fazai@$USER fazai-daemon fazai-web@$USER
+sudo systemctl disable fazai@$USER fazai-daemon fazai-web@$USER
 
 # Remover arquivos de serviço
 sudo rm /etc/systemd/system/fazai.service
-sudo rm /etc/systemd/system/fazai-web.service
+sudo rm /etc/systemd/system/fazai-daemon.service
+sudo rm /etc/systemd/system/fazai-web@.service
 sudo systemctl daemon-reload
 
 # Remover instalação (CUIDADO!)
@@ -418,5 +492,5 @@ rm ~/.local/bin/fazai
 
 ---
 
-**Versão:** FazAI v3.1-beta  
-**Atualizado:** 2024-11-15
+**Versão:** FazAI v3.20+
+**Atualizado:** 2026-03-18

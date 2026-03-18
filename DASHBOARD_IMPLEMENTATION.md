@@ -169,8 +169,8 @@ Options:
 - Troubleshooting section
 - curl examples
 
-#### **API Documentation** (`docs/dashboard-api.md`)
-- Full API reference
+#### **API Documentation** (`docs/guides/DASHBOARD.md`)
+- Full API reference (consolidado)
 - Request/response schemas
 - Error handling guide
 - Production deployment tips
@@ -205,8 +205,8 @@ src/dashboard/
 src/commands/
 └── dashboard.ts                 # CLI handler (223 lines)
 
-docs/
-└── dashboard-api.md             # API documentation (528 lines)
+docs/guides/
+└── DASHBOARD.md                 # API documentation (consolidado, ~400 lines)
 
 Total: 2,551 lines of production-ready code
 ```

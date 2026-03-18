@@ -1,6 +1,6 @@
 {
   "name": "fazai-web",
-  "version": "3.14.1",
+  "version": "3.20.0",
   "description": "FazAI - Web Interface for Autonomous Linux Agent",
   "private": true,
   "scripts": {
