@@ -1,45 +1,43 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import type { SambaAPIResponse } from '@/types/samba.types';
-
-// Samba Groups Management API
-// POST - Create Samba group
+import { execSync } from 'child_process';
 
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
+    const { groupname, users } = body;
 
-    // Forward to backend API
-    const backendUrl = process.env.FAZAI_BACKEND_URL || 'http://localhost:3001';
-    const response = await fetch(`${backendUrl}/api/samba/groups`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
+    if (!groupname) {
       return NextResponse.json(
-        {
-          success: false,
-          error: error.message || 'Failed to create group',
-        } as SambaAPIResponse<null>,
-        { status: response.status }
+        { success: false, error: 'groupname is required' },
+        { status: 400 }
       );
     }
 
-    const data = await response.json();
-    return NextResponse.json(data);
+    // Create system group if it doesn't exist
+    try {
+      execSync(`getent group "${groupname}" 2>/dev/null`, { encoding: 'utf-8' });
+    } catch {
+      execSync(`groupadd "${groupname}"`, { encoding: 'utf-8', timeout: 5000 });
+    }
+
+    // Add users to group if specified
+    if (users && Array.isArray(users)) {
+      for (const user of users) {
+        try {
+          execSync(`usermod -aG "${groupname}" "${user}"`, { encoding: 'utf-8', timeout: 5000 });
+        } catch { /* user may not exist, skip */ }
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: `Group '${groupname}' created`,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      {
-        success: false,
-        error: message,
-        message: 'Failed to create group'
-      } as SambaAPIResponse<null>,
+      { success: false, error: message, message: 'Failed to create group' },
       { status: 500 }
     );
   }

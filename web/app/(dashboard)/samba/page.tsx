@@ -23,6 +23,7 @@ interface SharesResponse {
     writable: boolean;
     browseable: boolean;
     forceGroup: string | null;
+    comment: string | null;
   }>;
 }
 
@@ -55,11 +56,11 @@ async function getSambaStatus(): Promise<StatusResponse> {
   return response.json();
 }
 
-async function createShare(path: string): Promise<ApiResponse> {
+async function createShare(data: { name: string; path: string }): Promise<ApiResponse> {
   const response = await fetch("/api/samba/shares", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path }),
+    body: JSON.stringify(data),
   });
   if (!response.ok) {
     const error = await response.json();
@@ -90,11 +91,11 @@ async function restartSamba(): Promise<ApiResponse> {
   return response.json();
 }
 
-async function createUser(username: string): Promise<ApiResponse> {
+async function createUser(data: { username: string; password: string }): Promise<ApiResponse> {
   const response = await fetch("/api/samba/users", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username }),
+    body: JSON.stringify(data),
   });
   if (!response.ok) {
     const error = await response.json();
@@ -122,8 +123,10 @@ function SambaContent() {
   const [showUserForm, setShowUserForm] = useState(false);
   const [showGroupForm, setShowGroupForm] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [newShareName, setNewShareName] = useState("");
   const [newSharePath, setNewSharePath] = useState("");
   const [newUsername, setNewUsername] = useState("");
+  const [newUserPassword, setNewUserPassword] = useState("");
   const [newGroupname, setNewGroupname] = useState("");
   const [apiMessage, setApiMessage] = useState<{ type: "success" | "error" | "info"; text: string } | null>(null);
 
@@ -146,10 +149,11 @@ function SambaContent() {
   }, [isLoading, setLoading]);
 
   const createShareMutation = useMutation({
-    mutationFn: createShare,
+    mutationFn: (data: { name: string; path: string }) => createShare(data),
     onSuccess: (data) => {
       refetchShares();
       setShowShareForm(false);
+      setNewShareName("");
       setNewSharePath("");
       setApiMessage({ type: "success", text: data.message });
       setTimeout(() => setApiMessage(null), 5000);
@@ -192,11 +196,12 @@ function SambaContent() {
   });
 
   const createUserMutation = useMutation({
-    mutationFn: createUser,
+    mutationFn: (data: { username: string; password: string }) => createUser(data),
     onSuccess: (data) => {
       setShowUserForm(false);
       setNewUsername("");
-      setApiMessage({ type: "info", text: `${data.message}\n\nCommand: ${data.command}` });
+      setNewUserPassword("");
+      setApiMessage({ type: "success", text: data.message });
     },
     onError: (error: Error) => {
       setError(error.message);
@@ -220,21 +225,31 @@ function SambaContent() {
   });
 
   const handleCreateShare = () => {
-    if (newSharePath && newSharePath.startsWith("/")) {
-      createShareMutation.mutate(newSharePath);
-    } else {
+    if (!newShareName) {
+      setApiMessage({ type: "error", text: "Share name is required" });
+      setTimeout(() => setApiMessage(null), 3000);
+      return;
+    }
+    if (!newSharePath || !newSharePath.startsWith("/")) {
       setApiMessage({ type: "error", text: "Please provide an absolute path starting with /" });
       setTimeout(() => setApiMessage(null), 3000);
+      return;
     }
+    createShareMutation.mutate({ name: newShareName, path: newSharePath });
   };
 
   const handleCreateUser = () => {
-    if (newUsername && /^[a-z_][a-z0-9_-]*[$]?$/.test(newUsername)) {
-      createUserMutation.mutate(newUsername);
-    } else {
+    if (!newUsername || !/^[a-z_][a-z0-9_-]*[$]?$/.test(newUsername)) {
       setApiMessage({ type: "error", text: "Invalid username format. Must match POSIX username rules." });
       setTimeout(() => setApiMessage(null), 3000);
+      return;
     }
+    if (!newUserPassword || newUserPassword.length < 4) {
+      setApiMessage({ type: "error", text: "Password must be at least 4 characters." });
+      setTimeout(() => setApiMessage(null), 3000);
+      return;
+    }
+    createUserMutation.mutate({ username: newUsername, password: newUserPassword });
   };
 
   const handleCreateGroup = () => {
@@ -355,6 +370,14 @@ function SambaContent() {
           {showShareForm && (
             <CardContent className="space-y-4">
               <div>
+                <label className="text-sm font-medium">Share Name</label>
+                <Input
+                  placeholder="public"
+                  value={newShareName}
+                  onChange={(e) => setNewShareName(e.target.value)}
+                />
+              </div>
+              <div>
                 <label className="text-sm font-medium">Directory Path</label>
                 <Input
                   placeholder="/srv/samba/public"
@@ -402,6 +425,15 @@ function SambaContent() {
                 <p className="text-xs text-muted-foreground mt-1">
                   POSIX-compliant username
                 </p>
+              </div>
+              <div>
+                <label className="text-sm font-medium">Password</label>
+                <Input
+                  type="password"
+                  placeholder="samba password"
+                  value={newUserPassword}
+                  onChange={(e) => setNewUserPassword(e.target.value)}
+                />
               </div>
 
               <Button onClick={handleCreateUser} className="w-full" disabled={createUserMutation.isPending}>
@@ -477,19 +509,24 @@ function SambaContent() {
                         <FolderOpen className="h-5 w-5 text-primary" />
                         <h4 className="font-semibold text-lg">{share.name}</h4>
                       </div>
-                      <div className="bg-secondary/50 rounded p-3 space-y-2">
-                        <p className="text-sm font-mono text-muted-foreground">
+                      <div className="bg-muted rounded p-3 space-y-2">
+                        <p className="text-sm font-mono">
                           <strong>Path:</strong> {share.path || "Not specified"}
                         </p>
                         {share.validUsers && share.validUsers.length > 0 && (
-                          <p className="text-sm font-mono text-muted-foreground flex items-center gap-1">
+                          <p className="text-sm font-mono flex items-center gap-1">
                             <Users className="h-3 w-3" />
                             <strong>Valid Users:</strong>{" "}
                             {share.validUsers.join(", ")}
                           </p>
                         )}
-                        {share.forceGroup && (
+                        {share.comment && (
                           <p className="text-sm font-mono text-muted-foreground">
+                            <strong>Comment:</strong> {share.comment}
+                          </p>
+                        )}
+                        {share.forceGroup && (
+                          <p className="text-sm font-mono">
                             <strong>Force Group:</strong> {share.forceGroup}
                           </p>
                         )}

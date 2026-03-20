@@ -1,9 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { execSync } from 'child_process';
 import type { SambaAPIResponse } from '@/types/samba.types';
-
-// Samba Share Management - Individual Share
-// DELETE - Remove a share by name
 
 export async function DELETE(
   request: NextRequest,
@@ -14,10 +12,7 @@ export async function DELETE(
 
     if (!shareName) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Share name is required',
-        } as SambaAPIResponse<null>,
+        { success: false, error: 'Share name is required' } as SambaAPIResponse<null>,
         { status: 400 }
       );
     }
@@ -26,41 +21,25 @@ export async function DELETE(
     const protectedShares = ['homes', 'printers', 'print$', 'IPC$'];
     if (protectedShares.includes(shareName)) {
       return NextResponse.json(
-        {
-          success: false,
-          error: `Cannot delete protected share: ${shareName}`,
-        } as SambaAPIResponse<null>,
+        { success: false, error: `Cannot delete protected share: ${shareName}` } as SambaAPIResponse<null>,
         { status: 403 }
       );
     }
 
-    // Forward to backend API
-    const backendUrl = process.env.FAZAI_BACKEND_URL || 'http://localhost:3001';
-    const response = await fetch(`${backendUrl}/api/samba/shares/${encodeURIComponent(shareName)}`, {
-      method: 'DELETE',
+    const output = execSync(
+      `net conf delshare "${shareName}"`,
+      { encoding: 'utf-8', timeout: 5000 }
+    );
+
+    return NextResponse.json({
+      success: true,
+      message: `Share '${shareName}' deleted`,
+      output: output.trim(),
     });
-
-    if (!response.ok) {
-      const error = await response.json();
-      return NextResponse.json(
-        {
-          success: false,
-          error: error.message || 'Failed to delete share',
-        } as SambaAPIResponse<null>,
-        { status: response.status }
-      );
-    }
-
-    const data = await response.json();
-    return NextResponse.json(data);
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error';
     return NextResponse.json(
-      {
-        success: false,
-        error: message,
-        message: 'Failed to delete share'
-      } as SambaAPIResponse<null>,
+      { success: false, error: message, message: 'Failed to delete share' } as SambaAPIResponse<null>,
       { status: 500 }
     );
   }
