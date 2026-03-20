@@ -90,11 +90,11 @@ export class CloudflareManager {
 
   constructor() {
     const config = loadConfig();
-    this.apiKey = config.cloudflareApiKey || process.env.CLOUDFLARE_API_KEY || '';
+    this.apiKey = config.cloudflareApiKey || process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_API_KEY || '';
     this.accountId = config.cloudflareAccountId || process.env.CLOUDFLARE_ACCOUNT_ID || '';
 
     if (!this.apiKey) {
-      throw new Error('CLOUDFLARE_API_KEY not configured');
+      throw new Error('CLOUDFLARE_API_TOKEN not configured. Set it in /etc/fazai/fazai.conf');
     }
   }
 

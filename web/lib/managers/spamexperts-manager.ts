@@ -48,27 +48,38 @@ export interface SpamExpertsListEntry {
 export class SpamExpertsManager {
   private host: string;
   private apiKey: string;
+  private username: string;
+  private password: string;
 
   constructor() {
     const config = loadConfig();
-    this.host = config.spamExpertsHost || process.env.SPAMEXPERTS_HOST || '';
+    this.host = config.spamExpertsHost || process.env.SPAMEXPERTS_API_URL || process.env.SPAMEXPERTS_HOST || '';
     this.apiKey = config.spamExpertsApiKey || process.env.SPAMEXPERTS_API_KEY || '';
+    this.username = config.spamExpertsUsername || process.env.SPAMEXPERTS_USERNAME || '';
+    this.password = config.spamExpertsPassword || process.env.SPAMEXPERTS_PASSWORD || '';
   }
 
   private async request(endpoint: string, method: string = 'GET', body?: unknown): Promise<unknown> {
-    if (!this.host || !this.apiKey) {
-      throw new Error('SpamExperts configuration missing. Set SPAMEXPERTS_HOST and SPAMEXPERTS_API_KEY');
+    if (!this.host || (!this.apiKey && !this.username)) {
+      throw new Error('SpamExperts configuration missing. Set SPAMEXPERTS_API_URL and SPAMEXPERTS_API_KEY (or SPAMEXPERTS_USERNAME/PASSWORD) in /etc/fazai/fazai.conf');
     }
 
     const url = `${this.host}/api/${endpoint}`;
 
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    if (this.apiKey) {
+      headers['Authorization'] = `Bearer ${this.apiKey}`;
+    } else if (this.username && this.password) {
+      headers['Authorization'] = `Basic ${Buffer.from(`${this.username}:${this.password}`).toString('base64')}`;
+    }
+
     const response = await fetch(url, {
       method,
-      headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      },
+      headers,
       body: body ? JSON.stringify(body) : undefined,
     });
 

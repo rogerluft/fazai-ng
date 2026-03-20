@@ -79,7 +79,7 @@ export class OPNsenseManager {
 
   constructor() {
     const config = loadConfig();
-    this.host = config.opnsenseHost || process.env.OPNSENSE_HOST || '';
+    this.host = config.opnsenseHost || process.env.OPNSENSE_API_URL || process.env.OPNSENSE_HOST || '';
     this.apiKey = config.opnsenseApiKey || process.env.OPNSENSE_API_KEY || '';
     this.apiSecret = config.opnsenseApiSecret || process.env.OPNSENSE_API_SECRET || '';
   }

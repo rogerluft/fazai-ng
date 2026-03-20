@@ -11,9 +11,12 @@ interface FazAIConfig {
   cloudflareAccountId?: string;
   spamExpertsApiKey?: string;
   spamExpertsHost?: string;
+  spamExpertsUsername?: string;
+  spamExpertsPassword?: string;
   opnsenseHost?: string;
   opnsenseApiKey?: string;
   opnsenseApiSecret?: string;
+  opnsenseSslVerify?: boolean;
   webUiUsername?: string;
   webUiPassword?: string;
   webHost?: string;
@@ -53,6 +56,7 @@ export function loadConfig(): FazAIConfig {
           const value = valueParts.join('=').trim().replace(/^["']|["']$/g, '');
 
           switch (key.trim().toUpperCase()) {
+            case 'CLOUDFLARE_API_TOKEN':
             case 'CLOUDFLARE_API_KEY':
               config.cloudflareApiKey = value;
               break;
@@ -62,9 +66,17 @@ export function loadConfig(): FazAIConfig {
             case 'SPAMEXPERTS_API_KEY':
               config.spamExpertsApiKey = value;
               break;
+            case 'SPAMEXPERTS_API_URL':
             case 'SPAMEXPERTS_HOST':
               config.spamExpertsHost = value;
               break;
+            case 'SPAMEXPERTS_USERNAME':
+              config.spamExpertsUsername = value;
+              break;
+            case 'SPAMEXPERTS_PASSWORD':
+              config.spamExpertsPassword = value;
+              break;
+            case 'OPNSENSE_API_URL':
             case 'OPNSENSE_HOST':
               config.opnsenseHost = value;
               break;
@@ -73,6 +85,9 @@ export function loadConfig(): FazAIConfig {
               break;
             case 'OPNSENSE_API_SECRET':
               config.opnsenseApiSecret = value;
+              break;
+            case 'OPNSENSE_SSL_VERIFY':
+              config.opnsenseSslVerify = value !== 'false';
               break;
             case 'WEB_UI_USERNAME':
               config.webUiUsername = value;
@@ -96,11 +111,13 @@ export function loadConfig(): FazAIConfig {
   }
 
   // Override with environment variables
-  config.cloudflareApiKey = process.env.CLOUDFLARE_API_KEY || config.cloudflareApiKey;
+  config.cloudflareApiKey = process.env.CLOUDFLARE_API_TOKEN || process.env.CLOUDFLARE_API_KEY || config.cloudflareApiKey;
   config.cloudflareAccountId = process.env.CLOUDFLARE_ACCOUNT_ID || config.cloudflareAccountId;
   config.spamExpertsApiKey = process.env.SPAMEXPERTS_API_KEY || config.spamExpertsApiKey;
-  config.spamExpertsHost = process.env.SPAMEXPERTS_HOST || config.spamExpertsHost;
-  config.opnsenseHost = process.env.OPNSENSE_HOST || config.opnsenseHost;
+  config.spamExpertsHost = process.env.SPAMEXPERTS_API_URL || process.env.SPAMEXPERTS_HOST || config.spamExpertsHost;
+  config.spamExpertsUsername = process.env.SPAMEXPERTS_USERNAME || config.spamExpertsUsername;
+  config.spamExpertsPassword = process.env.SPAMEXPERTS_PASSWORD || config.spamExpertsPassword;
+  config.opnsenseHost = process.env.OPNSENSE_API_URL || process.env.OPNSENSE_HOST || config.opnsenseHost;
   config.opnsenseApiKey = process.env.OPNSENSE_API_KEY || config.opnsenseApiKey;
   config.opnsenseApiSecret = process.env.OPNSENSE_API_SECRET || config.opnsenseApiSecret;
   config.webUiUsername = process.env.WEB_UI_USERNAME || config.webUiUsername || 'admin';

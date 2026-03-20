@@ -1,15 +1,5 @@
 import { NextResponse } from "next/server";
-
-const mockMemories = [
-  {
-    conversation_id: "conv_001",
-    message_id: 1,
-    role: "user" as const,
-    timestamp: new Date(Date.now() - 3600000).toISOString(),
-    content: "Can you restart the nginx service?",
-    importance: 0.8,
-  },
-];
+import { qdrant } from "@/lib/qdrant";
 
 export async function GET(
   _request: Request,
@@ -18,16 +8,36 @@ export async function GET(
   try {
     const { role } = await params;
 
-    if (role === "all") {
-      return NextResponse.json(mockMemories);
+    const must: any[] = [];
+    if (role !== "all") {
+      must.push({ key: "role", match: { value: role } });
     }
 
-    // Filter by role
-    const filtered = mockMemories.filter((m) => m.role === role);
-    return NextResponse.json(filtered);
-  } catch (error) {
+    const response = await qdrant.scroll("fazai_memory", {
+      filter: must.length > 0 ? { must } : undefined,
+      limit: 50,
+      with_payload: true,
+      with_vector: false,
+    });
+
+    const memories = response.points.map((point) => ({
+      id: point.id,
+      conversation_id: point.payload?.conversation_id,
+      message_id: point.payload?.message_id,
+      role: point.payload?.role,
+      timestamp: point.payload?.timestamp,
+      content: point.payload?.content,
+      summary: point.payload?.summary,
+      emotional_context: point.payload?.emotional_context,
+      importance: point.payload?.importance,
+      tags: point.payload?.tags,
+    }));
+
+    return NextResponse.json(memories);
+  } catch (error: any) {
+    console.error("Failed to fetch memory by role:", error);
     return NextResponse.json(
-      { error: "Failed to fetch memory" },
+      { error: "Failed to fetch memory", details: error.message },
       { status: 500 }
     );
   }
