@@ -1,4 +1,6 @@
 import OpenAI from "openai";
+import fs from "fs";
+import path from "path";
 import { askPrompt, generalAskPrompt } from "./askPrompt";
 import { Readable } from "stream";
 import { models } from "./models";
@@ -31,15 +33,20 @@ const SYSTEM_MESSAGES = {
 
     FERRAMENTAS DISPONÍVEIS (USE COM MODERAÇÃO):
     1. [[WEB: termo de busca específico]] - SOMENTE para informações atuais (notícias, preços, eventos após 2024)
-    2. [[SAVE: texto]] - Para salvar informações importantes que o usuário pede para lembrar
+    2. [[SAVE: texto]] - Para salvar informações importantes que o usuário pede para lembrar (grava embedding no Qdrant)
     3. [[READ: termo]] - Para recuperar algo que foi salvo anteriormente
+    4. [[READFILE: /caminho/completo/do/arquivo]] - Para ler um arquivo do filesystem e usar o conteúdo na resposta
+    5. [[SAVEFILE: /caminho/completo/do/arquivo conteúdo aqui]] - Para criar ou sobrescrever um arquivo no filesystem
 
     REGRAS CRÍTICAS:
     - NÃO use [[WEB:]] para fatos básicos (capitais, geografia, história, ciência, programação)
     - Use [[WEB:]] APENAS para dados atuais. Exemplo: [[WEB: cotação dólar real hoje dezembro 2024]]
     - O termo de busca deve ser ESPECÍFICO, não genérico como "busca"
     - Se usar ferramenta, escreva APENAS a tag completa, nada mais.
-    - Responda diretamente quando souber a resposta.`;
+    - Responda diretamente quando souber a resposta.
+    - Quando o usuário pedir "salve isso" ou "lembre disso", use [[SAVE: trecho relevante]] para gravar APENAS o trecho no Qdrant.
+    - Use [[READFILE:]] quando o usuário pedir para ler, analisar ou verificar um arquivo.
+    - Use [[SAVEFILE:]] quando o usuário pedir para criar, modificar ou salvar conteúdo em um arquivo.`;
 
     // Inject RAG context if available
     if (ragContext) {
@@ -144,6 +151,48 @@ async function executeEcoaTool(command: string): Promise<string> {
       return "Nenhuma memória relevante encontrada.";
     }
     return `MEMÓRIAS RECUPERADAS:\n${summarizeMemories(memories, 600)}`;
+  }
+
+  if (command.startsWith("READFILE:")) {
+    const filePath = command.replace("READFILE:", "").trim();
+    logger.info(`📄 [ECOA] Lendo arquivo: ${filePath}`);
+    const resolved = path.resolve(filePath);
+
+    try {
+      const content = fs.readFileSync(resolved, "utf-8");
+      return `CONTEÚDO DE ${resolved}:\n\`\`\`\n${content}\n\`\`\``;
+    } catch (err: unknown) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      return `ERRO ao ler ${resolved}: ${e.message}`;
+    }
+  }
+
+  if (command.startsWith("SAVEFILE:")) {
+    const rest = command.replace("SAVEFILE:", "").trim();
+    // Format: path\ncontent OR path<space>content (first line/token is path)
+    const newlineIdx = rest.indexOf("\n");
+    const spaceIdx = rest.indexOf(" ");
+    // Prefer newline delimiter; fallback to first space
+    const sepIdx = newlineIdx !== -1 ? newlineIdx : spaceIdx;
+    if (sepIdx === -1) {
+      return "ERRO: Formato: [[SAVEFILE: /path/to/file conteúdo]]";
+    }
+    const filePath = rest.substring(0, sepIdx).trim();
+    const content = rest.substring(sepIdx + 1);
+    logger.info(`💾 [ECOA] Gravando arquivo: ${filePath}`);
+    const resolved = path.resolve(filePath);
+
+    try {
+      const dir = path.dirname(resolved);
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+      }
+      fs.writeFileSync(resolved, content, "utf-8");
+      return `Arquivo salvo com sucesso: ${resolved} (${content.length} bytes)`;
+    } catch (err: unknown) {
+      const e = err instanceof Error ? err : new Error(String(err));
+      return `ERRO ao salvar ${resolved}: ${e.message}`;
+    }
   }
 
   return "Ferramenta desconhecida.";
@@ -373,7 +422,18 @@ async function* _askAISingleProvider(
 function detectEcoaTags(response: string): { hasTag: boolean; command: string | null; beforeTag: string } {
   // Pattern: [[WEB: ...]] or [WEB: ...] - flexible matching
   // Also matches the tag itself for replacement
-  const tagPattern = /\[?\[(WEB|SAVE|READ):\s*([^\]]+)\]?\]/i;
+  // SAVEFILE needs special handling: content may contain ] characters
+  // Try SAVEFILE first with greedy matching up to closing ]]
+  const saveFilePattern = /\[?\[(SAVEFILE):\s*([\s\S]+?)\]\]?/i;
+  const saveMatch = response.match(saveFilePattern);
+  if (saveMatch) {
+    const beforeTag = response.substring(0, saveMatch.index);
+    const command = `${saveMatch[1].toUpperCase()}:${saveMatch[2].trim()}`;
+    return { hasTag: true, command, beforeTag };
+  }
+
+  // Standard tags (WEB, SAVE, READ, READFILE)
+  const tagPattern = /\[?\[(WEB|SAVE|READ|READFILE):\s*([^\]]+)\]?\]/i;
   const match = response.match(tagPattern);
 
   if (match) {
