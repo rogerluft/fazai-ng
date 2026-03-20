@@ -1,5 +1,24 @@
 # FazAI Changelog
 
+## [3.20.1] - 2026-03-20
+
+### 🚀 feat: Single-shot persistence + pseudo-tools + web search injection
+
+#### Core
+- **Single-shot persistence** (`src/commands/ask.ts`): Respostas do `fazai ask` agora persistem automaticamente em `memory.json` e Qdrant (`fazai_memory`)
+- **Pseudo-tools READFILE/SAVEFILE** (`src/askAI.ts`): Novas tools `[[READFILE:]]` e `[[SAVEFILE:]]` permitem ao LLM ler/gravar arquivos. Prompt melhorado para `[[SAVE:]]` seletivo
+- **Web search injection** (`src/cli-mode.ts`): Resultados de busca web injetados no contexto do LLM (antes: exibição direta)
+
+#### Web UI — Fixes
+- **Removidos mocks da API** (`web/lib/api.ts`): Requisições reais com baseURL relativo
+- **Auth middleware** (`web/middleware.ts`): Protege TODAS as rotas, `/api/health` liberado
+- **Config-loader** (`web/lib/managers/config-loader.ts`): Mapeamento correto de `CLOUDFLARE_API_TOKEN`, `SPAMEXPERTS_*`, `OPNSENSE_*`
+- **SpamExperts** (`web/lib/managers/spamexperts-manager.ts`): Suporte a Basic Auth
+
+#### Web UI — Samba
+- **API routes refatoradas** (`web/app/api/samba/*`): Todas as rotas (shares, users, groups, status, restart) refatoradas para usar `execSync` com `testparm`/`net conf`
+- **UI melhorada** (`web/app/(dashboard)/samba/page.tsx`): Exibição de comment, type safety corrigida
+
 ## [3.20.0] - 2026-03-13
 
 ### 🔧 fix: Eliminação de hardcodes + Provider Gemini + Fallback unificado
