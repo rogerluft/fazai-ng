@@ -11,14 +11,14 @@ import type {
 } from "@/types/fazai";
 
 const apiClient = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL || "http://localhost:3000",
+  baseURL: "",
   timeout: 10000,
 });
 
 // Agent Status & Actions
 export async function getAgentStatus(): Promise<AgentStatus> {
-  // MOCK: Returns a default online status
-  return Promise.resolve({ status: "online", uptime_seconds: 3600, actions_per_minute: 10, success_rate: 99, total_actions: 1000, errors_count: 5, memory_usage_mb: 512, cpu_usage_percent: 25 });
+  const response = await apiClient.get<AgentStatus>("/api/agent/status");
+  return response.data;
 }
 
 export async function pauseAgent(): Promise<void> { await apiClient.post("/api/agent/pause"); }
@@ -26,39 +26,96 @@ export async function resumeAgent(): Promise<void> { await apiClient.post("/api/
 export async function stopAgent(): Promise<void> { await apiClient.post("/api/agent/stop"); }
 
 export async function getRecentActions(limit: number = 10): Promise<Action[]> {
-  return Promise.resolve([]);
+  try {
+    const response = await apiClient.get<{ actions: Action[] }>("/api/agent/actions", {
+      params: { limit },
+    });
+    return response.data.actions || [];
+  } catch {
+    return [];
+  }
 }
 
 // Inference Rules
 export async function getRules(limit: number = 100): Promise<InferenceRule[]> {
-    return Promise.resolve([]);
+  try {
+    const response = await apiClient.get<{ rules: InferenceRule[] }>("/api/rules", {
+      params: { limit },
+    });
+    return response.data.rules || [];
+  } catch {
+    return [];
+  }
 }
-export async function createRule(rule: Partial<InferenceRule>): Promise<void> { }
-export async function updateRule(id: string, rule: Partial<InferenceRule>): Promise<void> { }
-export async function deleteRule(id: string): Promise<void> { }
+
+export async function createRule(rule: Partial<InferenceRule>): Promise<void> {
+  await apiClient.post("/api/rules", rule);
+}
+
+export async function updateRule(id: string, rule: Partial<InferenceRule>): Promise<void> {
+  await apiClient.put(`/api/rules/${id}`, rule);
+}
+
+export async function deleteRule(id: string): Promise<void> {
+  await apiClient.delete("/api/rules", { params: { rule_id: id } });
+}
+
 export async function testRule(id: string): Promise<{ success: boolean; result: string }> {
-    return Promise.resolve({ success: true, result: "mocked response" });
+  const response = await apiClient.post(`/api/rules/${id}`, { action: "test" });
+  return response.data;
 }
 
 // Knowledge Base
 export async function getKnowledge(limit: number = 100): Promise<KnowledgeBase[]> {
-    return Promise.resolve([]);
+  try {
+    const response = await apiClient.get<{ knowledge: KnowledgeBase[] }>("/api/knowledge", {
+      params: { limit },
+    });
+    return response.data.knowledge || [];
+  } catch {
+    return [];
+  }
 }
-export async function createKnowledge(kb: Partial<KnowledgeBase>): Promise<void> { }
-export async function deleteKnowledge(id: string): Promise<void> { }
+
+export async function createKnowledge(kb: Partial<KnowledgeBase>): Promise<void> {
+  await apiClient.post("/api/knowledge", kb);
+}
+
+export async function deleteKnowledge(id: string): Promise<void> {
+  await apiClient.delete(`/api/knowledge/${id}`);
+}
 
 // Learning
 export async function getLearning(limit: number = 100): Promise<Learning[]> {
-    return Promise.resolve([]);
+  try {
+    const response = await apiClient.get<{ learnings: Learning[] }>("/api/learning", {
+      params: { limit },
+    });
+    return response.data.learnings || [];
+  } catch {
+    return [];
+  }
 }
 
 // Memory
 export async function searchMemory(query: string, limit: number = 10): Promise<Memory[]> {
-    return Promise.resolve([]);
+  try {
+    const response = await apiClient.get<{ memories: Memory[] }>("/api/memory/search", {
+      params: { query, limit },
+    });
+    return response.data.memories || [];
+  } catch {
+    return [];
+  }
 }
 
 export async function getMemoryByRole(role: string, limit: number = 50): Promise<Memory[]> {
-    return Promise.resolve([]);
+  try {
+    const response = await apiClient.get<Memory[]>(`/api/memory/by-role/${role}`);
+    return response.data || [];
+  } catch {
+    return [];
+  }
 }
 
 // Personality

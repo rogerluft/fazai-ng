@@ -1,18 +1,17 @@
 /**
- * Next.js Middleware for HTTP Basic Auth on API routes
- * Reads credentials from fazai.conf via config-loader
+ * Next.js Middleware for HTTP Basic Auth
+ * Protects all pages and API routes (except health check and static assets)
+ * Reads credentials from env vars (set from fazai.conf at server start)
  */
 
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-// Default credentials (will be overridden by fazai.conf at runtime)
+// Default credentials (overridden by env vars from fazai.conf)
 const DEFAULT_USERNAME = 'admin';
 const DEFAULT_PASSWORD = 'fazai123';
 
 function getCredentials(): { username: string; password: string } {
-  // In middleware, we can't use fs directly, so use env vars
-  // The config-loader will set these from fazai.conf when the server starts
   return {
     username: process.env.WEB_UI_USERNAME || DEFAULT_USERNAME,
     password: process.env.WEB_UI_PASSWORD || DEFAULT_PASSWORD,
@@ -39,21 +38,31 @@ function validateBasicAuth(request: NextRequest): boolean {
 }
 
 export function middleware(request: NextRequest) {
-  // Only protect /api/integrations/* routes
-  if (request.nextUrl.pathname.startsWith('/api/integrations')) {
-    if (!validateBasicAuth(request)) {
-      return new NextResponse('Unauthorized', {
-        status: 401,
-        headers: {
-          'WWW-Authenticate': 'Basic realm="FazAI Web UI"',
-        },
-      });
-    }
+  // Allow health check without auth
+  if (request.nextUrl.pathname === '/api/health') {
+    return NextResponse.next();
+  }
+
+  if (!validateBasicAuth(request)) {
+    return new NextResponse('Unauthorized', {
+      status: 401,
+      headers: {
+        'WWW-Authenticate': 'Basic realm="FazAI Web UI"',
+      },
+    });
   }
 
   return NextResponse.next();
 }
 
 export const config = {
-  matcher: '/api/integrations/:path*',
+  matcher: [
+    /*
+     * Match all request paths except:
+     * - _next/static (static files)
+     * - _next/image (image optimization)
+     * - favicon.ico (browser icon)
+     */
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
 };
