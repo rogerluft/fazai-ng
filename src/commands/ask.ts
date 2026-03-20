@@ -4,6 +4,8 @@ import { checkAPIKey, getAndSetAPIKey } from "../apiKeyUtils-fazai";
 import { askAI } from "../askAI";
 import { logger } from "../logger";
 import { FALLBACK_CHAIN, type ProviderName } from "../utils/provider-fallback";
+import { appendConversationEntry } from "../memory";
+import { storeMemoryInQdrant } from "../services/memory-loader";
 
 async function checkAndSetAPIKey(selectedModel: (typeof models)[number]) {
   const provider = selectedModel.provider;
@@ -101,6 +103,15 @@ export async function handleAskCommand(inputs: string[]): Promise<void> {
     chalk.gray(`Modelo: ${selectedModel.name} (${selectedModel.provider})`)
   );
 
+  const sessionId = `ask-${Date.now()}`;
+  const timestamp = new Date().toISOString();
+
+  // Persist user message (memory.json + Qdrant)
+  appendConversationEntry({ timestamp, role: "user", content: question });
+  storeMemoryInQdrant({ role: "user", content: question, timestamp, sessionId }).catch((err) => {
+    logger.debug(`Failed to store user memory: ${err.message}`);
+  });
+
   const answerStream = askAI(
     "",
     question,
@@ -109,8 +120,19 @@ export async function handleAskCommand(inputs: string[]): Promise<void> {
     true
   );
 
+  let fullResponse = "";
   for await (const chunk of answerStream) {
+    fullResponse += chunk;
     process.stdout.write(chunk);
   }
   logger.info("");
+
+  // Persist assistant response (memory.json + Qdrant)
+  if (fullResponse.length >= 10) {
+    const responseTimestamp = new Date().toISOString();
+    appendConversationEntry({ timestamp: responseTimestamp, role: "assistant", content: fullResponse });
+    storeMemoryInQdrant({ role: "assistant", content: fullResponse, timestamp: responseTimestamp, sessionId }).catch((err) => {
+      logger.debug(`Failed to store assistant memory: ${err.message}`);
+    });
+  }
 }
