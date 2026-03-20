@@ -503,18 +503,54 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         const orchestrator = new ResilienceOrchestrator();
         const result = await orchestrator.executeTaskWithResilience(query);
 
-        if (result.success) {
-          logger.info(chalk.green(`✅ Tarefa concluída no nível: ${result.level}`));
-          logger.info(chalk.bold("\n💡 Resposta Final:"));
-          logger.info(chalk.cyan(result.finalAnswer));
-        } else {
-          logger.warn(chalk.yellow(`⚠️  Não foi possível concluir a tarefa após todos os níveis de fallback.`));
-          if (result.finalAnswer) {
-            logger.info(chalk.bold("\n💡 Resposta Final:"));
-            logger.info(chalk.cyan(result.finalAnswer));
+        if (result.finalAnswer) {
+          logger.info(chalk.green(`✅ Busca concluída (nível: ${result.level}). Injetando no contexto do LLM...`));
+
+          // Persist original user query (not the enriched prompt)
+          const timestamp = new Date().toISOString();
+          conversationHistory.push({ role: "user", content: line });
+          appendConversationEntry({ role: "user", content: line, timestamp });
+          storeMemoryInQdrant({ role: "user", content: line, timestamp, sessionId }).catch((err) => {
+            logger.debug(`Failed to store user memory: ${err.message}`);
+          });
+
+          // Build prompt with web results injected as context (not as user message)
+          const enrichedPrompt = `O usuário pediu: "${query}"\n\n--- RESULTADO DA BUSCA WEB ---\n${result.finalAnswer}\n--- FIM DA BUSCA ---\n\nAnalise e responda com base nestes resultados. Resuma os pontos mais relevantes e adicione seu conhecimento quando útil.`;
+
+          let personalityCtx = "";
+          if (personality) {
+            personalityCtx = buildPersonalitySystemPrompt(personality);
           }
+
+          logger.info(chalk.blueBright("\n🤖 FazAI:"));
+          let response = "";
+          const stream = askAI(
+            personalityCtx,
+            enrichedPrompt,
+            defaultModel.name,
+            defaultModel.provider,
+            true,
+            semanticSearchEnabled
+          );
+          for await (const chunk of stream) {
+            process.stdout.write(chunk);
+            response += chunk;
+          }
+          logger.info("");
+
+          // Persist assistant response
+          if (response.trim().length >= 10) {
+            const respTimestamp = new Date().toISOString();
+            conversationHistory.push({ role: "assistant", content: response.trim() });
+            appendConversationEntry({ role: "assistant", content: response.trim(), timestamp: respTimestamp });
+            storeMemoryInQdrant({ role: "assistant", content: response.trim(), timestamp: respTimestamp, sessionId, context: line.substring(0, 200) }).catch((err) => {
+              logger.debug(`Failed to store assistant memory: ${err.message}`);
+            });
+          }
+        } else {
+          logger.warn(chalk.yellow(`⚠️  Busca não retornou resultados.`));
           if (result.error) {
-             logger.error(chalk.red(`\n❌ Motivo da falha final: ${result.error}`));
+             logger.error(chalk.red(`\n❌ Motivo: ${result.error}`));
           }
         }
       } catch (error: unknown) {
