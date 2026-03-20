@@ -795,6 +795,11 @@ IMPORTANTE: Responda APENAS com um objeto JSON válido no formato:
             prompt,
             format: "json",
             stream: false,
+            options: {
+              num_predict: parseInt(getConfigValue("OLLAMA_NUM_PREDICT") || "1024", 10),
+              temperature: parseFloat(getConfigValue("OLLAMA_TEMPERATURE") || "0"),
+              ...(getConfigValue("OLLAMA_THINK") === "false" && { think: false }),
+            },
           }),
           signal: controller.signal,
         });

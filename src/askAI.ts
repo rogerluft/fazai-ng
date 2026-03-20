@@ -345,16 +345,26 @@ async function* _askAISingleProvider(
       maxRetries: 0,
     });
 
-    const stream = await openai.chat.completions.create({
+    const ollamaNumPredict = parseInt(getConfigValue("OLLAMA_NUM_PREDICT") || "0", 10) || undefined;
+    const ollamaTemp = parseFloat(getConfigValue("OLLAMA_TEMPERATURE") || "0.7");
+    const ollamaThink = getConfigValue("OLLAMA_THINK") !== "false"; // default true, "false" disables
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const createParams: any = {
       model: model,
       messages: [
         { role: "system", content: systemMessage },
         { role: "user", content: prompt },
       ],
       stream: true,
-    });
+      ...(ollamaNumPredict && { max_tokens: ollamaNumPredict }),
+      temperature: ollamaTemp,
+      ...(!ollamaThink && { think: false }),
+    };
 
-    for await (const chunk of stream) {
+    const stream = await openai.chat.completions.create(createParams);
+
+    for await (const chunk of stream as AsyncIterable<OpenAI.Chat.Completions.ChatCompletionChunk>) {
       const content = chunk.choices[0]?.delta?.content || "";
       yield content;
     }
