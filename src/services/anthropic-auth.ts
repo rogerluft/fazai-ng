@@ -25,6 +25,7 @@ const _d = (a: number[]) => String.fromCharCode(...a);
  * Detect authentication type based on credential format
  */
 export function detectAuthType(credential: string): "api_key" | "oauth_token" {
+  // sk-ant-* tokens (including oat01) work as api_key via x-api-key header
   if (credential.startsWith("sk-ant-")) return "api_key";
   if (credential.length > 100) return "oauth_token";
   return "api_key";
