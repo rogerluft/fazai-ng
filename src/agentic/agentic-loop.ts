@@ -466,6 +466,7 @@ import {
   type AgenticSession,
   type SessionState,
 } from "./session-manager.js";
+import { ContextAssembler } from "../context/context-assembler.js";
 
 /**
  * Budget configuration for the agentic loop
@@ -568,9 +569,11 @@ export class BudgetAgenticLoop extends AgenticLoop {
   private estimateTokens: (text: string) => number;
   private onHeartbeat?: (session: AgenticSession) => void;
   private onCircuitBreaker?: (session: AgenticSession) => void;
+  private contextAssembler: ContextAssembler;
 
   constructor(config: BudgetAgenticConfig = {}) {
     super(config);
+    this.contextAssembler = new ContextAssembler();
 
     const defaults = loadBudgetDefaults();
     this.budget = {
@@ -684,9 +687,40 @@ export class BudgetAgenticLoop extends AgenticLoop {
           break;
         }
 
-        // Run iteration (uses parent class method)
+        // ── Phase 2: Context Assembly before LLM call ──────────────
         const iterStart = Date.now();
-        state = await this.runIteration(state);
+        const sessionId = session.sessionId;
+
+        try {
+          const richContext = await this.contextAssembler.build(
+            state.query,
+            sessionId
+          );
+
+          if (richContext.text && !richContext.fromCache) {
+            if (this.config.verbose) {
+              console.log(
+                `[Context] Assembled: ${richContext.tokenEstimate} tokens, ` +
+                `${richContext.ragItemCount} RAG, ${richContext.historyItemCount} history` +
+                `${richContext.truncated ? " (TRUNCATED)" : ""}`
+              );
+            }
+          }
+
+          // Enrich the query with assembled context for this iteration
+          const originalQuery = state.query;
+          state.query = richContext.text +
+            "\n\nAnswer precisely and aligned with your personality.\n";
+          state = await this.runIteration(state);
+          // Restore original query after iteration
+          state.query = originalQuery;
+        } catch (ctxError: any) {
+          // Graceful degradation: if context assembly fails, run without it
+          if (this.config.verbose) {
+            console.warn(`[Context] Assembly failed, running without: ${ctxError.message}`);
+          }
+          state = await this.runIteration(state);
+        }
 
         // Estimate tokens used in this iteration
         const iterTokens = this.estimateIterationTokens(state);
