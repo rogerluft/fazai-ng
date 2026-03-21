@@ -196,6 +196,14 @@ export const configSchema = z.object({
   OPNSENSE_SSL_VERIFY: booleanStringSchema.optional(),
   CRAWLER_STEALTH: booleanStringSchema.optional(),
 
+  // Agentic Loop Budget Settings
+  AGENTIC_MAX_ITERATIONS: z.number().int().positive().max(100).optional(),
+  AGENTIC_TOKEN_BUDGET: z.number().int().positive().optional(),
+  AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES: z.number().int().positive().max(10).optional(),
+  AGENTIC_CIRCUIT_BREAKER_COOLDOWN: z.number().int().positive().optional(),
+  AGENTIC_HEARTBEAT_INTERVAL: z.number().int().positive().optional(),
+  AGENTIC_SESSION_PERSIST: booleanStringSchema.optional(),
+
   // Other Settings
   WEB_HOST: z.string().optional(),
   WEB_PORT: z.number().int().positive().max(65535).optional(),
@@ -223,6 +231,11 @@ const NUMERIC_FIELDS = new Set([
   "VECTOR_DIMENSION",
   "API_TIMEOUT",
   "EMBEDDING_TIMEOUT",
+  "AGENTIC_MAX_ITERATIONS",
+  "AGENTIC_TOKEN_BUDGET",
+  "AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES",
+  "AGENTIC_CIRCUIT_BREAKER_COOLDOWN",
+  "AGENTIC_HEARTBEAT_INTERVAL",
 ]);
 
 /**

@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh pr view:*)",
+      "Bash(git fetch:*)",
+      "Bash(curl:*)",
+      "Bash(podman ps:*)",
+      "Bash(./scripts/qdrant-search.sh:*)",
+      "mcp__sequential-thinking__sequentialthinking",
+      "Bash(git checkout:*)",
+      "Bash(git reset:*)",
+      "Skill(commit-commands:commit)",
+      "mcp__filesystem__read_text_file"
+    ]
+  },
+  "outputStyle": "Learning",
+  "remote": {
+    "defaultEnvironmentId": "env_011CUaYUBgsX3ghnga9jVBpU"
+  }
+}

@@ -6,7 +6,8 @@
 import chalk from "chalk";
 import ora from "ora";
 import { runAgenticLoop, runReflection, listAvailableScripts } from "../agentic/genai-runner.js";
-import { AgenticLoop, runAgenticQuery } from "../agentic/agentic-loop.js";
+import { AgenticLoop, runAgenticQuery, BudgetAgenticLoop, runBudgetAgenticQuery } from "../agentic/agentic-loop.js";
+import { getSessionManager } from "../agentic/session-manager.js";
 
 const HELP = `
 ${chalk.bold.cyan("fazai agent")} - Coração Agêntico do FazAI
@@ -16,29 +17,37 @@ ${chalk.bold("USAGE:")}
 
 ${chalk.bold("SUBCOMMANDS:")}
   ${chalk.green("loop")} <query>      Executa loop agêntico nativo completo (RECOMENDADO)
+  ${chalk.green("budget")} <query>    Executa loop com budget tracking (max iterations + tokens)
   ${chalk.green("run")} <query>       Executa via GenAIScript (requer npx genaiscript)
   ${chalk.green("reflect")}           Executa reflexão autônoma sobre aprendizados
   ${chalk.green("native")} <query>    Alias para loop (compatibilidade)
   ${chalk.green("scripts")}           Lista scripts GenAIScript disponíveis
-  ${chalk.green("status")}            Mostra status do sistema agêntico
+  ${chalk.green("status")} [id]       Mostra status do sistema ou sessão específica
+  ${chalk.green("sessions")}          Lista todas as sessões agênticas
+  ${chalk.green("pause")} <id>        Pausa uma sessão em execução
+  ${chalk.green("resume")} <id>       Retoma uma sessão pausada
+  ${chalk.green("kill")} <id>         Encerra uma sessão
 
 ${chalk.bold("EXAMPLES:")}
   fazai agent loop "como otimizar embeddings locais no DL380"
-  fazai agent loop "configure samba para compartilhamento" -v
+  fazai agent budget "configure samba para compartilhamento" -i 20 --token-budget 100000
   fazai agent run "teste com GenAIScript" --model ollama:phi3
-  fazai agent reflect
-  fazai agent status
+  fazai agent sessions
+  fazai agent pause <session-id>
+  fazai agent status <session-id>
 
 ${chalk.bold("OPTIONS:")}
-  --verbose, -v       Mostra output detalhado
-  --model, -m         Modelo a usar (ex: ollama:phi3, anthropic:claude-sonnet-4-5)
-  --iterations, -i    Número máximo de iterações (default: 5)
+  --verbose, -v         Mostra output detalhado
+  --model, -m           Modelo a usar (ex: ollama:phi3, anthropic:claude-sonnet-4-5)
+  --iterations, -i      Número máximo de iterações (default: from config or 5)
+  --token-budget, -t    Budget máximo de tokens (default: from config or 50000)
 `;
 
 interface AgentOptions {
   verbose?: boolean;
   model?: string;
   iterations?: number;
+  tokenBudget?: number;
 }
 
 function parseArgs(args: string[]): { command: string; query: string; options: AgentOptions } {
@@ -54,6 +63,8 @@ function parseArgs(args: string[]): { command: string; query: string; options: A
       options.model = args[++i];
     } else if (arg === "--iterations" || arg === "-i") {
       options.iterations = parseInt(args[++i], 10);
+    } else if (arg === "--token-budget" || arg === "-t") {
+      options.tokenBudget = parseInt(args[++i], 10);
     } else if (!arg.startsWith("-")) {
       positional.push(arg);
     }
@@ -235,6 +246,143 @@ async function handleStatus(): Promise<void> {
   console.log();
 }
 
+async function handleBudgetLoop(query: string, options: AgentOptions): Promise<void> {
+  if (!query) {
+    console.error(chalk.red("Erro: Query é obrigatória"));
+    console.log("Uso: fazai agent budget <query>");
+    return;
+  }
+
+  console.log(chalk.cyan("\n💰 Iniciando Budget Agentic Loop..."));
+  console.log(chalk.dim(`Query: "${query}"`));
+  console.log(chalk.dim(`Max Iterações: ${options.iterations || 'config default'}`));
+  console.log(chalk.dim(`Token Budget: ${options.tokenBudget || 'config default'}`));
+  console.log();
+
+  const spinner = ora("Executando loop com budget tracking...").start();
+
+  try {
+    const loop = new BudgetAgenticLoop({
+      maxIterations: options.iterations,
+      enableReflection: true,
+      enableLearning: true,
+      verbose: options.verbose,
+      budget: {
+        maxIterations: options.iterations,
+        tokenBudget: options.tokenBudget,
+      },
+    });
+
+    const result = await loop.runWithBudget(query);
+    spinner.stop();
+
+    console.log(loop.formatBudgetOutput(result));
+
+    if (result.exitReason === "circuit_breaker") {
+      console.log(chalk.yellow("\n⚠ Circuit breaker ativado! Considere ajustar a query."));
+    } else if (result.exitReason === "budget_exhausted") {
+      console.log(chalk.yellow("\n💰 Budget esgotado. Use --token-budget ou --iterations para aumentar."));
+    }
+  } catch (error) {
+    spinner.fail("Erro ao executar budget loop");
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+  }
+}
+
+async function handleSessions(): Promise<void> {
+  const manager = getSessionManager();
+  const sessions = manager.listSessions();
+
+  if (sessions.length === 0) {
+    console.log(chalk.dim("\nNenhuma sessão agêntica ativa."));
+    return;
+  }
+
+  console.log(chalk.bold(`\n=== Sessões Agênticas (${sessions.length}) ===\n`));
+  for (const session of sessions) {
+    const stateColor = {
+      running: chalk.green,
+      paused: chalk.yellow,
+      completed: chalk.cyan,
+      failed: chalk.red,
+      killed: chalk.gray,
+    };
+    const colorFn = stateColor[session.state] || chalk.white;
+    console.log(colorFn(manager.formatSession(session)));
+    console.log();
+  }
+}
+
+async function handlePause(sessionId: string): Promise<void> {
+  if (!sessionId) {
+    console.error(chalk.red("Erro: Session ID é obrigatório"));
+    console.log("Uso: fazai agent pause <session-id>");
+    return;
+  }
+
+  const manager = getSessionManager();
+  const success = manager.pauseSession(sessionId);
+
+  if (success) {
+    console.log(chalk.yellow(`⏸️  Sessão ${sessionId} pausada.`));
+  } else {
+    console.error(chalk.red(`❌ Não foi possível pausar a sessão ${sessionId}`));
+  }
+}
+
+async function handleResume(sessionId: string): Promise<void> {
+  if (!sessionId) {
+    console.error(chalk.red("Erro: Session ID é obrigatório"));
+    console.log("Uso: fazai agent resume <session-id>");
+    return;
+  }
+
+  const manager = getSessionManager();
+  const success = manager.resumeSession(sessionId);
+
+  if (success) {
+    console.log(chalk.green(`▶️  Sessão ${sessionId} retomada.`));
+  } else {
+    console.error(chalk.red(`❌ Não foi possível retomar a sessão ${sessionId}`));
+  }
+}
+
+async function handleKill(sessionId: string): Promise<void> {
+  if (!sessionId) {
+    console.error(chalk.red("Erro: Session ID é obrigatório"));
+    console.log("Uso: fazai agent kill <session-id>");
+    return;
+  }
+
+  const manager = getSessionManager();
+  const success = manager.killSession(sessionId);
+
+  if (success) {
+    console.log(chalk.red(`💀 Sessão ${sessionId} encerrada.`));
+  } else {
+    console.error(chalk.red(`❌ Não foi possível encerrar a sessão ${sessionId}`));
+  }
+}
+
+async function handleSessionStatus(sessionId: string): Promise<void> {
+  if (!sessionId) {
+    // Fall back to system status
+    await handleStatus();
+    return;
+  }
+
+  const manager = getSessionManager();
+  const session = manager.getSession(sessionId);
+
+  if (!session) {
+    console.error(chalk.red(`❌ Sessão não encontrada: ${sessionId}`));
+    return;
+  }
+
+  console.log(chalk.bold("\n=== Sessão Agêntica ==="));
+  console.log(manager.formatSession(session));
+}
+
 export async function handleAgentCommand(args: string[]): Promise<void> {
   const { command, query, options } = parseArgs(args);
 
@@ -245,6 +393,10 @@ export async function handleAgentCommand(args: string[]): Promise<void> {
 
     case "loop":
       await handleLoop(query, options);
+      break;
+
+    case "budget":
+      await handleBudgetLoop(query, options);
       break;
 
     case "reflect":
@@ -260,7 +412,23 @@ export async function handleAgentCommand(args: string[]): Promise<void> {
       break;
 
     case "status":
-      await handleStatus();
+      await handleSessionStatus(query);
+      break;
+
+    case "sessions":
+      await handleSessions();
+      break;
+
+    case "pause":
+      await handlePause(query);
+      break;
+
+    case "resume":
+      await handleResume(query);
+      break;
+
+    case "kill":
+      await handleKill(query);
       break;
 
     case "help":

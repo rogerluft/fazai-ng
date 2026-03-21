@@ -25,10 +25,20 @@ export interface ExecutionResult {
  */
 export class ResilienceOrchestrator {
   private webCrawler: AgenticWebCrawler;
+  private lastTokenEstimate: number = 0;
+  private budgetTracker?: (tokensUsed: number) => void;
 
-  constructor() {
+  constructor(options?: { budgetTracker?: (tokensUsed: number) => void }) {
     this.webCrawler = new AgenticWebCrawler();
+    this.budgetTracker = options?.budgetTracker;
     logger.debug('ResilienceOrchestrator initialized.');
+  }
+
+  /**
+   * Get estimated tokens from the last execution
+   */
+  public getLastTokenEstimate(): number {
+    return this.lastTokenEstimate;
   }
 
   /**

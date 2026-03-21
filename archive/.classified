@@ -1,0 +1,317 @@
+3.0 PROMPT MESTRE — ANTIGRAVITY ORCHESTRATOR
+Revisado por Claudio (Claude Opus 4.6) com estado real do repo v3.21.0
+Para: Antigravity Mission Control mode
+De: Roger Luft (Andarilho dos Véus)
+________________________________________
+
+Pré-execução (instrução do Roger):
+Claudio analisou o repositório completo e preparou o spec abaixo com estado real.
+O prompt NÃO dita quem codifica — Roger decide por tarefa.
+Os agentes do Antigravity analisam, planejam e propõem. Execução é por demanda.
+
+________________________________________
+PROMPT MESTRE – ANTIGRAVITY ORCHESTRATOR (copie inteiro)
+
+You are the Antigravity Orchestrator (Mission Control mode). Use your full multi-agent system with Manager View.
+
+Repository: https://github.com/rogerluft/fazai-ng
+Version: 3.21.0
+Stack: TypeScript/Node.js (npm run build → tsc)
+
+## SPEC COMPLETO — ESTADO ATUAL v3.21.0
+
+### Entry Points
+- CLI: bin/fazai → src/app.ts (main orchestrator)
+- Web UI: src/web/ (Express, 4 pages: dashboard, ask, research, settings)
+- MCP Server: src/mcp/server.ts (Model Context Protocol)
+- Daemon: fazai-daemon.service (systemd, watchdog)
+
+### Architecture: ECOA (Evolução Cognitiva via Arrays Autoinformativos)
+- ResilienceOrchestrator: src/orchestrator/resilience-orchestrator.ts (multi-provider failover)
+- ResearchCoordinator: src/research.ts (RAG-first research chain)
+- TaskRouter: src/orchestrator/task-router.ts (intent classification → routing)
+- Linux Executor: src/linux-executor.ts + src/linux-admin.ts (safe command execution)
+
+### AI Providers (fallback chain in fazai.conf PROVIDER_FALLBACK_ORDER)
+- Anthropic: Claude Opus 4.6 (primary) — native fetch, no SDK, no curl
+- Google: Gemini via Cloudflare Worker proxy
+- Ollama: local models (Qwen 3.5 primary offline, Phi-3 fallback) at 192.168.0.101
+- OpenRouter: aggregator (includes MiniMax M2.5 as backup)
+- Perplexity: web-augmented research
+- OpenAI: GPT models
+- Llama: local llama.cpp server
+
+### Memory & RAG (Qdrant + ONNX local embeddings)
+- Vector DB: Qdrant (6 collections, 768d BGE-base-en-v1.5 via ONNX)
+- Collections: fazai_personality, fazai_memory, fazai_learning, fazai_kb, fazai_inference, fazai_semantic_cache
+- Embedding: src/services/universal-embedder.ts (ONNX local, no API calls)
+- Semantic Cache: src/services/semantic-cache.ts (threshold 0.6)
+- Memory Loader: src/services/memory-loader.ts (500 entries max)
+- Source Indexer: src/services/source-indexer.ts (codebase indexing)
+
+### Research Chain (ordered)
+1. RAG Local (Qdrant semantic search)
+2. Perplexity (web-augmented)
+3. Context7 (library docs via MCP)
+4. Brave Search (web)
+5. DuckDuckGo (fallback)
+6. Web Crawler: src/research/web-crawler.ts (Playwright + stealth mode via CRAWLER_STEALTH flag)
+
+### Security (5 layers — DO NOT TOUCH)
+- Risk Classification: CRITICAL/HIGH/MEDIUM/LOW
+- Dry-run mode (preview before execute)
+- Rollback capability
+- Maestro Cleaner (GenAIScript: genaisrc/cleaner.genai.mjs)
+- Watchdog: src/services/watchdog.ts
+
+### Agentic Loop (CURRENT — to be evolved)
+- AGENTIC_MAX_ITERATIONS=5 (fazai.conf)
+- AGENTIC_TIMEOUT=120000ms
+- ReAct-style but limited iterations
+
+### GenAIScript (genaisrc/)
+- cleaner.genai.mjs (Maestro Cleaner)
+- fazai-core.genai.mjs (core prompts)
+- reflect.genai.mjs (self-reflection)
+- qa-reporter.genai.mjs (quality assurance)
+- qdrant-adapter.genai.mjs (vector ops)
+- completion-sync.genai.mjs
+- model-migration-test.genai.mjs
+
+### Orchestrator Clients
+- Jules (Google): src/orchestrator/jules-client.ts + jules-api-client.ts
+- Copilot: src/orchestrator/copilot-client.ts
+- Gemini: src/orchestrator/gemini-client.ts
+- Qdrant ops: qdrant-backup.ts, qdrant-container.ts, qdrant-metrics.ts, qdrant-import-export.ts
+
+### Services Layer
+- anthropic-auth.ts (multi-method auth, native fetch)
+- cached-embedding-service.ts (embedding with cache layer)
+- skill-seeker.ts (skill discovery)
+- personality-loader.ts + personality-ingestor.ts
+- api-cache.ts, api-status-checker.ts
+
+### Config
+- Central: /etc/fazai/fazai.conf (ALL config here, nowhere else)
+- Schema validation: src/config/schema.ts (Zod)
+- Timeouts: src/config/timeouts.ts (fetchWithTimeout)
+
+### Tests
+- 546 passing, 12 skipped
+- Framework: Vitest
+- Location: tests/unit/, tests/utils/
+
+________________________________________
+
+## MISSION: Evolve FazAI-NG to next-gen autonomous agent
+
+Goals (4 phases, agents collaborate holistically):
+
+### PHASE 1 — Budget-Based Agent Loop + Heartbeat
+- Evolve current loop from fixed 5 iterations to budget-based: configurable max_iterations + token_budget + circuit_breaker
+- NOT infinite — "run until complete, fail, or exhaust budget"
+- Add heartbeat every 30s (log + Qdrant status update)
+- Session persistence (save state in fazai_memory + semantic_cache)
+- Commands: /pause, /resume, /status, /kill
+- Integrate Maestro Cleaner in loop
+- RESPECT existing ResilienceOrchestrator — extend, don't replace
+
+### PHASE 2 — Intelligent Context Assembly (the 10x multiplier)
+- Before EVERY LLM call, auto-build rich context from existing collections:
+  - Personalidade (from fazai_personality)
+  - Regras de Segurança (from fazai_inference)
+  - Contexto Relevante (RAG top-5 chunks threshold 0.65 from all 6 collections)
+  - Histórico Recente (from fazai_memory)
+  - Tarefa Atual
+- Create src/context/context-assembler.ts — hook into the loop
+- USE existing universal-embedder.ts and semantic-cache.ts — don't recreate
+
+### PHASE 3 — Mature Skill/Tool Registry
+- Centralized registry (src/skills/registry.ts)
+- Each skill: id, name, description, JSON schema, handler, permissionLevel, category
+- Auto-discovery from genaisrc/ (already has 7+ scripts)
+- Commands: /skills, /use <skill>
+- Dynamic runtime registration
+- EXTEND existing skill-seeker.ts
+
+### PHASE 4 — Gateway-ready (multi-input normalization)
+- Normalize inputs (terminal CLI, web UI, webhook, future Telegram)
+- Abstract input/output layer for future channels
+- Keep existing web UI working as-is
+
+## RULES FOR ALL AGENTS
+- Analyze and propose — execution decided by Roger per task
+- Preserve ALL 5 security layers untouched
+- Use GenAIScript where possible for prompts
+- Keep everything TypeScript, clean, modular
+- Extend existing components (ResilienceOrchestrator, ResearchCoordinator, universal-embedder) — don't replace
+- Config goes in fazai.conf — no new config files
+- Tests must pass (546+ current baseline)
+
+## OUTPUT FORMAT
+1. Complete spec of proposed changes (files to create/modify)
+2. Architecture diagrams (text-based) showing integration with existing components
+3. Detailed implementation plan per phase with dependencies
+4. Risk assessment (what could break, how to mitigate)
+5. Suggested execution order and who should code each part
+6. Test plan for each phase
+
+Start the mission. Coordinator, assign agents and begin analysis.
+
+________________________________________
+Notas do Roger:
+- Online: segue PROVIDER_FALLBACK_ORDER do conf + MiniMax via Ollama bridge ou OpenRouter
+- Offline: Ollama → Qwen 3.5 (primary), Phi-3 (fallback)
+- Quem codifica cada parte é decisão minha, não do prompt
+- Próximas evoluções: Telegram gateway, multi-agente nativo, Ollama como bridge provider nativo
+
+________________________________________
+## CLAUDIO'S NOTES (for Antigravity team — English)
+
+### On MiniMax M2.5 Integration
+A separate prompt was suggested (by Gemini) to make MiniMax the primary code generation provider with its own system prompt and free tier. We REJECT this approach. Reasons:
+
+1. **MiniMax is a fallback, not primary.** Claude Opus 4.6 remains the main model. MiniMax enters the existing PROVIDER_FALLBACK_ORDER chain — it does NOT get special treatment or a dedicated code path.
+2. **No free tier dependency.** Production systems don't rely on free tiers. MiniMax access goes through Ollama bridge (192.168.0.101) or OpenRouter with API key.
+3. **No per-provider system prompts.** PHASE 2 (Context Assembly) already handles context injection before EVERY LLM call, regardless of provider. Adding provider-specific prompts creates fragmentation.
+4. **MCP consumption is already in scope.** FazAI has src/mcp/server.ts. Expanding to consume external MCP servers (Zapier, etc.) fits under PHASE 4 (Gateway). No separate architecture needed.
+5. **Local execution already exists.** linux-executor.ts + linux-admin.ts handle safe local command execution with 5 security layers. This is not a new feature.
+
+### How MiniMax SHOULD be integrated
+- Add `minimax` to `validProviders` in src/config/schema.ts
+- Add MiniMax model support in ResilienceOrchestrator fallback chain
+- Access via OpenRouter (`minimax/minimax-m2.5`) or Ollama bridge — zero new provider code
+- Follows same context assembly, same security layers, same everything as other providers
+
+
+####################################
+#  REVISAO FINAL
+#
+##########################
+
+You are the Antigravity Orchestrator (Mission Control mode). Use your full multi-agent system with Manager View.
+Repository: https://github.com/rogerluft/fazai-ng (but WORK DIRECTLY on LOCAL clone via SSH – current working directory; GitHub lags at public view, trust local files)
+Version: latest local (v3.21.0 – native fetch Anthropic, Brave Search integration, repo cleanup from recent commits)
+
+## SPEC COMPLETO — ESTADO ATUAL v3.21.0 local
+Entry Points
+- CLI: bin/fazai → src/app.ts (main orchestrator)
+- Web UI: src/web/ (Express/Next.js, dashboard, ask, research, settings)
+- MCP Server: src/mcp/server.ts
+- Daemon: fazai-daemon.service (systemd, watchdog)
+
+Architecture: ECOA (Evolução Cognitiva via Arrays Autoinformativos)
+- ResilienceOrchestrator: src/orchestrator/resilience-orchestrator.ts (multi-provider failover)
+- ResearchCoordinator: src/research.ts (RAG-first chain)
+- TaskRouter: src/orchestrator/task-router.ts (intent → routing)
+- Linux Executor: src/linux-executor.ts + src/linux-admin.ts (safe exec)
+
+AI Providers (fallback chain in fazai.conf PROVIDER_FALLBACK_ORDER)
+- Primary: Anthropic Claude Opus 4.6 (native fetch, no SDK/curl)
+- Google Gemini via Cloudflare proxy
+- Ollama local (Qwen 3.5 primary, Phi-3 fallback) at 192.168.0.101
+- OpenRouter (inclui MiniMax M2.5 fallback)
+- Perplexity (web-augmented)
+- OpenAI, Llama.cpp local
+
+Memory & RAG
+- Qdrant: 6 collections (fazai_personality, fazai_memory, fazai_learning, fazai_kb, fazai_inference, fazai_semantic_cache)
+- Embeddings: src/services/universal-embedder.ts (ONNX local BGE-base-en-v1.5, 768d)
+- Semantic Cache: src/services/semantic-cache.ts (threshold 0.6)
+- Memory Loader: src/services/memory-loader.ts (max 500 entries)
+
+Research Chain (ordered)
+1. RAG Local (Qdrant)
+2. Perplexity
+3. Context7 (MCP)
+4. Brave Search
+5. DuckDuckGo
+6. Web Crawler (Playwright stealth)
+
+Security (5 layers – DO NOT TOUCH)
+- Risk CRITICAL/HIGH/MEDIUM/LOW
+- Dry-run
+- Rollback
+- Maestro Cleaner (GenAIScript: genaisrc/cleaner.genai.mjs)
+- Watchdog: src/services/watchdog.ts
+
+Agentic Loop (CURRENT)
+- AGENTIC_MAX_ITERATIONS=5
+- AGENTIC_TIMEOUT=120000ms
+- ReAct-style limited
+
+GenAIScript (genaisrc/)
+- cleaner.genai.mjs (Maestro)
+- fazai-core.genai.mjs, reflect.genai.mjs, qa-reporter.genai.mjs, etc.
+
+Config
+- Central: /etc/fazai/fazai.conf (Zod validated)
+- Timeouts: src/config/timeouts.ts
+
+Tests: 546 passing, Vitest
+
+## MISSION: Evolve to next-gen autonomous agent – capture OpenClaw magic + extras
+Goals (5 phases – agents collaborate holistically):
+
+PHASE 1 — Budget-Based Agent Loop + Heartbeat
+- Evolve to budget-based: configurable max_iterations + token_budget + circuit_breaker
+- Run until complete/fail/exhaust budget (not infinite)
+- Heartbeat 30s (log + Qdrant status)
+- Session persistence (fazai_memory + semantic_cache)
+- Commands: /pause /resume /status /kill
+- Integrate Maestro Cleaner in loop (invoke only)
+- Extend ResilienceOrchestrator – don't replace
+
+PHASE 2 — Intelligent Context Assembly (10x multiplier)
+- Before EVERY LLM call: auto-build rich context
+  - Personalidade (fazai_personality)
+  - Regras de Segurança (fazai_inference)
+  - Contexto Relevante (RAG top-5 threshold 0.65 all collections)
+  - Histórico Recente (fazai_memory)
+  - Tarefa Atual
+- Create src/context/context-assembler.ts – hook in loop
+- Use universal-embedder.ts + semantic-cache.ts existing
+
+PHASE 3 — Mature Skill/Tool Registry
+- Centralized: src/skills/registry.ts
+- Skill: id, name, description, JSON schema, handler, permissionLevel, category
+- Auto-discovery genaisrc/
+- Commands: /skills /use <skill>
+- Dynamic runtime registration
+- Extend existing skill-seeker.ts
+
+PHASE 4 — Gateway-ready (multi-input)
+- Normalize inputs (CLI, web UI, webhook, future Telegram)
+- Abstract I/O layer
+- Keep web UI intact
+
+PHASE 5 — Async Memory Freshness Injector
+- Background worker (Node + systemd timer/cron)
+- Triggers: every agent call OR 24h
+- Scan/inject last 2 days history/context into Qdrant (memory + semantic_cache)
+- Hybrid: Qdrant + sqlite-vector (fast fresh) + ≤200GB RAM cache
+- Check existing code for prior async logic
+
+## RULES FOR ALL AGENTS
+- Analyze local files first – propose only
+- Execution decided by Roger per task
+- Preserve ALL 5 security layers untouched
+- NEVER modify genaisrc/cleaner.genai.mjs or Maestro Cleaner logic – only call/invoke from loop (e.g. post-iteration or circuit breaker)
+- Use GenAIScript where possible
+- TypeScript, clean, modular
+- Extend existing (ResilienceOrchestrator, ResearchCoordinator, universal-embedder, skill-seeker) – don't replace
+- Config only in fazai.conf – no new files
+- Tests must pass (546+ baseline)
+- MiniMax: add to PROVIDER_FALLBACK_ORDER via OpenRouter (minimax/minimax-m2.5) or Ollama bridge – no new client/special prompt
+
+## OUTPUT FORMAT (strict)
+1. Summary of local code discoveries (CLI, loop, memory, async parts)
+2. Complete spec of changes (new/modified files with full code)
+3. Text-based architecture diagrams (integration with existing)
+4. Detailed implementation plan per phase + dependencies
+5. Risk assessment + mitigations
+6. Suggested execution order + who codes each (Roger decides)
+7. Test plan per phase
+8. One-liner per phase: "Expected power gain: X → Y" (e.g. limited 5 iter → budget-aware long-running autonomous)
+
+Start mission. Analyze local first, coordinate sub-agents.
