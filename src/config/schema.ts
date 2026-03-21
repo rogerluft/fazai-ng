@@ -194,6 +194,7 @@ export const configSchema = z.object({
   ENABLE_PREVIEW_FEATURES: booleanStringSchema.optional(),
   FAZAI_DISABLE_RESEARCH: booleanStringSchema.optional(),
   OPNSENSE_SSL_VERIFY: booleanStringSchema.optional(),
+  CRAWLER_STEALTH: booleanStringSchema.optional(),
 
   // Other Settings
   WEB_HOST: z.string().optional(),

@@ -21,11 +21,34 @@ import PQueue from "p-queue";
 import { logger } from "../logger";
 import { createEmbeddingService } from "../services/embeddings";
 import { getQdrantClient } from "../database/qdrant-pool";
+import { getConfigValue } from "../config";
 import { randomUUID } from "crypto";
 import { FAZAI_PATHS } from "../utils/paths";
 import * as fs from "fs";
 import * as path from "path";
 import type { PlaywrightCrawler } from "crawlee";
+
+const _ua = [
+  "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0",
+  "Mozilla/5.0 (X11; Ubuntu; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+  "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4 Safari/605.1.15",
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+];
+
+const _ref = [
+  "https://www.google.com/",
+  "https://www.google.com.br/",
+  "https://duckduckgo.com/",
+  "https://www.bing.com/",
+  "https://search.yahoo.com/",
+];
+
+function _pick<T>(arr: T[]): T { return arr[Math.floor(Math.random() * arr.length)]; }
+function _delay(min: number, max: number): Promise<void> {
+  return new Promise(r => setTimeout(r, min + Math.random() * (max - min)));
+}
 
 /**
  * Search result from a single source
@@ -92,6 +115,7 @@ export class AgenticWebCrawler {
   private cache: Map<string, CacheEntry>;
   private isSaving = false;
   private pendingSave = false;
+  private stealth: boolean;
 
   /**
    * Available sources organized by category
@@ -124,10 +148,10 @@ export class AgenticWebCrawler {
   };
 
   constructor() {
-    // Rate limiting: max 5 concurrent requests, 1 request per second
-    this.queue = new PQueue({ concurrency: 5, interval: 1000, intervalCap: 1 });
+    const flag = getConfigValue("CRAWLER_STEALTH") || process.env.CRAWLER_STEALTH || "";
+    this.stealth = ["1", "true", "yes", "on"].includes(flag.toLowerCase());
 
-    // Cache file
+    this.queue = new PQueue({ concurrency: 5, interval: 1000, intervalCap: 1 });
     this.cacheFile = path.join(FAZAI_PATHS.DATA, "web-search-cache.json");
     this.cache = this.loadCache();
   }
@@ -213,24 +237,34 @@ export class AgenticWebCrawler {
       let results: SearchResult[] = [];
 
       if (sourceType === "browser") {
-        // Browser scraping (SPA) - pass URL directly to parser
-        // We do not use the abort controller timeout here as Crawlee manages its own timeouts
-        // but we could race it if needed. For now, rely on Crawlee configuration.
         results = await source.parser(url);
       } else {
-        // HTTP scraping (Static)
+        if (this.stealth) await _delay(800, 2500);
+
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), timeout);
 
-        const response = await fetch(url, {
-          headers: {
-            "User-Agent": "Mozilla/5.0 (compatible; FazAI/3.5.4; +https://github.com/rogerluft/fazai-ng)",
-            Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-            "Accept-Language": "en-US,en;q=0.9",
-          },
-          signal: controller.signal,
-        });
+        const headers: Record<string, string> = {
+          Accept: "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "en-US,en;q=0.9,pt-BR;q=0.8",
+          "Accept-Encoding": "gzip, deflate, br",
+          "Cache-Control": "no-cache",
+          "User-Agent": this.stealth
+            ? _pick(_ua)
+            : "Mozilla/5.0 (compatible; FazAI/3.21; +https://github.com/rogerluft/fazai-ng)",
+        };
 
+        if (this.stealth) {
+          headers["Referer"] = _pick(_ref);
+          headers["Sec-Fetch-Dest"] = "document";
+          headers["Sec-Fetch-Mode"] = "navigate";
+          headers["Sec-Fetch-Site"] = "none";
+          headers["Sec-Fetch-User"] = "?1";
+          headers["Upgrade-Insecure-Requests"] = "1";
+          headers["DNT"] = "1";
+        }
+
+        const response = await fetch(url, { headers, signal: controller.signal });
         clearTimeout(timeoutId);
 
         if (!response.ok) {
@@ -381,21 +415,44 @@ export class AgenticWebCrawler {
       }
     }
 
-    // FALLBACK: Playwright Scraping with strict timeout (Option C)
+    // FALLBACK: Playwright Scraping with strict timeout
     const { PlaywrightCrawler, Dataset } = await import("crawlee");
     const datasetName = `devdocs-${randomUUID()}`;
     const dataset = await Dataset.open(datasetName);
     let crawler: PlaywrightCrawler | null = null;
+    const stealth = this.stealth;
 
     try {
+      const launchContext: Record<string, unknown> = {};
+      if (stealth) {
+        const vw = 1280 + Math.floor(Math.random() * 640);
+        const vh = 720 + Math.floor(Math.random() * 360);
+        launchContext.launchOptions = {
+          args: [
+            "--disable-blink-features=AutomationControlled",
+            `--window-size=${vw},${vh}`,
+          ],
+        };
+        launchContext.userAgent = _pick(_ua);
+      }
+
       crawler = new PlaywrightCrawler({
-        maxRequestsPerCrawl: 1, // só uma página por vez aqui, mas escalável
-        maxConcurrency: 1, // ajusta pra tua máquina/servidor
+        maxRequestsPerCrawl: 1,
+        maxConcurrency: 1,
         requestHandlerTimeoutSecs: 30,
         headless: true,
         navigationTimeoutSecs: 15,
+        ...launchContext,
         requestHandler: async ({ page, request }) => {
-          // Bloqueia lixo pra velocidade máxima
+          if (stealth) {
+            await page.addInitScript(() => {
+              Object.defineProperty(navigator, "webdriver", { get: () => false });
+              Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en", "pt-BR"] });
+              Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] });
+              (window as any).chrome = { runtime: {} };
+            });
+          }
+
           await page.route('**/*', (route) => {
             const type = route.request().resourceType();
             if (['stylesheet', 'font', 'image', 'media'].includes(type)) {
