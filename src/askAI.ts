@@ -9,7 +9,7 @@ import { perplexityProvider } from "./providers/perplexity-provider";
 import { getLlamaProvider } from "./providers/llama";
 import { SemanticCache } from "./services/semantic-cache";
 import { logger } from "./logger";
-import { createAnthropicClient } from "./services/anthropic-auth";
+// anthropic-auth imported dynamically inside _askAISingleProvider
 import {
   ProviderName,
   FallbackError,
@@ -275,22 +275,18 @@ async function* _askAISingleProvider(
   systemMessage: string
 ): AsyncGenerator<string, void, undefined> {
   if (provider === "anthropic") {
-    const anthropic = createAnthropicClient();
+    const { callAnthropicAPI } = await import("./services/anthropic-auth");
 
-    const stream = await anthropic.messages.create({
+    const response = await callAnthropicAPI({
+      model,
       messages: [{ role: "user", content: prompt }],
-      model: model,
-      max_tokens: 4096,
-      stream: true,
-      system: systemMessage,
+      systemMessage,
+      maxTokens: 4096,
     });
 
-    for await (const chunk of stream) {
-      if (
-        chunk.type === "content_block_delta" &&
-        chunk.delta?.type === "text_delta"
-      ) {
-        yield chunk.delta.text;
+    for (const block of response.content || []) {
+      if (block.type === "text" && block.text) {
+        yield block.text;
       }
     }
   } else if (provider === "openai") {

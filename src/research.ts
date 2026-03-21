@@ -264,24 +264,76 @@ export class ResearchCoordinator {
     const provider = (this.options.webSearchProvider
       ?? getConfigValue("WEB_SEARCH_PROVIDER")
       ?? process.env.WEB_SEARCH_PROVIDER
-      ?? "duckduckgo").toLowerCase();
+      ?? "brave").toLowerCase();
 
-    if (provider === "duckduckgo") {
-      const result = await this.searchDuckDuckGo(query);
-      if (!result) {
+    const searchers: Record<string, () => Promise<ResearchFinding[] | null>> = {
+      brave: () => this.searchBrave(query),
+      duckduckgo: () => this.searchDuckDuckGo(query),
+    };
+
+    // Try configured provider, fallback to duckduckgo if brave has no key
+    const tryOrder = provider === "brave"
+      ? ["brave", "duckduckgo"]
+      : [provider];
+
+    for (const p of tryOrder) {
+      const searcher = searchers[p];
+      if (!searcher) continue;
+
+      const result = await searcher();
+      if (result) {
+        return {
+          provider: p,
+          query,
+          reason: this.decorateReason(reason, trigger, p),
+          findings: result,
+        };
+      }
+    }
+
+    return null;
+  }
+
+  private async searchBrave(query: string): Promise<ResearchFinding[] | null> {
+    const apiKey = getConfigValue("BRAVE_SEARCH_API_KEY") || process.env.BRAVE_SEARCH_API_KEY;
+    if (!apiKey) {
+      logger.debug("Brave Search: BRAVE_SEARCH_API_KEY not configured, skipping");
+      return null;
+    }
+
+    const endpoint = `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(query)}&count=5`;
+    try {
+      const response = await fetch(endpoint, {
+        headers: {
+          "Accept": "application/json",
+          "Accept-Encoding": "gzip",
+          "X-Subscription-Token": apiKey,
+        },
+      });
+
+      if (!response.ok) {
+        logger.warn(chalk.yellow(`⚠️  Brave Search retornou status ${response.status}`));
         return null;
       }
 
-      return {
-        provider: "duckduckgo",
-        query,
-        reason: this.decorateReason(reason, trigger, "duckduckgo"),
-        findings: result,
-      };
-    }
+      const payload = await response.json() as any;
+      const findings: ResearchFinding[] = [];
 
-    logger.warn(chalk.yellow(`⚠️  Provedor de busca "${provider}" não suportado. Configure WEB_SEARCH_PROVIDER=duckduckgo.`));
-    return null;
+      if (Array.isArray(payload?.web?.results)) {
+        for (const result of payload.web.results.slice(0, 5)) {
+          findings.push({
+            title: result.title || query,
+            snippet: result.description || result.extra_snippets?.[0] || "",
+            url: result.url || undefined,
+          });
+        }
+      }
+
+      return findings.length ? findings : null;
+    } catch (error) {
+      logger.warn(chalk.yellow(`⚠️  Falha ao consultar Brave Search: ${String(error)}`));
+      return null;
+    }
   }
 
   private async searchDuckDuckGo(query: string): Promise<ResearchFinding[] | null> {

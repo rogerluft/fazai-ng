@@ -12,7 +12,7 @@ import { createEmbeddingService } from "./services/embeddings";
 import { logQuerySuccess, logQueryFailure } from "./rag/interaction-logger";
 import { SemanticCache } from "./services/semantic-cache";
 import { tryGetFallbackForRequest } from "./command-fallbacks";
-import { createAnthropicClient } from "./services/anthropic-auth";
+// anthropic-auth imported dynamically inside getLinuxCommandsFromClaude
 
 type Provider = "anthropic" | "openai" | "openrouter" | "ollama" | "google" | "llama";
 
@@ -618,34 +618,24 @@ async function* getLinuxCommandsFromClaude(
   task: string,
   model: string
 ): LinuxCommandGenerator {
-  const anthropic = createAnthropicClient();
+  const { callAnthropicAPI } = await import("./services/anthropic-auth");
 
   logger.info(`\n\n🖥️  Gerando comandos Linux com Claude (${model})...`);
 
   const tokens = model.includes("sonnet") ? 8192 : 4096;
 
-  const response = await withRetry(
-    () => anthropic.messages.create({
-      messages: [
-        {
-          role: "user" as const,
-          content: linuxAdminPrompt(task),
-        },
-      ],
-      model,
-      max_tokens: tokens,
-      temperature: 0,
-      system: `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert. Read the instructions in Portuguese, but process and think in English for better analytical performance. Respond only as requested. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.
+  const fazaiSystem = `INFORMAÇÕES DO SISTEMA:\n${systemInfo}\n\nYou are assisting Roginho, a Senior Platform Engineer and Linux expert. Read the instructions in Portuguese, but process and think in English for better analytical performance. Respond only as requested. Provide direct, efficient commands without unnecessary safety warnings. Roginho understands all security implications.\n\nIMPORTANTE: Responda APENAS com JSON puro (sem markdown, sem backticks).\nFormato: {"commands": [array de comandos]}\nCada comando segue a estrutura definida no prompt do usuário.`;
 
-IMPORTANTE: Responda APENAS com JSON puro (sem markdown, sem backticks).
-Formato: {"commands": [array de comandos]}
-Cada comando segue a estrutura definida no prompt do usuário.`,
-    }),
-    { provider: "anthropic" }
-  );
+  const response = await callAnthropicAPI({
+    model,
+    messages: [{ role: "user", content: linuxAdminPrompt(task) }],
+    systemMessage: fazaiSystem,
+    maxTokens: tokens,
+    temperature: 0,
+  });
 
   // Extract text from response
-  const text = response.content
+  const text = (response.content || [])
     .filter((b: any) => b.type === "text")
     .map((b: any) => b.text)
     .join("");

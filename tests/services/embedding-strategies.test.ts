@@ -7,7 +7,7 @@
  * Run: npm test -- tests/services/embedding-strategies.test.ts
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   semanticChunk,
   getEmbeddingStrategy,
@@ -19,7 +19,6 @@ import {
   type EmbeddingModel,
   EMBEDDING_STRATEGIES,
 } from "../../src/services/embedding-strategies";
-import { getOllamaEmbedUrl } from "../../src/config";
 
 describe("Embedding Strategies", () => {
   describe("semanticChunk()", () => {
@@ -369,195 +368,38 @@ describe("Embedding Strategies", () => {
   });
 
   describe("isModelAvailable()", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it("should return true when model is available", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          models: [
-            { name: "nomic-embed-text:latest" },
-            { name: "nomic-embed-text:latest" },
-          ],
-        }),
-      });
-
-      const result = await isModelAvailable("nomic-embed-text");
-
-      expect(result).toBe(true);
-      // Embeddings usam OLLAMA_EMBED_URL (lido de fazai.conf)
-      expect(fetch).toHaveBeenCalledWith(
-        expect.stringMatching(/^http:\/\/.*:11434\/api\/tags$/),
-        expect.objectContaining({ signal: expect.any(AbortSignal) })
-      );
-    });
-
-    it("should return true when model name matches without tag", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          models: [{ name: "nomic-embed-text" }],
-        }),
-      });
-
-      const result = await isModelAvailable("nomic-embed-text");
-
+    // ONNX BGE-base-en-v1.5 is bundled locally — always available, no network needed
+    it("should always return true (ONNX model is bundled)", async () => {
+      const result = await isModelAvailable("BGE-base-en-v1.5");
       expect(result).toBe(true);
     });
 
-    it("should return false when model is not in list", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          models: [{ name: "other-model:latest" }],
-        }),
-      });
-
+    it("should return true regardless of model name (stub)", async () => {
       const result = await isModelAvailable("nomic-embed-text");
-
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
 
-    it("should return false when API request fails", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: false,
-      });
-
-      const result = await isModelAvailable("nomic-embed-text");
-
-      expect(result).toBe(false);
-    });
-
-    it("should return false on network timeout", async () => {
-      global.fetch = vi.fn().mockImplementation(() => {
-        return new Promise((_, reject) => {
-          setTimeout(() => reject(new Error("Timeout")), 100);
-        });
-      });
-
-      const result = await isModelAvailable("nomic-embed-text");
-
-      expect(result).toBe(false);
-    });
-
-    it("should use custom Ollama base URL", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ models: [] }),
-      });
-
-      await isModelAvailable("nomic-embed-text", "http://localhost:11434");
-
-      expect(fetch).toHaveBeenCalledWith(
-        "http://localhost:11434/api/tags",
-        expect.any(Object)
-      );
-    });
-
-    it("should handle malformed API response", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({}), // No models array
-      });
-
-      const result = await isModelAvailable("nomic-embed-text");
-
-      expect(result).toBe(false);
+    it("should return true with custom base URL (ignored)", async () => {
+      const result = await isModelAvailable("BGE-base-en-v1.5", "http://localhost:11434");
+      expect(result).toBe(true);
     });
   });
 
   describe("getFallbackModel()", () => {
-    beforeEach(() => {
-      vi.clearAllMocks();
-    });
-
-    afterEach(() => {
-      vi.restoreAllMocks();
-    });
-
-    it("should return first available fallback model", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          models: [{ name: "nomic-embed-text:latest" }],
-        }),
-      });
-
-      // Preferred é OpenAI, fallback para nomic-embed-text
+    // ONNX BGE-base-en-v1.5 is the universal model — no fallback chain needed
+    it("should always return BGE-base-en-v1.5", async () => {
       const result = await getFallbackModel("text-embedding-3-small");
-
-      expect(result).toBe("nomic-embed-text");
+      expect(result).toBe("BGE-base-en-v1.5");
     });
 
-    it("should skip preferred model in fallback list", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          models: [
-            { name: "mxbai-embed-large:latest" },
-            { name: "nomic-embed-text:latest" },
-          ],
-        }),
-      });
-
-      // Preferred é nomic, mas ele está no fallback list então deve pular e retornar mxbai
-      const result = await getFallbackModel("nomic-embed-text");
-
-      expect(result).toBe("mxbai-embed-large");
+    it("should return BGE-base-en-v1.5 even when preferred is same", async () => {
+      const result = await getFallbackModel("BGE-base-en-v1.5");
+      expect(result).toBe("BGE-base-en-v1.5");
     });
 
-    it("should return null when no fallback available", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({
-          models: [],
-        }),
-      });
-
-      const result = await getFallbackModel("text-embedding-3-small");
-
-      expect(result).toBe(null);
-    });
-
-    it("should use custom Ollama base URL", async () => {
-      global.fetch = vi.fn().mockResolvedValue({
-        ok: true,
-        json: async () => ({ models: [] }),
-      });
-
-      await getFallbackModel("nomic-embed-text", "http://localhost:11434");
-
-      expect(fetch).toHaveBeenCalledWith(
-        "http://localhost:11434/api/tags",
-        expect.any(Object)
-      );
-    });
-
-    it("should check models in priority order", async () => {
-      let callCount = 0;
-      global.fetch = vi.fn().mockImplementation(() => {
-        callCount++;
-        return Promise.resolve({
-          ok: true,
-          json: async () => ({
-            models:
-              callCount === 2
-                ? [{ name: "nomic-embed-text:latest" }]
-                : [],
-          }),
-        });
-      });
-
-      const result = await getFallbackModel("text-embedding-3-small");
-
-      expect(result).toBe("nomic-embed-text");
-      expect(fetch).toHaveBeenCalledTimes(2); // mxbai first, then nomic
+    it("should ignore custom base URL (ONNX is local)", async () => {
+      const result = await getFallbackModel("nomic-embed-text", "http://localhost:11434");
+      expect(result).toBe("BGE-base-en-v1.5");
     });
   });
 

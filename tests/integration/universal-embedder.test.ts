@@ -1,16 +1,10 @@
 /**
  * Integration Tests - Universal Local Embedder
  *
- * Tests real Ollama API integration with nomic-embed-text model.
- * Requires Ollama embedding server running with nomic-embed-text model.
+ * Tests ONNX BGE-base-en-v1.5 embedding via qdrant-universal-injection.
+ * No external services required — ONNX model is bundled locally.
  *
  * Run: npm test -- tests/integration/universal-embedder.test.ts
- *
- * Prerequisites:
- * 1. Ollama embedding server running (http://localhost:11434)
- *    - Configurado em /etc/fazai/fazai.conf como OLLAMA_EMBED_URL
- *    - Separado do servidor de chat (OLLAMA_BASE_URL)
- * 2. Model pulled: ollama pull nomic-embed-text
  */
 
 import { describe, it, expect, beforeAll } from "vitest";
@@ -19,39 +13,33 @@ import {
   UniversalLocalEmbedder,
   padVector,
 } from "../../src/services/universal-embedder";
-import { getOllamaEmbedUrl } from "../../src/config";
 
-// Embedding server URL (local para melhor performance)
-const OLLAMA_EMBED_URL = getOllamaEmbedUrl();
-
-// Check if Ollama embedding server is available
-async function isOllamaAvailable(): Promise<boolean> {
+// Check if ONNX embedder is available
+async function isEmbedderAvailable(): Promise<boolean> {
   try {
-    const response = await fetch(`${OLLAMA_EMBED_URL}/api/tags`, {
-      signal: AbortSignal.timeout(3000),
-    });
-    return response.ok;
+    const emb = await generateUniversalEmbedding("test");
+    return Array.isArray(emb) && emb.length === 768;
   } catch {
     return false;
   }
 }
 
 describe("Universal Local Embedder (Integration Tests)", () => {
-  let ollamaAvailable: boolean;
+  let embedderAvailable: boolean;
 
   beforeAll(async () => {
-    ollamaAvailable = await isOllamaAvailable();
-    if (!ollamaAvailable) {
+    embedderAvailable = await isEmbedderAvailable();
+    if (!embedderAvailable) {
       console.warn(
-        `⚠️  Ollama embedding server not available at ${OLLAMA_EMBED_URL} - skipping integration tests`
+        "⚠️  ONNX embedder not available - skipping integration tests"
       );
     }
   });
 
   describe("generateUniversalEmbedding", () => {
     it("should generate 768d embedding for simple text", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -64,8 +52,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should generate different embeddings for different texts", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -78,8 +66,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should generate similar embeddings for similar texts", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -104,8 +92,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should handle long text with truncation", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -125,8 +113,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should embed single text", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -137,8 +125,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should embed batch of texts", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -160,8 +148,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should handle empty batch", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -173,16 +161,16 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     it("should return embedder info", () => {
       const info = embedder.getInfo();
 
-      expect(info.model).toBe("nomic-embed-text");
+      expect(info.model).toBe("BGE-base-en-v1.5");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(768);
-      // Embeddings usam servidor local (OLLAMA_EMBED_URL de fazai.conf)
-      expect(info.ollamaUrl).toMatch(/^http:\/\/.*:11434$/);
+      // ONNX local — no network dependency
+      expect(info.ollamaUrl).toBe("(ONNX local — no network)");
     });
 
     it("should handle special characters", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -194,8 +182,8 @@ describe("Universal Local Embedder (Integration Tests)", () => {
     });
 
     it("should handle code snippets", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -213,8 +201,8 @@ function hello(name: string): string {
 
   describe("Native 768d Verification", () => {
     it("should verify embeddings are native 768d without padding", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -241,8 +229,8 @@ function hello(name: string): string {
 
   describe("Performance Tests", () => {
     it("should embed text in reasonable time", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 
@@ -255,8 +243,8 @@ function hello(name: string): string {
     });
 
     it("should process batch efficiently", async () => {
-      if (!ollamaAvailable) {
-        console.log("Skipping test: Ollama not available");
+      if (!embedderAvailable) {
+        console.log("Skipping test: ONNX embedder not available");
         return;
       }
 

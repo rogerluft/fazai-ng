@@ -84,22 +84,22 @@ describe("Universal Local Embedder (Unit Tests)", () => {
     it("should initialize with correct configuration", () => {
       const info = embedder.getInfo();
 
-      expect(info.model).toBe("nomic-embed-text");
+      expect(info.model).toBe("BGE-base-en-v1.5");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(768);
-      // Embedder usa servidor local (OLLAMA_EMBED_URL)
-      expect(info.ollamaUrl).toBe("http://localhost:11434");
+      // ONNX local — constructor params are ignored
+      expect(info.ollamaUrl).toBe("(ONNX local — no network)");
     });
 
     it("should use default values when not provided", () => {
       const defaultEmbedder = new UniversalLocalEmbedder();
       const info = defaultEmbedder.getInfo();
 
-      expect(info.model).toBe("nomic-embed-text");
+      expect(info.model).toBe("BGE-base-en-v1.5");
       expect(info.nativeDimension).toBe(768);
       expect(info.targetDimension).toBe(768);
-      // Default usa getOllamaEmbedUrl() que lê de fazai.conf
-      expect(info.ollamaUrl).toMatch(/^http:\/\/.*:11434$/);
+      // ONNX local — no network dependency
+      expect(info.ollamaUrl).toBe("(ONNX local — no network)");
     });
 
     it("should handle empty batch", async () => {

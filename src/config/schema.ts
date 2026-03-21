@@ -159,6 +159,7 @@ export const configSchema = z.object({
   GITHUB_TOKEN: apiKeySchema.optional(),
   CLOUDFLARE_API_TOKEN: apiKeySchema.optional(),
   CLOUDFLARE_API_KEY: apiKeySchema.optional(),
+  BRAVE_SEARCH_API_KEY: apiKeySchema.optional(),
   SPAMEXPERTS_API_KEY: apiKeySchema.optional(),
   OPNSENSE_API_KEY: apiKeySchema.optional(),
 

@@ -271,14 +271,12 @@ describe('FazAI CLI Tests', () => {
 
         // Act
         mockRl.emit('line', `pesquise sobre ${query}`);
-        await new Promise(resolve => setTimeout(resolve, 50)); // Allow async operations to complete
+        await new Promise(resolve => setTimeout(resolve, 50));
 
         // Assert
         expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(`Executando com fluxo de resiliência: "${query}"`));
         expect(ResilienceOrchestrator.prototype.executeTaskWithResilience).toHaveBeenCalledWith(query);
-        expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Tarefa concluída no nível: web_search'));
-        expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Resposta Final:'));
-        expect(logger.info).toHaveBeenCalledWith(expect.stringContaining(mockExecutionResult.finalAnswer));
+        expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('Busca concluída (nível: web_search)'));
         expect(mockRl.prompt).toHaveBeenCalled();
     });
 
@@ -289,7 +287,6 @@ describe('FazAI CLI Tests', () => {
             success: false,
             level: 'critical_failure',
             error: 'All fallback mechanisms were exhausted without a successful result.',
-            finalAnswer: 'Desculpe, não consegui encontrar uma resposta.',
         };
 
         vi.mocked(ResilienceOrchestrator.prototype.executeTaskWithResilience).mockResolvedValue(mockExecutionResult);
@@ -300,7 +297,7 @@ describe('FazAI CLI Tests', () => {
 
         // Assert
         expect(ResilienceOrchestrator.prototype.executeTaskWithResilience).toHaveBeenCalledWith(query);
-        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Não foi possível concluir a tarefa após todos os níveis de fallback'));
+        expect(logger.warn).toHaveBeenCalledWith(expect.stringContaining('Busca não retornou resultados'));
         expect(mockRl.prompt).toHaveBeenCalled();
     });
 
