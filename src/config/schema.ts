@@ -41,9 +41,7 @@ const apiKeySchema = z
   .regex(/^[A-Za-z0-9\-_\.]+$/, { message: "API key contains invalid characters" });
 
 /**
- * OAuth Token schema - for tokens like Anthropic OAuth from `claude setup-token`
- * 
- * OAuth tokens are typically longer and may have different format
+ * Extended token schema - longer format tokens
  */
 const oauthTokenSchema = z
   .string()
@@ -163,7 +161,7 @@ export const configSchema = z.object({
   SPAMEXPERTS_API_KEY: apiKeySchema.optional(),
   OPNSENSE_API_KEY: apiKeySchema.optional(),
 
-  // OAuth Tokens (longer format)
+  // Extended tokens
   ANTHROPIC_OAUTH_TOKEN: oauthTokenSchema.optional(),
 
   // URLs

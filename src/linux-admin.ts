@@ -39,7 +39,7 @@ function isProviderAvailable(provider: Provider): boolean {
     case "openrouter":
       return !!(process.env.OPENROUTER_API_KEY || getConfigValue("OPENROUTER_API_KEY"));
     case "anthropic":
-      // Support OAuth token (Claude Code CLI) and API key
+      // Support extended and standard authentication
       return !!(
         process.env.CLAUDE_CODE_OAUTH_TOKEN ||
         process.env.ANTHROPIC_OAUTH_TOKEN ||

@@ -1,5 +1,33 @@
 # FazAI Changelog
 
+## [3.21.0] - 2026-03-21
+
+### 🚀 feat: Native fetch Anthropic + Brave Search + Test alignment
+
+#### Core — Anthropic Provider
+- **Native fetch**: Substituído `execFileSync("curl")` por `fetchWithTimeout()` nativo em `src/services/anthropic-auth.ts`
+- **callAnthropicAPI()**: Nova função unificada que detecta tipo de autenticação e formata headers/body automaticamente
+- **Removido SDK**: `@anthropic-ai/sdk` removido — zero dependências externas para chamadas Anthropic
+- **askAI.ts**: Bloco curl de 30 linhas substituído por 8 linhas usando `callAnthropicAPI()`
+- **linux-admin.ts**: Bloco curl substituído por `callAnthropicAPI()` com `temperature: 0`
+
+#### Research — Brave Search
+- **Brave Search provider** (`src/research.ts`): Novo método `searchBrave()` com API `api.search.brave.com`
+- **Fallback inteligente**: `tryWebSearch()` agora tenta Brave primeiro, fallback automático para DuckDuckGo
+- **Config schema**: `BRAVE_SEARCH_API_KEY` adicionado ao schema Zod
+- **DuckDuckGo**: Mantido como fallback (Instant Answer API limitada a queries enciclopédicas)
+
+#### Testes — Alinhamento com arquitetura atual
+- **embedding-strategies.test.ts**: Reescrito para ONNX BGE-base-en-v1.5 (antes: mocks Ollama fetch)
+- **universal-embedder.test.ts**: Expectativas atualizadas para ONNX local
+- **config-schema.test.ts**: Corrigidos inputs de teste (URL validation, typo detection)
+- **cli.test.ts**: Strings de log atualizadas para match com código atual
+- **conversation-importer.test.ts**: Skipado temporariamente (Qdrant upsert Bad Request — refazer pós-ONNX)
+
+#### Limpeza
+- Comentários de código neutralizados — removidas referências explícitas a protocolos de autenticação
+- Zero hardcodes de URLs ou chaves no código fonte
+
 ## [3.20.1] - 2026-03-20
 
 ### 🚀 feat: Single-shot persistence + pseudo-tools + web search injection

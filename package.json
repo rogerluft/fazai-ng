@@ -1,6 +1,6 @@
 {
   "name": "fazai",
-  "version": "3.20.0",
+  "version": "3.21.0",
   "author": "Roger Luft (VeilWalker) <roger@rogerluft.com.br>",
   "description": "Administrador Linux Inteligente com IA - Gerenciador de sistemas Linux com modelos híbridos",
   "repository": {
@@ -10,7 +10,6 @@
   "license": "Apache-2.0",
   "type": "module",
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.24.3",
     "@crawlee/playwright": "^3.15.3",
     "@genaiscript/api": "^2.5.1",
     "@genaiscript/core": "^2.5.1",
@@ -41,6 +40,7 @@
     "p-queue": "^9.0.1",
     "pdf-parse": "^2.4.5",
     "playwright": "^1.57.0",
+    "qdrant-universal-injection": "file:../qdrant-universal-injection",
     "robots-parser": "^3.0.1",
     "terminal-kit": "^3.1.2",
     "undici": "^5.28.4",

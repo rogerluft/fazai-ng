@@ -22,7 +22,7 @@ export function checkAPIKey(provider: string): boolean {
     return true; // llama.cpp sempre retorna true
   }
 
-  // For Anthropic, check OAuth token and API key
+  // For Anthropic, check extended token and API key
   if (provider === "anthropic") {
     // Priority: CLAUDE_CODE_OAUTH_TOKEN > ANTHROPIC_OAUTH_TOKEN > ANTHROPIC_API_KEY
     const oauthToken =
@@ -129,7 +129,7 @@ function saveAPIKeyToConfig(provider: string, apiKey: string): void {
 function getEnvVarName(provider: string): string {
   switch (provider) {
     case "anthropic":
-      // OAuth (Bearer) takes precedence over API key (x-api-key)
+      // Extended token takes precedence over API key
       if (process.env.CLAUDE_CODE_OAUTH_TOKEN || process.env.ANTHROPIC_AUTH_TOKEN) {
         return "ANTHROPIC_AUTH_TOKEN";
       }

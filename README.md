@@ -1,112 +1,102 @@
-# 🖥️ FazAI v3.14.1 - Terminal Admin Linux com IA Autônoma
+# 🖥️ FazAI — Administrador Linux Inteligente com IA
 
 <div align="center">
 
-**Administrador de Sistemas Linux Senior + Redes**
-*GenAIScript · llama.cpp · RAG Multi-Collection · Vector Store Qdrant · ECOA Architecture*
+**Orquestração Multi-Agente para Administração de Sistemas Linux**
+*Multi-Provider LLM · RAG Local · ONNX Embeddings · Qdrant Vector Store · ECOA Architecture*
 
-[![Version](https://img.shields.io/badge/version-3.14.1-blue.svg)](CHANGELOG.md)
-[![License](https://img.shields.io/badge/license-CC%20BY%204.0-green.svg)](LICENSE)
+[![Version](https://img.shields.io/badge/version-3.21.0-blue.svg)](CHANGELOG.md)
+[![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://typescriptlang.org)
 
 </div>
 
-<h3 align="center">Terminal inteligente que converte linguagem natural em comandos Linux seguros, com memória operacional, aprendizado contínuo, LLM local gratuito e pesquisa assistida.</h3>
+<h3 align="center">Converte linguagem natural em comandos Linux seguros, com memória operacional, aprendizado contínuo, pesquisa web integrada e fallback multi-provider.</h3>
 
 ---
 
-## 🌟 O que há de novo na v3.14
+## O que h&aacute; de novo na v3.21
 
-### 🧹 Maestro Cleaner (v3.14.1)
-- **Faxineiro Semântico** - detecta e arquiva código obsoleto
-- Análise de imports órfãos e tecnologias deprecadas
-- Modo seguro: nunca deleta, apenas move para `archive/`
-- GenAIScript agent com 6 tools especializados
-- `fazai cleaner [--exec] [--dry-run]`
-
-### 🛡️ Validação de Comandos (v3.14.1)
-- **Bloqueia opções desconhecidas** antes de enviar à IA
-- Evita desperdício de tokens com comandos inválidos
-- Mensagem clara: "Use 'fazai --help' para ver opções"
-
-### 🔄 Migração Jarvis→FazAI (v3.14.0)
-- **Jarvis completamente deprecado**
-- Referências legadas removidas do código
-- Documentação unificada sob marca FazAI
-- Build migrado para ESM (ECMAScript Modules)
+- **Native fetch para Anthropic** — removido curl e SDK externo, chamadas 100% via `fetchWithTimeout()`
+- **Brave Search** — novo provider de pesquisa web com fallback automático para DuckDuckGo
+- **Testes alinhados** — suíte de testes atualizada para arquitetura ONNX/BGE-base-en-v1.5
+- **Código limpo** — zero hardcodes, zero referências a protocolos internos
 
 ---
 
-## 🌟 Features
+## Features
 
-### 🧠 Inteligência e Memória
-- **6 Collections Qdrant Especializadas** para RAG e memória operacional
-  - `fazai_personality` - Expertise técnica e estilo de troubleshooting
-  - `fazai_memory` - Histórico operacional e contexto de infraestrutura
-  - `fazai_learning` - Aprendizado técnico (erros, soluções, padrões)
-  - `fazai_kb` - Base de conhecimento Linux/Redes validada
-  - `fazai_inference` - Políticas de segurança, SLAs e regras operacionais
-  - `fazai_semantic_cache` - Cache semântico de respostas (TTL 1h)
+### IA Multi-Provider (Config-Driven)
 
-### 🤖 IA Multi-Provider (Fallback Chain)
-
-**Ordem de prioridade:** `llama → ollama → openrouter → anthropic → openai → google`
+Providers e modelos definidos em `/etc/fazai/fazai.conf`. Fallback automático via `PROVIDER_FALLBACK_ORDER`.
 
 | Provider | Modelos | Custo | Uso |
 |----------|---------|-------|-----|
-| **llama.cpp** | Phi-3-mini | Grátis | LLM local, privado, offline |
-| **Ollama** | Llama 3.2, Qwen, Mistral | Grátis | LLM local via Ollama |
-| **OpenRouter** | 200+ modelos | Variável | Cloud com free tier |
-| **Anthropic** | Claude Sonnet, Haiku | Pago | Tarefas complexas |
+| **Ollama** | Qwen 3.5, Phi-3, Gemma 3, Llama 3.2 | Gratis | LLM local via Ollama |
+| **Anthropic** | Claude Sonnet 4.5, Haiku 4.5 | Pago | Tarefas complexas |
+| **Google** | Gemini 2.5 Pro, Gemini 2.5 Flash | Variavel | 1M context window |
+| **OpenRouter** | 200+ modelos | Variavel | Cloud com free tier |
+| **Perplexity** | Sonar Large/Small | Pago | Pesquisa online |
 | **OpenAI** | GPT-4o, GPT-4 Mini | Pago | Multi-modal |
-| **Google** | Gemini 2.0/2.5 | Variável | 1M context window |
 
-### 🛡️ Segurança em 5 Camadas
-- **Pattern Matching**: Bloqueia comandos destrutivos conhecidos
-- **Avaliação de Risco**: Análise automática (CRITICAL, HIGH, MEDIUM, LOW)
-- **Safety Checks**: Validações pré-execução geradas pela IA
-- **Rollback Automático**: Comandos reversíveis com undo integrado
-- **Modo Dry-Run**: Simule sem executar nada
+### Memoria e RAG (Arquitetura ECOA)
 
-### 🔍 RAG-First Research
-- **Consulta local primeiro**: RAG com threshold 0.6 antes de APIs externas
-- **Fallback inteligente**: Perplexity → Context7 → DuckDuckGo
-- **Cache semântico**: Evita re-processamento de queries similares
+6 collections Qdrant especializadas com embeddings ONNX locais (BGE-base-en-v1.5, 768d):
 
-### 🎯 Universal Local Embedder
-- **Nativo 768d**: BGE-base-en-v1.5 via ONNX (sem zero-padding necessário)
-- **100% Local**: ONNX runtime local via `qdrant-universal-injection` (sem custos de API)
-- **Cache LRU**: Economia de ~70% em processamento repetido
-- **Semantic Chunking**: Separadores inteligentes para indexação
+| Collection | Proposito |
+|------------|-----------|
+| `fazai_personality` | Expertise tecnica e estilo de troubleshooting |
+| `fazai_memory` | Historico operacional e contexto de infraestrutura |
+| `fazai_learning` | Aprendizado tecnico (erros, solucoes, padroes) |
+| `fazai_kb` | Base de conhecimento Linux/Redes validada |
+| `fazai_inference` | Politicas de seguranca, SLAs e regras operacionais |
+| `fazai_semantic_cache` | Cache semantico de respostas (TTL 1h) |
 
-### 💬 Modo CLI Interativo
-- **Chat persistente** com memória contextual entre sessões
-- **Comandos especiais**: `/exec`, `/history`, `/memory`, `/samba`, `/help`
-- **Histórico navegável**: Setas ↑/↓ e auto-complete
-- **Bash completion**: Instalação automática para Bash e Zsh
+### Embeddings 100% Local
+
+- **ONNX Runtime** com BGE-base-en-v1.5 (768d) — sem dependencia de API externa
+- **Cache LRU** — economia de ~70% em processamento repetido
+- **Semantic Chunking** — separadores inteligentes para indexacao
+- Ollama **nao** eh usado para embeddings (apenas para inferencia LLM)
+
+### Pesquisa Web (RAG-First)
+
+Estrategia de pesquisa em cascata:
+
+1. **RAG Local** — consulta Qdrant primeiro (threshold 0.6)
+2. **Perplexity** — pesquisa online com raciocinio
+3. **Context7** — documentacao de bibliotecas em tempo real
+4. **Brave Search** — busca web geral (free tier 2000 req/mes)
+5. **DuckDuckGo** — fallback para queries enciclopedicas
+
+### Seguranca em 5 Camadas
+
+1. **Pattern Matching** — bloqueia `rm -rf /`, `dd if=/dev/zero`, `mkfs`, etc.
+2. **Avaliacao de Risco** — CRITICAL, HIGH, MEDIUM, LOW com confirmacao proporcional
+3. **Safety Checks** — validacoes pre-execucao geradas pela IA
+4. **Rollback Automatico** — comandos reversiveis com undo integrado
+5. **Dry-Run Mode** — `fazai --dry-run` simula sem executar
 
 ---
 
-## 🚀 Instalação
+## Instalacao
 
-### Método 1: Instalador Automático (Recomendado)
+### Metodo 1: Instalador Automatico (Recomendado)
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/rogerluft/fazai-ng/master/install.sh | bash
 ```
 
-O instalador irá:
-- ✅ Verificar dependências (Node.js 18+, npm, git, cmake, g++)
-- ✅ Clonar e compilar o projeto
-- ✅ **Compilar llama.cpp** e baixar modelo Phi-3-mini (~2.4GB)
-- ✅ **Configurar serviço systemd** `fazai-llama`
-- ✅ Oferecer instalação do Qdrant (Docker/Podman/Binário)
-- ✅ Criar arquivo de configuração interativo
-- ✅ Instalar Bash/Zsh completion automaticamente
-- ✅ Configurar diretórios de sistema (`/etc/fazai`, `/var/log/fazai`, `/opt/fazai`)
+O instalador:
+- Verifica dependencias (Node.js 18+, npm, git)
+- Compila o projeto TypeScript
+- Oferece instalacao do Qdrant (Docker/Podman/Binario)
+- Cria configuracao interativa em `/etc/fazai/fazai.conf`
+- Instala Bash/Zsh completion automaticamente
+- Configura diretorios de sistema (`/etc/fazai`, `/var/log/fazai`, `/opt/fazai`)
 
-### Método 2: Build Local
+### Metodo 2: Build Local
 
 ```bash
 git clone https://github.com/rogerluft/fazai-ng
@@ -117,68 +107,30 @@ npm link
 fazai --help
 ```
 
-### Instalação do llama.cpp (Opcional)
-
-Se preferir instalar manualmente:
+### Embeddings ONNX (qdrant-universal-injection)
 
 ```bash
-# 1. Compilar llama.cpp
-git clone https://github.com/ggerganov/llama.cpp /opt/fazai/llama.cpp
-cd /opt/fazai/llama.cpp
-cmake -B build -DCMAKE_BUILD_TYPE=Release
-cmake --build build --config Release -j$(nproc)
+# Clonar o pacote de embeddings
+git clone https://github.com/rogerluft/qdrant-universal-injection
+cd qdrant-universal-injection
+npm install && npm run build
 
-# 2. Baixar modelo Phi-3-mini
-mkdir -p /opt/fazai/models/phi3
-wget -O /opt/fazai/models/phi3/Phi-3-mini-4k-instruct-q4.gguf \
-  "https://huggingface.co/microsoft/Phi-3-mini-4k-instruct-gguf/resolve/main/Phi-3-mini-4k-instruct-q4.gguf"
-
-# 3. Criar symlinks
-sudo ln -sf /opt/fazai/llama.cpp/build/bin/llama-server /usr/local/bin/llama-server
-sudo ln -sf /opt/fazai/llama.cpp/build/bin/llama-cli /usr/local/bin/llama-cli
-
-# 4. Instalar serviço
-sudo cp etc/fazai/fazai-llama.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now fazai-llama
-
-# 5. Verificar
-curl http://localhost:11430/health
+# Linkar no fazai-ng
+cd /caminho/para/fazai-ng
+npm link /caminho/para/qdrant-universal-injection
 ```
 
-### Instalação do qdrant-universal-injection (Embeddings ONNX)
+### Qdrant (Vector Store)
 
-O FazAI usa o pacote `qdrant-universal-injection` para embeddings locais via ONNX (BGE-base-en-v1.5, 768d). O pacote deve ser linkado localmente:
+Todas as collections usam vetores de **768 dimensoes** com distancia Cosine.
 
 ```bash
-# 1. Clonar o pacote de embeddings
-git clone https://github.com/rogerluft/qdrant-universal-injection /home/rluft/qdrant-universal-injection
-
-# 2. Instalar dependências e compilar
-cd /home/rluft/qdrant-universal-injection
-npm install
-npm run build
-
-# 3. Linkar no fazai-ng
-cd /home/rluft/fazai-ng
-npm link /home/rluft/qdrant-universal-injection
-```
-
-**Nota:** Ollama **nao e mais necessario** para embeddings. O ONNX runtime inicializa localmente em ~11s no cold start. Ollama continua sendo usado apenas como provedor de LLM (llama3.2, qwen, mistral, etc.) na fallback chain de inferência.
-
-### Instalação do Qdrant (Vector Store)
-
-Todas as collections usam vetores de **768 dimensões** (Lei 768) com distância Cosine.
-
-**Docker (Recomendado):**
-```bash
+# Docker (Recomendado)
 docker run -d -p 6333:6333 -p 6334:6334 \
   -v $(pwd)/qdrant_storage:/qdrant/storage:z \
   qdrant/qdrant
-```
 
-**Podman:**
-```bash
+# Podman
 podman run -d -p 6333:6333 -p 6334:6334 \
   -v ./qdrant_storage:/qdrant/storage:z \
   qdrant/qdrant
@@ -186,26 +138,22 @@ podman run -d -p 6333:6333 -p 6334:6334 \
 
 ---
 
-## 📖 Uso
+## Uso
 
 ### Modo Admin Linux (Default)
 
 ```bash
-# Iniciar FazAI (usa primeiro provider disponível)
-fazai
+fazai                    # Usa primeiro provider disponivel
+fazai "lista portas abertas"   # Tarefa em linguagem natural
+fazai --dry-run          # Simula sem executar
+fazai --cli              # Modo interativo com chat
+```
 
-# Com modelo específico
-fazai phi3           # Phi-3-mini local (llama.cpp) - GRÁTIS
-fazai llama32        # Llama 3.2 local (Ollama)
-fazai qwen           # Qwen3 Coder (OpenRouter free)
-fazai sonnet         # Claude Sonnet (Anthropic)
-fazai gpt4o          # GPT-4o (OpenAI)
+### Modo Ask (Consultas)
 
-# Modo simulação (visualizar sem executar)
-fazai --dry-run
-
-# Modo CLI interativo com chat e memória persistente
-fazai --cli
+```bash
+fazai ask "Como configurar nginx como proxy reverso?"
+fazai ask "Melhores praticas para hardening SSH"
 ```
 
 ### Modo CLI Interativo
@@ -213,335 +161,157 @@ fazai --cli
 ```bash
 fazai --cli
 
-# Comandos disponíveis:
-/help                    # Lista todos os comandos
+# Comandos:
+/help                    # Lista comandos
 /exec instalar nginx     # Executa fluxo administrativo
-/history                 # Mostra histórico de comandos
-/history clear           # Limpa histórico
-/memory clear            # Limpa memória contextual
+/history                 # Historico de comandos
+/memory clear            # Limpa memoria contextual
 /samba list              # Lista shares Samba
-/quit ou /exit          # Encerra o CLI
-
-# Suporta texto multi-linha:
-/exec '''
-  configurar nginx como proxy reverso
-  para porta 3000 com SSL
-'''
+/quit                    # Encerra
 ```
 
-### Comandos Samba
+### Samba
 
 ```bash
-# Listar compartilhamentos
-fazai samba list               # Lista todos os shares Samba
-
-# Adicionar diretório existente
-fazai samba add /dados/compartilhado  # Adiciona diretório como share
-
-# Remover share (com confirmação)
-fazai samba del myshare        # Remove share do smb.conf
-
-# Criar usuário com acesso Samba
-fazai samba criauser joao      # Cria usuário Unix + Samba (interativo)
-
-# Criar diretório como share
-fazai samba criadir /dados/projetos  # Cria dir + configura share
-
-# Criar grupo com permissões
-fazai samba criagroup developers  # Cria grupo + aplica ACLs
+fazai samba list                     # Lista shares
+fazai samba add /dados/compartilhado # Adiciona share
+fazai samba del myshare              # Remove share
+fazai samba criauser joao            # Cria usuario Unix + Samba
+fazai samba criadir /dados/projetos  # Cria diretorio como share
+fazai samba criagroup developers     # Cria grupo com ACLs
 ```
 
-### Modo Ask (Consultas e Dúvidas)
+### Vector Store e Gerenciamento
 
 ```bash
-fazai ask "Como configurar nginx como proxy reverso?"
-fazai ask "Diferença entre systemctl e service?"
-fazai ask "Melhores práticas para hardening SSH"
-```
-
-### Gerenciamento e Vector Store
-
-```bash
-# Listar configurações e API keys
-fazai config
-
-# Ver ajuda completa
-fazai --help
-
-# Comandos do Vector Store
-fazai vector validate              # Validar collections
-fazai vector recreate --provider qdrant  # Recriar collections
-fazai vector import --file conversas.json  # Importar conversas
-
-# Auto-complete Bash/Zsh
-fazai completion
+fazai config                              # Ver configuracoes
+fazai vector validate                     # Validar collections
+fazai vector recreate --provider qdrant   # Recriar collections
+fazai vector import --file conversas.json # Importar conversas
 ```
 
 ---
 
-## 🔧 Configuração
+## Configuracao
 
-### Arquivo de Configuração (`/etc/fazai/fazai.conf`)
+Arquivo unico: **`/etc/fazai/fazai.conf`** — fonte de verdade para todas as configuracoes.
 
 ```bash
-# ============================================
-# FAZAI v3.14.1 - Configuração
-# ============================================
+# Providers e modelos (max 3 por provider, separados por virgula)
+MODELS_OLLAMA=qwen3.5,phi3:latest,gemma3:12b
+MODELS_ANTHROPIC=claude-sonnet-4-5,claude-haiku-4-5
+MODELS_GOOGLE=gemini-2.5-pro,gemini-2.5-flash
+MODELS_OPENROUTER=qwen/qwen3-coder:free,meta-llama/llama-3.3-70b
 
-# --- Local LLM (llama.cpp + Phi-3-mini) ---
-LLAMA_SERVER_URL=http://localhost:11430
-LLAMA_TIMEOUT=10000
-LLAMA_RETRIES=3
-LLAMA_TEMPERATURE=0.7
-LLAMA_MAX_TOKENS=2048
-MODELS_LLAMA=phi3-mini
+# Ordem de fallback (providers sem API key sao ignorados)
+PROVIDER_FALLBACK_ORDER=anthropic,google,openrouter,ollama
 
-# --- Ollama (Local) ---
+# Pesquisa web
+WEB_SEARCH_PROVIDER=brave
+BRAVE_SEARCH_API_KEY=sua_chave_aqui
+
+# Ollama (servidor remoto ou local)
 OLLAMA_BASE_URL=http://localhost:11434
-MODELS_OLLAMA=llama3.2,qwen2.5,mistral
+OLLAMA_NUM_PREDICT=1024
+OLLAMA_TEMPERATURE=0.4
 
-# --- OpenRouter (Cloud - Free Tier) ---
-OPENROUTER_API_KEY=sk-or-v1-xxxxx
-MODELS_OPENROUTER=qwen/qwen3-coder:free,google/gemini-2.0-flash-exp:free
-
-# --- Anthropic Claude (4.5 Family) ---
-ANTHROPIC_API_KEY=sk-ant-api03-xxxxx
-MODELS_ANTHROPIC=claude-opus-4-5-20251101,claude-sonnet-4-5-20250929,claude-3-5-haiku-latest
-
-# --- OpenAI ---
-OPENAI_API_KEY=sk-xxxxx
-MODELS_OPENAI=gpt-4o,gpt-4o-mini
-
-# --- Google Gemini (2.x Family) ---
-GOOGLE_API_KEY=xxxxx
-MODELS_GOOGLE=gemini-2.5-pro,gemini-2.5-flash,gemini-2.5-flash-lite
-
-# --- Vector Store (Qdrant) ---
-VECTOR_PROVIDER=qdrant
-QDRANT_URL=http://localhost:6333
-QDRANT_API_KEY=
-VECTOR_DIMENSION=768
-VECTOR_DISTANCE=cosine
-
-# --- Research ---
-FAZAI_DISABLE_RESEARCH=false
-FAZAI_RESEARCH_ON_FAILURE=true
-WEB_SEARCH_PROVIDER=duckduckgo
-
-# --- Agentic Loop Safeguards ---
-AGENTIC_MAX_ITERATIONS=5
-AGENTIC_TIMEOUT=120000
-
-# --- Logs ---
-LOG_LEVEL=info
+# Timeouts por provider (ms)
+TIMEOUT_OLLAMA=180000
+TIMEOUT_ANTHROPIC=120000
+TIMEOUT_GOOGLE=90000
 ```
 
 ---
 
-## 🛡️ Sistema de Segurança
+## Web Interface
 
-FazAI possui **5 camadas de proteção**:
+FazAI inclui interface web Next.js 15 para administracao visual:
 
-### 1. Pattern Matching
-Bloqueia comandos conhecidamente perigosos:
-- `rm -rf /` (destruição de sistema)
-- `dd if=/dev/zero` (sobrescrever disco)
-- `mkfs`, `fdisk`, `wipefs` (formatar disco)
-- `chmod 777 -R /` (permissões inseguras)
-
-### 2. Avaliação de Risco Automática
-- **CRITICAL**: Prompt forte, default=não, exige confirmação explícita
-- **HIGH**: Confirmação obrigatória
-- **MEDIUM**: Confirmação normal
-- **LOW**: Executa direto
-
-### 3. Safety Checks
-IA gera verificações pré-execução:
-- "Verificar se nginx está instalado"
-- "Checar se porta 80 está livre"
-- "Confirmar que há espaço em disco"
-
-### 4. Rollback Automático
-Comandos reversíveis incluem comando de rollback:
-```json
-{
-  "command": "systemctl stop nginx",
-  "rollbackCommand": "systemctl start nginx"
-}
-```
-
-### 5. Dry-Run Mode
-```bash
-fazai --dry-run
-```
-Simula tudo sem executar, perfeito para testar.
+| Pagina | Descricao |
+|--------|-----------|
+| `/` | Dashboard principal com metricas |
+| `/personality` | Gerenciar tracos de personalidade |
+| `/memory` | Explorar memorias por role |
+| `/knowledge` | Knowledge base (CRUD) |
+| `/learning` | Aprendizados e estatisticas |
+| `/integrations/cloudflare` | Zones, DNS, SSL, firewall, cache |
+| `/integrations/opnsense` | Firewall, NAT, VPN, DHCP |
+| `/integrations/spamexperts` | Dominios, quarentena, listas |
+| `/samba` | Gerenciar shares Samba |
 
 ---
 
-## 🧪 Testes de Integração Reais
+## Stack Tecnico
 
-O FazAI-NG inclui uma suíte de testes de ponta a ponta para garantir a robustez e a inteligência agêntica. Estes testes simulam cenários reais de uso, interagindo diretamente com o sistema e as IAs.
-
-### Executando a Suíte de Testes
-
-1.  **Gere os Testes:** Execute o script principal para rodar todos os cenários e capturar logs brutos:
-    ```bash
-    ./tests/real-world-suite.sh
-    ```
-    *(Este script requer permissões de sudo para alguns testes administrativos).*
-
-2.  **Auditoria Automática:** Após a execução, o script chama automaticamente o auditor agêntico para analisar os resultados e o estado do sistema (Qdrant, Cache, Personalidade):
-    ```bash
-    genaiscript run qa-reporter
-    ```
-
-### Relatório de Erros
-
-O auditor gerará um relatório detalhado em `${LOG_FILE}` indicando falhas, prováveis causas e sugestões de correção.
-
-### Contribuição de Testes
-
-Para adicionar novos cenários de teste, crie um novo bloco de `run_test` no script `tests/real-world-suite.sh` e um novo prompt no `genaisrc/qa-reporter.genai.mjs` para análise, se necessário.
-
-
-
-## 🗂️ Estrutura do Projeto
-
-```
-/home/rluft/fazai-ng/          # Repositório desenvolvimento
-├── src/                        # Código fonte TypeScript
-│   ├── app.ts                  # CLI principal
-│   ├── models.ts               # Definição de modelos (FONTE!)
-│   ├── providers/              # Providers de IA
-│   │   ├── llama.ts            # llama.cpp local
-│   │   ├── ollama.ts           # Ollama local
-│   │   └── ...                 # OpenRouter, Anthropic, OpenAI, Google
-│   └── services/               # Serviços (cache, embeddings)
-├── scripts/                    # Scripts de build e instalação
-├── completion/                 # Arquivos de completion gerados
-├── tests/                      # Testes (vitest)
-├── docs/                       # Documentação
-├── etc/fazai/                  # Configurações de sistema
-│   ├── fazai.conf              # Configuração principal
-│   └── fazai-llama.service     # Serviço systemd
-└── package.json
-
-/opt/fazai/                     # Instalação produção
-├── llama.cpp/                  # llama.cpp compilado
-└── models/phi3/                # Modelo Phi-3-mini
-
-/etc/fazai/fazai.conf           # Configuração sistema
-/var/log/fazai/                 # Logs do sistema
-```
+| Tecnologia | Uso |
+|------------|-----|
+| TypeScript 5.0 | Linguagem principal |
+| Node.js 18+ | Runtime |
+| Qdrant | Vector database (768d Cosine) |
+| ONNX Runtime | Embeddings locais (BGE-base-en-v1.5) |
+| Vitest | Testing framework |
+| Husky | Git hooks (TDD enforcer) |
+| Zod | Validacao de schemas |
+| Next.js 15 | Web UI |
+| Chalk | Cores no terminal |
 
 ---
 
-## 📦 Stack Técnico
-
-- **TypeScript 5.0** - Tipagem estática
-- **Node.js 18+** - Runtime
-- **llama.cpp** - LLM local (Phi-3-mini)
-- **Qdrant** - Vector database
-- **Vitest** - Testing framework
-- **Husky** - Git hooks (TDD enforcer)
-- **Anthropic/OpenAI SDK** - IA APIs
-- **Inquirer** - Prompts interativos
-- **Chalk** - Cores no terminal
-- **Zod** - Validação de schemas
-
----
-
-## 🔗 Integração GitHub
+## Integracao GitHub
 
 ```bash
-# Login com Personal Access Token
-fazai github auth login
-
-# Informações de usuário
-fazai github user
-
-# Gerenciar repositórios
-fazai github repos
-fazai github repo owner/repo
-fazai github fork owner/repo
-fazai github star owner/repo
-
-# Issues
-fazai github issues owner/repo
-fazai github issue create owner/repo
+fazai github auth login         # Login com PAT
+fazai github user               # Info do usuario
+fazai github repos              # Listar repositorios
+fazai github issues owner/repo  # Listar issues
+fazai github issue create owner/repo  # Criar issue
 ```
 
 ---
 
-## 🛠️ Manutenção e Ferramentas
-
-### Remover Pasta do Histórico Git
-
-Para remover permanentemente uma pasta ou arquivo do histórico completo do Git:
+## Testes
 
 ```bash
-# Usando script automatizado
-./scripts/git-purge-folder.sh claudio15-11-25
-
-# Com dry-run (simulação)
-./scripts/git-purge-folder.sh "claudio*" --glob --dry-run
+npm test                  # Todos os testes
+npm run test:unit         # Apenas unitarios
+npm run test:integration  # Apenas integracao
 ```
 
-**Documentação completa**: [docs/guides/REMOVE_FROM_GIT_HISTORY.md](docs/guides/REMOVE_FROM_GIT_HISTORY.md)
-
-**⚠️ Aviso**: Esta é uma operação destrutiva que requer `git push --force` e pode afetar colaboradores.
+O projeto usa **TDD enforcer** via pre-commit hook — commits sao bloqueados se qualquer teste falhar.
 
 ---
 
-## 🤝 Contribuindo
-
-Contribuições são muito bem-vindas! Consulte o [Guia de Contribuição](CONTRIBUTING.md).
-
-### Início Rápido
+## Contribuindo
 
 1. Fork o projeto
 2. Clone seu fork
 3. Crie uma branch (`git checkout -b feature/MinhaFeature`)
-4. Faça suas mudanças
-5. Commit (`git commit -m 'Add: MinhaFeature'`) - TDD enforced!
-6. Push para a branch
-7. Abra um Pull Request
+4. Faca suas mudancas
+5. Commit (`git commit -m 'Add: MinhaFeature'`) — TDD enforced!
+6. Push e abra um Pull Request
 
 ---
 
-## 📄 Licença
+## Licenca
 
-**[Creative Commons Attribution 4.0 International (CC BY 4.0)](LICENSE)**
+**[Apache License 2.0](LICENSE)**
 
-Copyright (c) 2024-2025 Roger Luft - roger@rogerluft.com.br
-
-Você é livre para compartilhar e adaptar este material para qualquer finalidade,
-inclusive comercial, desde que atribua o crédito apropriado.
+Copyright (c) 2024-2026 Roger Luft — roger@rogerluft.com.br
 
 ---
 
-## 🙏 Agradecimentos
-
-Agradecimento especial a [Hrishi Olickel](https://github.com/hrishioa) pelo projeto
-[Mandark](https://github.com/hrishioa/mandark) que serviu de inspiração inicial.
-
----
-
-## ⚠️ Aviso
+## Aviso
 
 FazAI executa comandos reais no seu sistema. Sempre:
 - Use `--dry-run` para testar primeiro
 - Revise comandos antes de confirmar
 - Tenha backups dos dados importantes
-- Entenda o que cada comando faz
 
-**FazAI não se responsabiliza por dados perdidos ou sistemas danificados.**
+**FazAI nao se responsabiliza por dados perdidos ou sistemas danificados.**
 
 ---
 
 <div align="center">
-
-⭐ **Se FazAI te ajudou, deixe uma estrela!**
 
 **[Changelog](CHANGELOG.md) · [Issues](https://github.com/rogerluft/fazai-ng/issues) · [Discussions](https://github.com/rogerluft/fazai-ng/discussions)**
 
