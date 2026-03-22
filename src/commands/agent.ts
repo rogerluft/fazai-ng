@@ -8,6 +8,7 @@ import ora from "ora";
 import { runAgenticLoop, runReflection, listAvailableScripts } from "../agentic/genai-runner.js";
 import { AgenticLoop, runAgenticQuery, BudgetAgenticLoop, runBudgetAgenticQuery } from "../agentic/agentic-loop.js";
 import { getSessionManager } from "../agentic/session-manager.js";
+import { getSkillRegistry, initSkillRegistry } from "../skills/registry.js";
 
 const HELP = `
 ${chalk.bold.cyan("fazai agent")} - Coração Agêntico do FazAI
@@ -24,6 +25,8 @@ ${chalk.bold("SUBCOMMANDS:")}
   ${chalk.green("scripts")}           Lista scripts GenAIScript disponíveis
   ${chalk.green("status")} [id]       Mostra status do sistema ou sessão específica
   ${chalk.green("sessions")}          Lista todas as sessões agênticas
+  ${chalk.green("skills")}            Lista skills/tools registrados
+  ${chalk.green("use")} <skill>       Executa um skill registrado
   ${chalk.green("pause")} <id>        Pausa uma sessão em execução
   ${chalk.green("resume")} <id>       Retoma uma sessão pausada
   ${chalk.green("kill")} <id>         Encerra uma sessão
@@ -32,6 +35,8 @@ ${chalk.bold("EXAMPLES:")}
   fazai agent loop "como otimizar embeddings locais no DL380"
   fazai agent budget "configure samba para compartilhamento" -i 20 --token-budget 100000
   fazai agent run "teste com GenAIScript" --model ollama:phi3
+  fazai agent skills
+  fazai agent use cleaner --mode analyze
   fazai agent sessions
   fazai agent pause <session-id>
   fazai agent status <session-id>
@@ -383,6 +388,64 @@ async function handleSessionStatus(sessionId: string): Promise<void> {
   console.log(manager.formatSession(session));
 }
 
+async function handleSkills(): Promise<void> {
+  const spinner = ora("Discovering skills...").start();
+
+  try {
+    const registry = await initSkillRegistry();
+    spinner.stop();
+
+    const count = registry.count();
+    console.log(chalk.bold(`\n=== Skills Registrados (${count}) ===\n`));
+    console.log(registry.formatSkillList());
+    console.log();
+  } catch (error) {
+    spinner.fail("Erro ao descobrir skills");
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+  }
+}
+
+async function handleUse(skillId: string, options: AgentOptions): Promise<void> {
+  if (!skillId) {
+    console.error(chalk.red("Erro: Skill ID é obrigatório"));
+    console.log("Uso: fazai agent use <skill-id> [--mode <mode>]");
+    return;
+  }
+
+  const spinner = ora(`Loading skill: ${skillId}...`).start();
+
+  try {
+    const registry = await initSkillRegistry();
+    const skill = registry.get(skillId);
+
+    if (!skill) {
+      spinner.fail(`Skill não encontrado: ${skillId}`);
+      console.log(chalk.dim(`Skills disponíveis: ${registry.list().map(s => s.id).join(", ")}`));
+      return;
+    }
+
+    spinner.text = `Executing: ${skill.name}...`;
+
+    const input: Record<string, unknown> = {};
+    if (options.model) input.model = options.model;
+    if (options.verbose) input.verbose = options.verbose;
+
+    const result = await registry.execute(skillId, input);
+    spinner.stop();
+
+    if (result.success) {
+      console.log(chalk.green(`\n✓ ${skill.name} concluído (${result.duration}ms)`));
+      if (result.output) console.log("\n" + result.output);
+    } else {
+      console.log(chalk.red(`\n✗ ${skill.name} falhou (${result.duration}ms)`));
+      if (result.error) console.log(chalk.red("Erro: " + result.error));
+    }
+  } catch (error) {
+    spinner.fail("Erro ao executar skill");
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+  }
+}
+
 export async function handleAgentCommand(args: string[]): Promise<void> {
   const { command, query, options } = parseArgs(args);
 
@@ -429,6 +492,14 @@ export async function handleAgentCommand(args: string[]): Promise<void> {
 
     case "kill":
       await handleKill(query);
+      break;
+
+    case "skills":
+      await handleSkills();
+      break;
+
+    case "use":
+      await handleUse(query, options);
       break;
 
     case "help":

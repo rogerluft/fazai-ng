@@ -574,6 +574,23 @@ export class SkillSeekerService {
       logger.error(`Failed to save registry: ${error.message}`);
     }
   }
+
+  /**
+   * Notify the SkillRegistry about newly indexed knowledge (Phase 3 bridge)
+   *
+   * When a new file is indexed, trigger skill auto-discovery
+   * so the SkillRegistry stays in sync with available knowledge.
+   */
+  async notifySkillRegistry(): Promise<void> {
+    try {
+      const { getSkillRegistry } = await import("../skills/registry.js");
+      const registry = getSkillRegistry();
+      await registry.discover();
+      logger.debug("[SkillSeeker] SkillRegistry re-scanned after index update");
+    } catch (error: any) {
+      logger.debug(`[SkillSeeker] SkillRegistry notification failed: ${error.message}`);
+    }
+  }
 }
 
 /**

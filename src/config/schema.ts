@@ -204,6 +204,10 @@ export const configSchema = z.object({
   AGENTIC_HEARTBEAT_INTERVAL: z.number().int().positive().optional(),
   AGENTIC_SESSION_PERSIST: booleanStringSchema.optional(),
 
+  // Skill Registry Settings
+  SKILL_REGISTRY_SCAN_INTERVAL: z.number().int().positive().optional(),
+  GENAISRC_DIR: z.string().optional(),
+
   // Other Settings
   WEB_HOST: z.string().optional(),
   WEB_PORT: z.number().int().positive().max(65535).optional(),
@@ -236,6 +240,7 @@ const NUMERIC_FIELDS = new Set([
   "AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES",
   "AGENTIC_CIRCUIT_BREAKER_COOLDOWN",
   "AGENTIC_HEARTBEAT_INTERVAL",
+  "SKILL_REGISTRY_SCAN_INTERVAL",
 ]);
 
 /**

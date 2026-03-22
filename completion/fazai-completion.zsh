@@ -173,13 +173,20 @@ _fazai() {
         agent)
             local -a agent_cmds
             agent_cmds=(
+                'budget:budget subcommand'
                 'help:help subcommand'
+                'kill:kill subcommand'
                 'loop:loop subcommand'
                 'native:native subcommand'
+                'pause:pause subcommand'
                 'reflect:reflect subcommand'
+                'resume:resume subcommand'
                 'run:run subcommand'
                 'scripts:scripts subcommand'
+                'sessions:sessions subcommand'
+                'skills:skills subcommand'
                 'status:status subcommand'
+                'use:use subcommand'
                 '--help:--help subcommand'
                 '-h:-h subcommand'
             )
