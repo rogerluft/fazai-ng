@@ -1,0 +1,39 @@
+[Unit]
+Description=FazAI Memory Freshness Injector
+Documentation=https://github.com/rogerluft/fazai-ng
+After=network.target qdrant.service
+Wants=qdrant.service
+
+[Service]
+Type=oneshot
+User=fazai
+Group=fazai
+WorkingDirectory=/opt/fazai
+
+ExecStartPre=/usr/bin/test -f /opt/fazai/dist/services/memory-injector-worker.js
+ExecStart=/usr/bin/node /opt/fazai/dist/services/memory-injector-worker.js --verbose
+
+# Environment
+Environment=NODE_ENV=production
+EnvironmentFile=-/etc/fazai/fazai.conf
+
+# Resource limits
+MemoryMax=4G
+MemoryHigh=2G
+CPUQuota=50%
+
+# Logging
+StandardOutput=append:/var/log/fazai/fazai-memory-injector.log
+StandardError=append:/var/log/fazai/fazai-memory-injector.log
+
+# Restart behavior — timer will re-trigger, no auto-restart
+Restart=no
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/log/fazai /opt/fazai/data
+
+[Install]
+WantedBy=multi-user.target

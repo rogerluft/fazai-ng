@@ -208,6 +208,12 @@ export const configSchema = z.object({
   SKILL_REGISTRY_SCAN_INTERVAL: z.number().int().positive().optional(),
   GENAISRC_DIR: z.string().optional(),
 
+  // Async Memory Freshness Injector (Phase 5)
+  ASYNC_MEMORY_INTERVAL: z.number().int().positive().optional(),
+  RAM_CACHE_LIMIT_GB: z.number().positive().optional(),
+  SQLITE_VECTOR_PATH: z.string().optional(),
+  LOG_PATH_MEMORY_INJECTOR: z.string().optional(),
+
   // Other Settings
   WEB_HOST: z.string().optional(),
   WEB_PORT: z.number().int().positive().max(65535).optional(),
@@ -241,6 +247,8 @@ const NUMERIC_FIELDS = new Set([
   "AGENTIC_CIRCUIT_BREAKER_COOLDOWN",
   "AGENTIC_HEARTBEAT_INTERVAL",
   "SKILL_REGISTRY_SCAN_INTERVAL",
+  "ASYNC_MEMORY_INTERVAL",
+  "RAM_CACHE_LIMIT_GB",
 ]);
 
 /**

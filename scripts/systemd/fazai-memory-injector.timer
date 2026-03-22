@@ -1,0 +1,21 @@
+[Unit]
+Description=FazAI Memory Freshness Injector Timer
+Documentation=https://github.com/rogerluft/fazai-ng
+
+[Timer]
+# Default: run every 24 hours
+# Override via: systemctl edit fazai-memory-injector.timer
+OnBootSec=5min
+OnUnitActiveSec=24h
+
+# Randomize delay to avoid thundering herd
+RandomizedDelaySec=30min
+
+# Persist timer across reboots
+Persistent=true
+
+# Accuracy for power savings (1 minute slack OK)
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

@@ -1,5 +1,129 @@
 # FazAI Changelog
 
+## [3.22.0] - 2026-03-21
+
+### 🚀 feat: Autonomous Agent Core — Phases 1-3 Complete
+
+Evolução do FazAI para agente autônomo com loop orçamentário, montagem inteligente
+de contexto e registro maduro de skills. **594 testes passando**, 12 skipped, 0 falhas.
+
+---
+
+#### Phase 1 — Budget-Based Agent Loop + Heartbeat
+
+**Novo módulo `BudgetAgenticLoop`** — loop agêntico evoluído com controle de orçamento,
+circuit breaker, heartbeat e persistência de sessão.
+
+##### Arquivos Criados
+- `src/agentic/agentic-loop.ts` — `BudgetAgenticLoop` (extends `AgenticLoop`)
+  - Budget tracking: `maxIterations` + `tokenBudget` configuráveis
+  - Circuit breaker: pausa após N falhas consecutivas (default: 3)
+  - Heartbeat: log + status Qdrant a cada 30s (configurável)
+  - Maestro Cleaner hook: invocado em circuit breaker e final de loop
+  - Exit reasons: `completed`, `budget_exhausted`, `circuit_breaker`, `timeout`, `killed`, `paused`
+- `src/agentic/session-manager.ts` — `SessionManager` CRUD
+  - State machine: `running → paused → running`, `running → completed/failed/killed`
+  - Persist sessões para Qdrant (`fazai_memory`) com embedding semântico
+  - Load/resume sessões após restart
+  - Heartbeat data logging
+- `src/commands/agent.ts` — CLI expandido:
+  - `fazai agent budget <query>` — loop com budget tracking
+  - `fazai agent sessions` — lista sessões ativas
+  - `fazai agent pause <id>` / `resume <id>` / `kill <id>`
+  - `fazai agent status <id>` — status detalhado de sessão
+
+##### Config (`fazai.conf`)
+```bash
+AGENTIC_MAX_ITERATIONS=5
+AGENTIC_TOKEN_BUDGET=50000
+AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES=3
+AGENTIC_CIRCUIT_BREAKER_COOLDOWN=30000
+AGENTIC_HEARTBEAT_INTERVAL=30000
+AGENTIC_SESSION_PERSIST=true
+```
+
+##### Testes
+- `tests/agentic-budget-loop.test.ts` — 30+ testes: SessionManager CRUD, state transitions,
+  budget exhaustion, circuit breaker, heartbeat, formatSession, singleton
+
+---
+
+#### Phase 2 — Intelligent Context Assembly
+
+**Novo módulo `ContextAssembler`** — montagem automática de contexto rico antes de cada
+chamada LLM, buscando personalidade, regras de segurança, RAG, memória e tarefa atual.
+
+##### Arquivos Criados
+- `src/context/context-assembler.ts` — `ContextAssembler`
+  - SemanticCache fast path (30 min TTL, threshold 0.95)
+  - `fazai_personality` top-1 (sempre incluído)
+  - `fazai_inference` top-3 (threshold 0.65 — safety rules)
+  - Combined RAG: `fazai_kb` + `fazai_learning` + `fazai_semantic_cache` + `fazai_memory`
+    → merge, sort by score, deduplicate by ID, top-5
+  - Recent history: `fazai_memory` top-12 (threshold 0.55)
+  - Token limit: 180k tokens com truncamento automático
+  - Output formatado com `## Section Headers`
+  - Graceful degradation: se Qdrant/embeddings falhar, retorna seções vazias
+
+##### Integração com Phase 1
+- `BudgetAgenticLoop.runWithBudget()` agora invoca `ContextAssembler.build()`
+  antes de cada iteração, enriquecendo a query com contexto RAG + personalidade
+
+---
+
+#### Phase 3 — Mature Skill/Tool Registry
+
+**Novo módulo `SkillRegistry`** — registro centralizado de skills/tools com
+auto-discovery, permissões, categorias e execução segura.
+
+##### Arquivos Criados
+- `src/skills/registry.ts` — `SkillRegistry`
+  - CRUD: `register()`, `unregister()`, `get()`, `has()`, `list()`, `execute()`
+  - Auto-discovery: `discover()` escaneia `genaisrc/*.genai.mjs`, extrai
+    `script({ title, description, model })` via regex (sem executar)
+  - PermissionLevel: `low`, `medium`, `high`, `critical`
+  - SkillCategory: `system`, `research`, `code`, `devops`, `analysis`, `custom`
+  - SkillSource: `builtin`, `genaisrc`, `runtime`
+  - JSON Schema input validation por skill
+  - Handler async com GenAIScript runner como backend
+  - `formatSkillList()` — output formatado com ícones por categoria/permissão
+  - `getSkillContext()` — contexto para assembly
+  - Singleton via `getSkillRegistry()` / `initSkillRegistry()`
+
+##### CLI Expandido (`src/commands/agent.ts`)
+- `fazai agent skills` — lista todos os skills registrados com auto-discovery
+- `fazai agent use <skill-id>` — executa skill por ID (`--model`, `--verbose`)
+
+##### Config
+```bash
+SKILL_REGISTRY_SCAN_INTERVAL=0   # Scan interval in seconds (0 = scan on demand)
+GENAISRC_DIR=genaisrc             # Directory for GenAIScript skills
+```
+
+##### Schema Validation (`src/config/schema.ts`)
+- Added: `AGENTIC_MAX_ITERATIONS`, `AGENTIC_TOKEN_BUDGET`,
+  `AGENTIC_CIRCUIT_BREAKER_*`, `AGENTIC_HEARTBEAT_INTERVAL`,
+  `AGENTIC_SESSION_PERSIST`, `SKILL_REGISTRY_SCAN_INTERVAL`, `GENAISRC_DIR`
+
+##### Testes
+- `tests/skill-registry.test.ts` — 16+ testes: register/unregister, CRUD, filtering
+  by category/permission/source, execute/error handling, context generation, formatting
+
+---
+
+#### Power Gains (Phases 1-3 Combined)
+
+| Before | After |
+|--------|-------|
+| Single-shot LLM call, no budget | Budget-aware loop with max iterations + token limit |
+| No context before LLM | Rich context: personality + safety + RAG + history + task |
+| Manual script discovery | Auto-discovery of GenAIScript skills from `genaisrc/` |
+| No session persistence | Sessions persist to Qdrant, resume after restart |
+| No circuit breaker | Auto-pause after N consecutive failures |
+| No heartbeat | Periodic heartbeat with metrics logging |
+
+---
+
 ## [3.21.0] - 2026-03-21
 
 ### 🚀 feat: Native fetch Anthropic + Brave Search + Test alignment

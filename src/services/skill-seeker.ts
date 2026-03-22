@@ -117,7 +117,12 @@ export class SkillSeekerService {
     }
 
     try {
-      // Ensure ingest directory exists
+      // Ensure INGEST_DIR exists synchronously before chokidar.watch
+      if (!fsSync.existsSync(INGEST_DIR)) {
+        fsSync.mkdirSync(INGEST_DIR, { recursive: true });
+      }
+
+      // Ensure ingest directory exists (async, for permissions etc.)
       await this.ensureIngestDirectory();
 
       // Verify Qdrant collection exists
@@ -137,32 +142,36 @@ export class SkillSeekerService {
         },
       });
 
-      // Watch for new files
-      this.watcher.on("add", async (filePath: string) => {
-        await this.handleNewFile(filePath);
-      });
+      if (this.watcher) {
+        // Watch for new files
+        this.watcher.on("add", async (filePath: string) => {
+          await this.handleNewFile(filePath);
+        });
 
-      // Watch for file changes
-      this.watcher.on("change", async (filePath: string) => {
-        await this.handleFileChange(filePath);
-      });
+        // Watch for file changes
+        this.watcher.on("change", async (filePath: string) => {
+          await this.handleFileChange(filePath);
+        });
 
-      // Watch for file deletions
-      this.watcher.on("unlink", async (filePath: string) => {
-        await this.handleFileDelete(filePath);
-      });
+        // Watch for file deletions
+        this.watcher.on("unlink", async (filePath: string) => {
+          await this.handleFileDelete(filePath);
+        });
 
-      // Error handling
-      this.watcher.on("error", (error: Error) => {
-        logger.error(`SkillSeeker watcher error: ${error.message}`);
-        this.stats.errors++;
-      });
+        // Error handling
+        this.watcher.on("error", (error: unknown) => {
+          const msg = error instanceof Error ? error.message : String(error);
+          logger.error(`SkillSeeker watcher error: ${msg}`);
+          this.stats.errors++;
+        });
+      }
 
       this.stats.isRunning = true;
       logger.info(`✓ SkillSeeker started monitoring: ${INGEST_DIR}`);
-    } catch (error: any) {
-      logger.error(`Failed to start SkillSeeker: ${error.message}`);
-      throw error;
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.error(`Failed to start SkillSeeker: ${msg}`);
+      // Do not throw — log and leave isRunning=false
     }
   }
 
@@ -384,6 +393,7 @@ export class SkillSeekerService {
       await this.saveRegistry();
 
       logger.info(`✓ Indexed ${filename} (${chunks.length} chunks)`);
+      await this.notifySkillRegistry();
     } catch (error: any) {
       logger.error(`Failed to process file ${filePath}: ${error.message}`);
       this.stats.errors++;
@@ -423,6 +433,7 @@ export class SkillSeekerService {
         await this.saveRegistry();
       }
 
+      await this.notifySkillRegistry();
       logger.info(`✓ Removed deleted file from index: ${filename}`);
     } catch (error: any) {
       logger.error(`Failed to remove deleted file ${filename}: ${error.message}`);
@@ -582,13 +593,18 @@ export class SkillSeekerService {
    * so the SkillRegistry stays in sync with available knowledge.
    */
   async notifySkillRegistry(): Promise<void> {
+    if (!this.stats.isRunning) {
+      logger.warn("[SkillSeeker] notifySkillRegistry called while not running — auto-starting");
+      await this.start();
+    }
     try {
       const { getSkillRegistry } = await import("../skills/registry.js");
       const registry = getSkillRegistry();
       await registry.discover();
       logger.debug("[SkillSeeker] SkillRegistry re-scanned after index update");
-    } catch (error: any) {
-      logger.debug(`[SkillSeeker] SkillRegistry notification failed: ${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      logger.debug(`[SkillSeeker] SkillRegistry notification failed: ${msg}`);
     }
   }
 }

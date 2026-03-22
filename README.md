@@ -3,29 +3,45 @@
 <div align="center">
 
 **Orquestração Multi-Agente para Administração de Sistemas Linux**
-*Multi-Provider LLM · RAG Local · ONNX Embeddings · Qdrant Vector Store · ECOA Architecture*
+*Autonomous Agent Core · Multi-Provider LLM · RAG Local · ONNX Embeddings · Qdrant Vector Store · ECOA Architecture*
 
-[![Version](https://img.shields.io/badge/version-3.21.0-blue.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-3.22.0-blue.svg)](CHANGELOG.md)
 [![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)](LICENSE)
 [![Node](https://img.shields.io/badge/node-%3E%3D18-brightgreen.svg)](https://nodejs.org)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://typescriptlang.org)
+[![Tests](https://img.shields.io/badge/tests-594%20passing-brightgreen.svg)](#testes)
 
 </div>
 
-<h3 align="center">Converte linguagem natural em comandos Linux seguros, com memória operacional, aprendizado contínuo, pesquisa web integrada e fallback multi-provider.</h3>
+<h3 align="center">Agente autônomo Linux com loop orçamentário persistente, montagem inteligente de contexto antes de cada chamada LLM, registro maduro de skills com auto-discovery, e fallback multi-provider.</h3>
 
 ---
 
-## O que h&aacute; de novo na v3.21
+## O que h&aacute; de novo na v3.22
 
-- **Native fetch para Anthropic** — removido curl e SDK externo, chamadas 100% via `fetchWithTimeout()`
-- **Brave Search** — novo provider de pesquisa web com fallback automático para DuckDuckGo
-- **Testes alinhados** — suíte de testes atualizada para arquitetura ONNX/BGE-base-en-v1.5
-- **Código limpo** — zero hardcodes, zero referências a protocolos internos
+- **Agent Loop com Budget** — loop agêntico com limites de iteração e tokens, circuit breaker, heartbeat e sessões persistentes
+- **Context Assembly** — montagem automática de contexto rico (personalidade + safety + RAG + histórico) antes de cada chamada LLM
+- **Skill Registry** — registro centralizado com auto-discovery de skills no `genaisrc/`, permissões e categorias
+- **CLI Agent expandido** — `fazai agent skills`, `fazai agent use <skill>`, `fazai agent budget`, `fazai agent sessions`
+- **594 testes passando** — cobertura de Phase 1 (budget loop), Phase 2 (context assembly), Phase 3 (skill registry)
+
+> **Próximo:** Phase 5 — Async Memory Freshness Injector (background worker + systemd timer para manter memórias Qdrant atualizadas)
 
 ---
 
 ## Features
+
+### Agente Autônomo (Phases 1-3)
+
+| Feature | Descrição |
+|---------|-----------|
+| **Budget Loop** | Loop agêntico com `maxIterations` + `tokenBudget` configuráveis via `fazai.conf` |
+| **Circuit Breaker** | Pausa automática após N falhas consecutivas (default: 3) |
+| **Heartbeat** | Log periódico de estado + métricas a cada 30s |
+| **Session Persistence** | Sessões salvas em Qdrant, resume após restart |
+| **Context Assembly** | Personalidade + safety rules + RAG (5 collections) + histórico + tarefa atual |
+| **Skill Registry** | Auto-discovery de `genaisrc/*.genai.mjs`, permissões por nível, categorias |
+| **Maestro Cleaner** | Invocado automaticamente no circuit breaker e final de loop |
 
 ### IA Multi-Provider (Config-Driven)
 
@@ -95,6 +111,7 @@ O instalador:
 - Cria configuracao interativa em `/etc/fazai/fazai.conf`
 - Instala Bash/Zsh completion automaticamente
 - Configura diretorios de sistema (`/etc/fazai`, `/var/log/fazai`, `/opt/fazai`)
+- Valida novos flags de configuracao (AGENTIC_*, SKILL_REGISTRY_*)
 
 ### Metodo 2: Build Local
 
@@ -156,6 +173,28 @@ fazai ask "Como configurar nginx como proxy reverso?"
 fazai ask "Melhores praticas para hardening SSH"
 ```
 
+### Agente Autônomo
+
+```bash
+# Loop com budget tracking
+fazai agent budget "configure samba para compartilhamento" -i 20 --token-budget 100000
+
+# Loop agêntico nativo
+fazai agent loop "como otimizar embeddings locais no DL380"
+
+# Skills
+fazai agent skills                          # Lista skills registrados (com auto-discovery)
+fazai agent use cleaner --mode analyze      # Executa um skill
+fazai agent use reflect                     # Executa reflexão autônoma
+
+# Sessões
+fazai agent sessions                        # Lista sessões ativas
+fazai agent status <session-id>             # Status detalhado
+fazai agent pause <session-id>              # Pausa sessão
+fazai agent resume <session-id>             # Retoma sessão
+fazai agent kill <session-id>               # Encerra sessão
+```
+
 ### Modo CLI Interativo
 
 ```bash
@@ -214,6 +253,17 @@ BRAVE_SEARCH_API_KEY=sua_chave_aqui
 OLLAMA_BASE_URL=http://localhost:11434
 OLLAMA_NUM_PREDICT=1024
 OLLAMA_TEMPERATURE=0.4
+
+# Agente Autônomo (Phase 1)
+AGENTIC_MAX_ITERATIONS=5
+AGENTIC_TOKEN_BUDGET=50000
+AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES=3
+AGENTIC_HEARTBEAT_INTERVAL=30000
+AGENTIC_SESSION_PERSIST=true
+
+# Skill Registry (Phase 3)
+SKILL_REGISTRY_SCAN_INTERVAL=0
+GENAISRC_DIR=genaisrc
 
 # Timeouts por provider (ms)
 TIMEOUT_OLLAMA=180000

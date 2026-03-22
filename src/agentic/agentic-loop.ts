@@ -767,9 +767,9 @@ export class BudgetAgenticLoop extends AgenticLoop {
       // Update session final state
       const finalState: SessionState =
         exitReason === "completed" ? "completed" :
-        exitReason === "killed" ? "killed" :
-        exitReason === "paused" ? "paused" :
-        "failed";
+          exitReason === "killed" ? "killed" :
+            exitReason === "paused" ? "paused" :
+              "failed";
 
       this.sessionManager.updateState(
         session.sessionId,

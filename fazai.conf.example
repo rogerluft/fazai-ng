@@ -338,3 +338,42 @@ WEB_PORT=3000
 # IMPORTANTE: Troque as credenciais padrao em producao!
 WEB_UI_USERNAME=admin
 WEB_UI_PASSWORD=fazai123
+
+# =============================================================================
+# AGENTIC LOOP (Phase 1-3)
+# =============================================================================
+
+# Budget-Based Agent Loop
+# AGENTIC_MAX_ITERATIONS=5
+# AGENTIC_TOKEN_BUDGET=50000
+# AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES=3
+# AGENTIC_CIRCUIT_BREAKER_COOLDOWN=30000
+# AGENTIC_HEARTBEAT_INTERVAL=30000
+# AGENTIC_SESSION_PERSIST=true
+
+# Skill Registry
+# SKILL_REGISTRY_SCAN_INTERVAL=0
+# GENAISRC_DIR=genaisrc
+
+# =============================================================================
+# ASYNC MEMORY FRESHNESS INJECTOR (Phase 5)
+# =============================================================================
+#
+# Background worker that scans recent logs and re-injects fresh memories
+# into Qdrant (fazai_memory + fazai_semantic_cache).
+#
+# Triggered by systemd timer or agent interaction.
+# Enable: sudo systemctl enable --now fazai-memory-injector.timer
+
+# Trigger interval in seconds (default: 86400 = 24 hours)
+# ASYNC_MEMORY_INTERVAL=86400
+
+# Max RAM for in-memory cache in GB (default: 200)
+# RAM_CACHE_LIMIT_GB=200
+
+# SQLite vector cache path (fast fresh lookup)
+# SQLITE_VECTOR_PATH=/opt/fazai/data/memory-vectors.sqlite
+
+# Log file for memory injector (appended)
+# LOG_PATH_MEMORY_INJECTOR=/var/log/fazai/fazai-memory-injector.log
+

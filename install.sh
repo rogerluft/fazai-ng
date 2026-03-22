@@ -24,7 +24,7 @@ CYAN='\033[0;36m'
 NC='\033[0m' # No Color
 
 # Configurações
-FAZAI_VERSION="3.10.1"
+FAZAI_VERSION="3.22.0"
 INSTALL_DIR="/opt/fazai"
 BIN_DIR="/usr/local/bin"
 REPO_URL="https://github.com/rogerluft/fazai-ng"
@@ -43,9 +43,9 @@ print_banner() {
 ║   ██║     ██║  ██║███████╗██║  ██║██║              ║
 ║   ╚═╝     ╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚═╝              ║
 ║                                                       ║
-║   Terminal FazAI v3.10.0                             ║
-║   Administrador Linux Senior + Redes                 ║
-║   GenAIScript Agentic Core + Dashboard               ║
+║   Terminal FazAI v3.22.0                             ║
+║   Autonomous Agent + Linux Admin + Redes             ║
+║   Budget Loop · Context Assembly · Skill Registry    ║
 ║                                                       ║
 ╚═══════════════════════════════════════════════════════╝
 EOF
@@ -233,6 +233,32 @@ setup_config_file() {
     else
         success "Configuração encontrada em /etc/fazai/fazai.conf"
     fi
+
+    # Seed Phase 1-3 config keys if missing (idempotent)
+    seed_config_key "AGENTIC_MAX_ITERATIONS" "5"
+    seed_config_key "AGENTIC_TOKEN_BUDGET" "50000"
+    seed_config_key "AGENTIC_CIRCUIT_BREAKER_MAX_FAILURES" "3"
+    seed_config_key "AGENTIC_CIRCUIT_BREAKER_COOLDOWN" "30000"
+    seed_config_key "AGENTIC_HEARTBEAT_INTERVAL" "30000"
+    seed_config_key "AGENTIC_SESSION_PERSIST" "true"
+    seed_config_key "SKILL_REGISTRY_SCAN_INTERVAL" "0"
+    # Phase 5 config keys
+    seed_config_key "ASYNC_MEMORY_INTERVAL" "86400"
+    seed_config_key "RAM_CACHE_LIMIT_GB" "200"
+    seed_config_key "SQLITE_VECTOR_PATH" "/opt/fazai/data/memory-vectors.sqlite"
+    seed_config_key "LOG_PATH_MEMORY_INJECTOR" "/var/log/fazai/fazai-memory-injector.log"
+}
+
+# Seed a config key into fazai.conf if not already present (idempotent, no overwrite)
+seed_config_key() {
+    local KEY="$1"
+    local DEFAULT_VALUE="$2"
+    local CONF_FILE="/etc/fazai/fazai.conf"
+
+    if ! grep -q "^${KEY}=" "$CONF_FILE" 2>/dev/null; then
+        echo "# ${KEY}=${DEFAULT_VALUE}" | sudo tee -a "$CONF_FILE" > /dev/null
+        info "Seeded config: ${KEY}=${DEFAULT_VALUE} (commented)"
+    fi
 }
 
 setup_log_directory() {
@@ -361,6 +387,47 @@ verify_service_permissions() {
     fi
 }
 
+# Setup systemd services/timers for Phase 5 memory injector
+setup_systemd_services() {
+    info "Configurando serviços systemd..."
+    local SYSTEMD_DIR="/etc/systemd/system"
+    local SRC_SYSTEMD="$INSTALL_DIR/scripts/systemd"
+
+    # Install memory injector service + timer if files exist
+    if [ -f "$SRC_SYSTEMD/fazai-memory-injector.service" ]; then
+        if [ ! -f "$SYSTEMD_DIR/fazai-memory-injector.service" ] || \
+           ! diff -q "$SRC_SYSTEMD/fazai-memory-injector.service" "$SYSTEMD_DIR/fazai-memory-injector.service" > /dev/null 2>&1; then
+            sudo cp "$SRC_SYSTEMD/fazai-memory-injector.service" "$SYSTEMD_DIR/"
+            success "Instalado: fazai-memory-injector.service"
+        else
+            info "fazai-memory-injector.service já atualizado"
+        fi
+    fi
+
+    if [ -f "$SRC_SYSTEMD/fazai-memory-injector.timer" ]; then
+        if [ ! -f "$SYSTEMD_DIR/fazai-memory-injector.timer" ] || \
+           ! diff -q "$SRC_SYSTEMD/fazai-memory-injector.timer" "$SYSTEMD_DIR/fazai-memory-injector.timer" > /dev/null 2>&1; then
+            sudo cp "$SRC_SYSTEMD/fazai-memory-injector.timer" "$SYSTEMD_DIR/"
+            success "Instalado: fazai-memory-injector.timer"
+        else
+            info "fazai-memory-injector.timer já atualizado"
+        fi
+    fi
+
+    # Install worker service if exists
+    if [ -f "$SRC_SYSTEMD/fazai-worker.service" ]; then
+        if [ ! -f "$SYSTEMD_DIR/fazai-worker.service" ] || \
+           ! diff -q "$SRC_SYSTEMD/fazai-worker.service" "$SYSTEMD_DIR/fazai-worker.service" > /dev/null 2>&1; then
+            sudo cp "$SRC_SYSTEMD/fazai-worker.service" "$SYSTEMD_DIR/"
+            success "Instalado: fazai-worker.service"
+        fi
+    fi
+
+    # Reload systemd daemon
+    sudo systemctl daemon-reload 2>/dev/null || true
+    info "systemd daemon reloaded"
+}
+
 # Main
 main() {
   print_banner
@@ -371,12 +438,14 @@ main() {
   install_deps_build
   create_bin_link
   setup_config_file
+  setup_systemd_services
   verify_service_permissions
 
   echo ""
-  success "Instalação concluída!"
+  success "Instalação concluída! (v${FAZAI_VERSION})"
   echo -e "Execute 'fazai' para começar."
   echo -e "Para iniciar o serviço: ${CYAN}sudo systemctl start fazai-worker${NC}"
+  echo -e "Para memory injector: ${CYAN}sudo systemctl enable --now fazai-memory-injector.timer${NC}"
 }
 
 main "$@"
