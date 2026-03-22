@@ -15,15 +15,18 @@
 
 <h3 align="center">Agente autônomo Linux com loop orçamentário persistente, montagem inteligente de contexto antes de cada chamada LLM, registro maduro de skills com auto-discovery, e fallback multi-provider.</h3>
 
----
+## O que h&aacute; de novo na v3.23 (Phase 4)
 
-## O que h&aacute; de novo na v3.22
+- **Claude-Import Converter** — cli subcommand `fazai agent claude-import` to ingest `.claude/SKILL.md` (YAML + Markdown) and auto-generate FazAI native `.genai.mjs` wrapper skills
+- **New Gateways (Telegram + Voice)** — `telegram-bot` skill connects the AgenticLoop to a lightweight polling bot, and `voice-stt` handles 100% local Whisper STT / gTTS TTS
+- **Dashboard API Routes** — dedicated routers for config (`/api/config`), system prompts CRUD (`/api/prompts`), and embedded terminal status (`/api/terminal`)
+
+## Principais Recursos Integrados (Phases 1-3)
 
 - **Agent Loop com Budget** — loop agêntico com limites de iteração e tokens, circuit breaker, heartbeat e sessões persistentes
 - **Context Assembly** — montagem automática de contexto rico (personalidade + safety + RAG + histórico) antes de cada chamada LLM
 - **Skill Registry** — registro centralizado com auto-discovery de skills no `genaisrc/`, permissões e categorias
 - **CLI Agent expandido** — `fazai agent skills`, `fazai agent use <skill>`, `fazai agent budget`, `fazai agent sessions`
-- **594 testes passando** — cobertura de Phase 1 (budget loop), Phase 2 (context assembly), Phase 3 (skill registry)
 
 > **Próximo:** Phase 5 — Async Memory Freshness Injector (background worker + systemd timer para manter memórias Qdrant atualizadas)
 

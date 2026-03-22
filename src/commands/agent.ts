@@ -30,6 +30,7 @@ ${chalk.bold("SUBCOMMANDS:")}
   ${chalk.green("pause")} <id>        Pausa uma sessão em execução
   ${chalk.green("resume")} <id>       Retoma uma sessão pausada
   ${chalk.green("kill")} <id>         Encerra uma sessão
+  ${chalk.green("claude-import")} <path> Importa uma skill do formato Claude (.claude/SKILL.md)
 
 ${chalk.bold("EXAMPLES:")}
   fazai agent loop "como otimizar embeddings locais no DL380"
@@ -37,6 +38,7 @@ ${chalk.bold("EXAMPLES:")}
   fazai agent run "teste com GenAIScript" --model ollama:phi3
   fazai agent skills
   fazai agent use cleaner --mode analyze
+  fazai agent claude-import ./meu-projeto
   fazai agent sessions
   fazai agent pause <session-id>
   fazai agent status <session-id>
@@ -446,6 +448,34 @@ async function handleUse(skillId: string, options: AgentOptions): Promise<void> 
   }
 }
 
+async function handleClaudeImport(pathArg: string): Promise<void> {
+  if (!pathArg) {
+    console.error(chalk.red("Erro: Caminho é obrigatório"));
+    console.log("Uso: fazai agent claude-import <path>");
+    return;
+  }
+
+  const spinner = ora(`Importing Claude skill from: ${pathArg}...`).start();
+
+  try {
+    const { claudeConverterSkill } = await import("../skills/claude-converter.js");
+    const result = await claudeConverterSkill.handler({ targetPath: pathArg });
+    
+    spinner.stop();
+
+    if (result.success) {
+      console.log(chalk.green("\n✓ Importação concluída!"));
+      console.log(result.output);
+    } else {
+      console.log(chalk.red("\n✗ Falha na importação"));
+      console.error(result.error);
+    }
+  } catch (error) {
+    spinner.fail("Erro fatal ao importar skill");
+    console.error(chalk.red(error instanceof Error ? error.message : String(error)));
+  }
+}
+
 export async function handleAgentCommand(args: string[]): Promise<void> {
   const { command, query, options } = parseArgs(args);
 
@@ -500,6 +530,10 @@ export async function handleAgentCommand(args: string[]): Promise<void> {
 
     case "use":
       await handleUse(query, options);
+      break;
+
+    case "claude-import":
+      await handleClaudeImport(query);
       break;
 
     case "help":

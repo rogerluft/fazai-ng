@@ -68,7 +68,7 @@ check_dependencies() {
     [ "$node_version" -lt 18 ] && missing_deps+=("Node.js 18+ (atual: $(node --version))")
   fi
   
-  for cmd in npm git curl; do
+  for cmd in npm git curl ttyd; do
     ! command -v $cmd &> /dev/null && missing_deps+=("$cmd")
   done
   
@@ -245,8 +245,13 @@ setup_config_file() {
     # Phase 5 config keys
     seed_config_key "ASYNC_MEMORY_INTERVAL" "86400"
     seed_config_key "RAM_CACHE_LIMIT_GB" "200"
-    seed_config_key "SQLITE_VECTOR_PATH" "/opt/fazai/data/memory-vectors.sqlite"
     seed_config_key "LOG_PATH_MEMORY_INJECTOR" "/var/log/fazai/fazai-memory-injector.log"
+    # Phase 4 keys
+    seed_config_key "TELEGRAM_BOT_TOKEN" ""
+    seed_config_key "TELEGRAM_ALLOWED_USERS" ""
+    seed_config_key "WHISPER_CPP_PATH" "/opt/whisper.cpp/main"
+    seed_config_key "WHISPER_MODEL_PATH" "/opt/whisper.cpp/models/ggml-base.bin"
+    seed_config_key "TTS_LANG" "pt-br"
 }
 
 # Seed a config key into fazai.conf if not already present (idempotent, no overwrite)

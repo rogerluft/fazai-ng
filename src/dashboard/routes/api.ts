@@ -11,6 +11,9 @@ import { searchRouter } from "./search";
 import { agentRouter } from "./agent";
 import { skillsRouter } from "./skills";
 import { sambaRouter } from "./samba";
+import { configRouter } from "./config";
+import { promptsRouter } from "./prompts";
+import { terminalRouter } from "./terminal";
 
 export const apiRouter = Router();
 
@@ -21,6 +24,9 @@ apiRouter.use("/search", searchRouter);
 apiRouter.use("/agent", agentRouter);
 apiRouter.use("/skills", skillsRouter);
 apiRouter.use("/samba", sambaRouter);
+apiRouter.use("/config", configRouter);
+apiRouter.use("/prompts", promptsRouter);
+apiRouter.use("/terminal", terminalRouter);
 
 // API info endpoint
 apiRouter.get("/", (req, res) => {
@@ -58,6 +64,22 @@ apiRouter.get("/", (req, res) => {
         "POST /api/samba/groups": "Create Samba group (info)",
         "POST /api/samba/restart": "Restart Samba services",
       },
+      config: {
+        "GET /api/config": "List configurable FazAI settings",
+        "PUT /api/config": "Update configurations directly to fazai.conf",
+      },
+      prompts: {
+        "GET /api/prompts": "List system prompts",
+        "GET /api/prompts/:id": "Get prompt content",
+        "POST /api/prompts": "Create new prompt",
+        "PUT /api/prompts/:id": "Update existing prompt",
+        "DELETE /api/prompts/:id": "Delete a prompt",
+      },
+      terminal: {
+        "GET /api/terminal/status": "Check ttyd status",
+        "GET /api/terminal/url": "Get iframe URL for ttyd",
+        "POST /api/terminal/start": "Try to start ttyd locally",
+      }
     },
   });
 });

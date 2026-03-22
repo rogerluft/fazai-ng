@@ -1,5 +1,30 @@
 # FazAI Changelog
 
+## [3.23.0] - 2026-03-22
+
+### 🚀 feat: Gateway-Ready Multi-Input + New Skills (Phase 4)
+
+Expandimos a arquitetura do FazAI introduzindo novos gateways de entrada físicos e virtuais, além de endpoints utilitários para a Web UI.
+
+#### 1. Claude-Import Converter Skill (`claude-import`)
+- Conversor automatizado que importa habilidades do formato Anthropic Claude (`.claude/SKILL.md`)
+- Analisa o frontmatter YAML (Name, Description, Model) e as instruções Markdown
+- Auto-gera um arquivo padrão GenAIScript em `genaisrc/`
+- Registra no `SkillRegistry` garantindo idempotência
+- CLI: `fazai agent claude-import <path>`
+
+#### 2. Novos Gateways (Telegram + Voz)
+- **Telegram Bot Skill**: Gateway leve de chat gerenciado pela IA (`node-telegram-bot-api`). Valida segurança via `TELEGRAM_ALLOWED_USERS` e roteia as mensagens direto para o `AgenticLoop`.
+- **Voice STT/TTS Skill**: Processamento de áudio 100% local com `whisper.cpp` (Speech-to-Text) e `gtts-cli` (Text-to-Speech).
+
+#### 3. Dashboard API Routes (Web UI)
+Servidor Node/Express expandido para habilitar o novo Web UI:
+- **Router de Config** (`/api/config`): Lista e edita o `/etc/fazai/fazai.conf` mascarando dinamicamente chaves sensíveis (API keys, Tokens).
+- **Router de Prompts** (`/api/prompts`): CRUD completo sobre templates armazenados em `system-prompts/`.
+- **Router de Terminal** (`/api/terminal`): Proxy e monitoramento do serviço `ttyd` (Terminal over HTTP) para expor shell direto no navegador via iframe.
+
+---
+
 ## [3.22.0] - 2026-03-21
 
 ### 🚀 feat: Autonomous Agent Core — Phases 1-3 Complete

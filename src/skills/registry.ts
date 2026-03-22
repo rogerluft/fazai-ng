@@ -531,11 +531,28 @@ export function getSkillRegistry(): SkillRegistry {
 }
 
 /**
- * Initialize registry: discover genaisrc/ skills
+ * Initialize registry: discover genaisrc/ skills and register native runtime skills
  * Call once at startup.
  */
 export async function initSkillRegistry(): Promise<SkillRegistry> {
   const registry = getSkillRegistry();
+  
+  // 1. Discover file-based GenAIScripts
   await registry.discover();
+  
+  // 2. Register native runtime skills safely (dynamic import or direct require)
+  try {
+    const { claudeConverterSkill } = await import("./claude-converter.js");
+    registry.register(claudeConverterSkill);
+    
+    const { telegramBotSkill } = await import("./telegram-bot.js");
+    registry.register(telegramBotSkill);
+    
+    const { voiceSttSkill } = await import("./voice-stt.js");
+    registry.register(voiceSttSkill);
+  } catch (err: any) {
+    logger.warn(`[SkillRegistry] Failed to register some native skills: ${err.message}`);
+  }
+
   return registry;
 }
