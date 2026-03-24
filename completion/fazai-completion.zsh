@@ -174,6 +174,7 @@ _fazai() {
             local -a agent_cmds
             agent_cmds=(
                 'budget:budget subcommand'
+                'claude-import:claude-import subcommand'
                 'help:help subcommand'
                 'kill:kill subcommand'
                 'loop:loop subcommand'

@@ -74,7 +74,7 @@ _fazai_completion() {
             return 0
             ;;
         agent)
-            local subcmds="budget help kill loop native pause reflect resume run scripts sessions skills status use --help -h"
+            local subcmds="budget claude-import help kill loop native pause reflect resume run scripts sessions skills status use --help -h"
             COMPREPLY=( $(compgen -W "${subcmds}" -- ${cur}) )
             return 0
             ;;

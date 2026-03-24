@@ -1,5 +1,52 @@
 # FazAI Changelog
 
+## [3.24.0] - 2026-03-24
+
+### 🐛 fix: MenoPauseFix v2 — Critical Bug Fixes Before Phase 6
+
+Sessão de correções urgentes para estabilizar o sistema antes do Phase 6.
+
+#### 1. Personality Loading — Campo Mismatch Resolvido
+**Root cause:** `personality-loader.ts` esperava campos `trait_name`/`category`/`value` que **nunca existiram** nos payloads reais. O `personality-ingestor.ts` armazena `type`/`source_file`/`style`/`emotional_layer`/`ressonancia`.
+
+**Fix:** Reescrita completa do mapper em `personality-loader.ts` com suporte dual-schema:
+- Schema legacy (`trait_name`/`category`/`value`) — backward compatible
+- Schema ingerido (`type`/`style`/`emotional_layer`/`ressonancia`/`metadata`) — real data
+- `mapTypeToCategory()`: dialogue→style, fact→expertise, technical_context→domain
+- `extractTraitName()`: extrai nomes legíveis de metadata ou conteúdo
+- `payloadToTrait()`: converte qualquer schema para `PersonalityTrait`
+
+#### 2. ONNX Thread Safety — Prevenção de Core Dump
+**Root cause:** Chamadas concorrentes a `ensureInit()` podiam disparar múltiplas inicializações do ONNX runtime. Se a primeira falhava, a promise ficava travada permanentemente.
+
+**Fix:** Adicionado reset de `initPromise` no `.catch()`:
+- `src/services/embeddings.ts`: `ONNXEmbeddingService.ensureInit()`
+- `src/services/universal-embedder.ts`: `UniversalLocalEmbedder.ensureInit()`
+- Se init falhar, limpa `initPromise` para permitir retry
+
+#### 3. CLI Exit Handler — Hang no Ctrl+D Resolvido
+**Root cause:** Quando `isInteractive === true` e `shouldExit === false`, o handler silenciosamente não fazia nada — o processo ficava pendurado.
+
+**Fix:** Removida condição desnecessária. Agora `rl.on('close')` sempre:
+- Limpa o `inactivityTimeout`
+- Exibe "Até breve!"
+- Chama `process.exit(0)`
+
+#### 4. Version Sync
+- `package.json` atualizado de 3.21.0 para 3.24.0 (sync com CHANGELOG)
+
+#### Arquivos Modificados
+| Arquivo | Mudança |
+|---------|---------|
+| `src/services/personality-loader.ts` | Reescrita completa do mapper (dual-schema) |
+| `src/services/embeddings.ts` | Init lock com error reset |
+| `src/services/universal-embedder.ts` | Init lock com error reset |
+| `src/cli-mode.ts` | Close handler fix (Ctrl+D) |
+| `package.json` | Version bump 3.21.0 → 3.24.0 |
+| `CHANGELOG.md` | Esta entrada |
+
+---
+
 ## [3.23.0] - 2026-03-22
 
 ### 🚀 feat: Gateway-Ready Multi-Input + New Skills (Phase 4)

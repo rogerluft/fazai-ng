@@ -56,7 +56,11 @@ class ONNXEmbeddingService implements EmbeddingService {
   private async ensureInit(): Promise<void> {
     if (this.embedder.isReady) return;
     if (!this.initPromise) {
-      this.initPromise = this.embedder.init();
+      // MenoPauseFix: reset promise on failure so retries are possible
+      this.initPromise = this.embedder.init().catch((err) => {
+        this.initPromise = null;
+        throw err;
+      });
     }
     return this.initPromise;
   }

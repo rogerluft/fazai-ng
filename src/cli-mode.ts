@@ -286,17 +286,17 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
   const timeoutMs = getCliInactivityTimeout();
 
   const resetInactivityTimeout = () => {
-      if (inactivityTimeout) {
-          clearTimeout(inactivityTimeout);
-      }
+    if (inactivityTimeout) {
+      clearTimeout(inactivityTimeout);
+    }
 
-      // Only set timeout if running interactively
-      if (process.stdin.isTTY) {
-        inactivityTimeout = setTimeout(() => {
-            logger.info(chalk.yellow(`\nInatividade detectada (${timeoutMs}ms), encerrando a sessão.`));
-            rl.close();
-        }, timeoutMs);
-      }
+    // Only set timeout if running interactively
+    if (process.stdin.isTTY) {
+      inactivityTimeout = setTimeout(() => {
+        logger.info(chalk.yellow(`\nInatividade detectada (${timeoutMs}ms), encerrando a sessão.`));
+        rl.close();
+      }, timeoutMs);
+    }
   };
 
   resetInactivityTimeout();
@@ -550,7 +550,7 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
         } else {
           logger.warn(chalk.yellow(`⚠️  Busca não retornou resultados.`));
           if (result.error) {
-             logger.error(chalk.red(`\n❌ Motivo: ${result.error}`));
+            logger.error(chalk.red(`\n❌ Motivo: ${result.error}`));
           }
         }
       } catch (error: unknown) {
@@ -763,8 +763,6 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
 
   rl.on("close", () => {
     logger.debug("[ETAPA] readline.on('close'): Encerrando sessão CLI");
-    // Detect if running interactively or from pipe
-    const isInteractive = process.stdin.isTTY;
 
     if (pendingOperations > 0) {
       shouldExit = true;
@@ -773,11 +771,9 @@ export async function runCliMode(semanticSearchEnabled: boolean = false): Promis
       return;
     }
 
-    // Only show exit message and exit when explicitly closed (interactive /exit)
-    // or when pipe completes with no pending operations
-    if (!isInteractive || shouldExit) {
-      logger.info(chalk.green("\nAté breve!"));
-      process.exit(0);
-    }
+    // MenoPauseFix: always exit cleanly when close is triggered (Ctrl+D, /exit, EOF)
+    if (inactivityTimeout) clearTimeout(inactivityTimeout);
+    logger.info(chalk.green("\nAté breve!"));
+    process.exit(0);
   });
 }

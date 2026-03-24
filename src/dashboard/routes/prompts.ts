@@ -30,7 +30,7 @@ promptsRouter.get("/", async (req: Request, res: Response) => {
   try {
     const files = await fs.readdir(PROMPTS_DIR);
     const prompts = files.filter(f => f.endsWith(".md") || f.endsWith(".txt"));
-    
+
     res.json({
       success: true,
       data: prompts
@@ -54,9 +54,9 @@ promptsRouter.get("/:id", async (req: Request, res: Response) => {
     // Basic path traversal prevention
     const safeId = path.basename(id);
     const promptPath = path.join(PROMPTS_DIR, safeId);
-    
+
     const content = await fs.readFile(promptPath, "utf-8");
-    
+
     res.json({
       success: true,
       data: {
@@ -79,14 +79,14 @@ promptsRouter.get("/:id", async (req: Request, res: Response) => {
 promptsRouter.post("/", async (req: Request, res: Response) => {
   try {
     const { id, content } = req.body;
-    
+
     if (!id || !content) {
       return res.status(400).json({ success: false, error: "Missing id or content" });
     }
 
     const safeId = path.basename(id) + (id.includes(".") ? "" : ".md");
     const promptPath = path.join(PROMPTS_DIR, safeId);
-    
+
     const exists = await fs.stat(promptPath).catch(() => null);
     if (exists) {
       return res.status(409).json({ success: false, error: "Prompt already exists" });
@@ -94,7 +94,7 @@ promptsRouter.post("/", async (req: Request, res: Response) => {
 
     await fs.writeFile(promptPath, content, "utf-8");
     logger.info(`[Dashboard] Created prompt: ${safeId}`);
-    
+
     res.json({
       success: true,
       data: { id: safeId }
@@ -112,17 +112,17 @@ promptsRouter.put("/:id", async (req: Request, res: Response) => {
   try {
     const id = req.params.id;
     const { content } = req.body;
-    
+
     if (content === undefined) {
       return res.status(400).json({ success: false, error: "Missing content" });
     }
 
     const safeId = path.basename(id);
     const promptPath = path.join(PROMPTS_DIR, safeId);
-    
+
     await fs.writeFile(promptPath, content, "utf-8");
     logger.info(`[Dashboard] Updated prompt: ${safeId}`);
-    
+
     res.json({
       success: true,
       message: "Updated successfully"
@@ -141,10 +141,10 @@ promptsRouter.delete("/:id", async (req: Request, res: Response) => {
     const id = req.params.id;
     const safeId = path.basename(id);
     const promptPath = path.join(PROMPTS_DIR, safeId);
-    
+
     await fs.unlink(promptPath);
     logger.info(`[Dashboard] Deleted prompt: ${safeId}`);
-    
+
     res.json({
       success: true,
       message: "Deleted successfully"
